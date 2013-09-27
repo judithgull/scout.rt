@@ -726,6 +726,10 @@ public class SimpleXmlElement {
     return buf.toString();
   }
 
+  public void writeContent(Writer w) throws IOException {
+    writeDocumentImpl(w, null, null, false);
+  }
+
   public void writeDocument(Writer w, String dtdName, String encoding) throws IOException {
     writeDocumentImpl(w, dtdName, encoding);
   }
@@ -740,12 +744,18 @@ public class SimpleXmlElement {
   }
 
   protected void writeDocumentImpl(Writer w, String dtdName, String encoding) throws IOException {
+    writeDocumentImpl(w, dtdName, encoding, true);
+  }
+
+  protected void writeDocumentImpl(Writer w, String dtdName, String encoding, boolean writeEncodingInfo) throws IOException {
     try {
-      if (encoding != null) {
-        w.write("<?xml version=\"1.0\" encoding=\"" + encoding + "\"?>\n");
-      }
-      else {
-        w.write("<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n");
+      if (writeEncodingInfo) {
+        if (encoding != null) {
+          w.write("<?xml version=\"1.0\" encoding=\"" + encoding + "\"?>\n");
+        }
+        else {
+          w.write("<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n");
+        }
       }
       if (dtdName != null) {
         w.write("<!DOCTYPE app SYSTEM \"" + dtdName + "\">\n");

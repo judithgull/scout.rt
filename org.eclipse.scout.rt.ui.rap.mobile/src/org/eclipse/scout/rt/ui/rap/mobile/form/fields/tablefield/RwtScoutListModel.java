@@ -20,6 +20,8 @@ import org.eclipse.jface.viewers.LabelProviderChangedEvent;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.rap.rwt.RWT;
 import org.eclipse.scout.commons.StringUtility;
+import org.eclipse.scout.commons.validation.BlacklistMarkupValidator;
+import org.eclipse.scout.commons.validation.IMarkupValidator;
 import org.eclipse.scout.rt.client.ui.basic.cell.ICell;
 import org.eclipse.scout.rt.client.ui.basic.table.ITable;
 import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
@@ -28,7 +30,9 @@ import org.eclipse.scout.rt.ui.rap.basic.table.RwtScoutTableEvent;
 import org.eclipse.scout.rt.ui.rap.html.HtmlAdapter;
 import org.eclipse.scout.rt.ui.rap.util.HtmlTextUtility;
 import org.eclipse.swt.graphics.Image;
+import org.eclipse.swt.internal.widgets.MarkupValidator;
 
+@SuppressWarnings("restriction")
 public class RwtScoutListModel implements IRwtScoutListModel {
   private static final long serialVersionUID = 1L;
 
@@ -43,10 +47,12 @@ public class RwtScoutListModel implements IRwtScoutListModel {
   private final ITable m_scoutTable;
   private final RwtScoutList m_uiList;
   private boolean m_multiline;
+  private final IMarkupValidator m_markupValidator;
 
   public RwtScoutListModel(ITable scoutTable, RwtScoutList uiTable) {
     m_scoutTable = scoutTable;
     m_uiList = uiTable;
+    m_markupValidator = new BlacklistMarkupValidator();
   }
 
   @Override
@@ -191,6 +197,22 @@ public class RwtScoutListModel implements IRwtScoutListModel {
       if (markupEnabled || multiline) {
         text = HtmlTextUtility.transformPlainTextToHtml(text);
       }
+    }
+
+    text = validateText(text);
+    return text;
+  }
+
+  protected String validateText(String text) {
+    boolean markupValidationDisabled = Boolean.TRUE.equals(getUiList().getUiField().getData(MarkupValidator.MARKUP_VALIDATION_DISABLED));
+    boolean markupEnabled = Boolean.TRUE.equals(getUiList().getUiField().getData(RWT.MARKUP_ENABLED));
+    boolean isHtmlMarkupText = HtmlTextUtility.isTextWithHtmlMarkup(text);
+
+    if (markupValidationDisabled && markupEnabled && isHtmlMarkupText) {
+      System.out.println("markupValidationDisabled: " + markupValidationDisabled + ", markup enabled: " + markupEnabled + ", isHtmlMarkupText: " + isHtmlMarkupText);
+      System.out.println("before validation: " + text);
+      text = m_markupValidator.validate(text);
+      System.out.println("after validation: " + text);
     }
     return text;
   }
