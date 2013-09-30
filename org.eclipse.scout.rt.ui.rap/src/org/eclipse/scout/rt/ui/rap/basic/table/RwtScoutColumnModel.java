@@ -26,8 +26,6 @@ import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.internal.widgets.MarkupValidator;
 import org.eclipse.swt.widgets.Display;
-import org.jsoup.Jsoup;
-import org.jsoup.safety.Whitelist;
 
 @SuppressWarnings("restriction")
 public class RwtScoutColumnModel extends ColumnLabelProvider {
@@ -120,15 +118,11 @@ public class RwtScoutColumnModel extends ColumnLabelProvider {
     boolean markupEnabled = Boolean.TRUE.equals(getUiTable().getUiField().getData(RWT.MARKUP_ENABLED));
     boolean isHtmlMarkupText = HtmlTextUtility.isTextWithHtmlMarkup(text);
 
-//    if (markupValidationDisabled && markupEnabled && isHtmlMarkupText) {
-//      System.out.println("markupValidationDisabled: " + markupValidationDisabled + ", markup enabled: " + markupEnabled + ", isHtmlMarkupText: " + isHtmlMarkupText);
-//      System.out.println("before validation: " + text);
-//      text = m_markupValidator.validate(text);
-//      System.out.println("after validation: " + text);
-//    }
-
     if (markupValidationDisabled && markupEnabled && isHtmlMarkupText) {
-      text = Jsoup.clean(text, Whitelist.relaxed());
+      System.out.println("markupValidationDisabled: " + markupValidationDisabled + ", markup enabled: " + markupEnabled + ", isHtmlMarkupText: " + isHtmlMarkupText);
+      System.out.println("before validation: " + text);
+      text = m_markupValidator.validate(text);
+      System.out.println("after validation: " + text);
     }
 
     return text;

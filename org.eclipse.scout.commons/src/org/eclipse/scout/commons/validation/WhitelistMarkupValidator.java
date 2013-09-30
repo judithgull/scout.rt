@@ -17,6 +17,7 @@ import java.util.Map.Entry;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
 import org.jsoup.safety.Cleaner;
 import org.jsoup.safety.Whitelist;
 
@@ -56,9 +57,15 @@ public class WhitelistMarkupValidator implements IMarkupValidator {
   @Override
   public String validate(String text) {
     Document htmlDoc = Jsoup.parse(text);
+
+    for (Element e : htmlDoc.getElementsByTag("p")) {
+      System.out.println("element tag name: " + e.tagName() + ", has children: " + e.children().size() + ", val " + e.ownText());
+
+    }
+
+//    System.out.println("html element: " + htmlDoc.children());
     Document validatedHtmlDoc = m_cleaner.clean(htmlDoc);
 
     return validatedHtmlDoc.html();
   }
-
 }

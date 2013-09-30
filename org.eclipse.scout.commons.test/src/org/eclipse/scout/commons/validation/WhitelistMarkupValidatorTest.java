@@ -73,7 +73,7 @@ public class WhitelistMarkupValidatorTest {
   @Test
   public void testValidate() {
     WhitelistMarkupValidator validator = new WhitelistMarkupValidator();
-    String validatedInput = validator.validate(INPUT);
+    String validatedInput = validator.validate(INPUT2);
 
     System.out.println("validatedInput:\n " + validatedInput.toString());
 

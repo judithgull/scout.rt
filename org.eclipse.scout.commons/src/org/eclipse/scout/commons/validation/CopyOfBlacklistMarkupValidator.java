@@ -10,6 +10,8 @@
  ******************************************************************************/
 package org.eclipse.scout.commons.validation;
 
+import java.io.IOException;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -17,22 +19,20 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Pattern;
 
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Attribute;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
+import org.eclipse.scout.commons.xmlparser.SimpleXmlElement;
 
 /**
  * @since 3.10.0-M2
  */
-public class BlacklistMarkupValidator extends AbstractMarkupValidator {
-  private static final IScoutLogger LOG = ScoutLogManager.getLogger(BlacklistMarkupValidator.class);
+public class CopyOfBlacklistMarkupValidator extends AbstractMarkupValidator {
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(CopyOfBlacklistMarkupValidator.class);
 
   protected static final String ALL_ATTRIBUTES = "ALL_ATTRIBUTES";
   protected static final String[] BLACKLISTED_ELEMENTS = new String[]{"script", "iframe", "object", "embed"};
@@ -122,46 +122,45 @@ public class BlacklistMarkupValidator extends AbstractMarkupValidator {
       return text;
     }
 
-    Document doc = convertToHtmlDoc(text);
-    Element root = doc.getElementsByTag("html").first();
+    SimpleXmlElement xml = convertToXml(text);
+    SimpleXmlElement root = xml.getRoot();
     if (isForbiddenElement(root)) {
       return "";
     }
 
     validateChildElements(root);
 
-//    String validatedText = "";
-//    try {
-//      doc.toString();
-//
-//
-//      StringWriter writer = new StringWriter();
-//      xml.writeContent(writer); // writer will be closed in the writeContent method
-//      validatedText = writer.toString();
-//    }
-//    catch (IOException e) {
-//      LOG.warn("Could not write content of " + xml.toString());
-//    }
-    return doc.toString();
+    String validatedText = "";
+    try {
+      StringWriter writer = new StringWriter();
+      xml.writeContent(writer); // writer will be closed in the writeContent method
+      validatedText = writer.toString();
+    }
+    catch (IOException e) {
+      LOG.warn("Could not write content of " + xml.toString());
+    }
+    return validatedText;
   }
 
-  private Document convertToHtmlDoc(String text) {
-    return Jsoup.parse(text);
+  private SimpleXmlElement convertToXml(String text) {
+    SimpleXmlElement xml = new SimpleXmlElement();
+    xml.parseString(text);
+    return xml;
   }
 
-  private boolean isForbiddenElement(Element element) {
-    return FORBIDDEN_ELEMENTS.contains(element.tagName().toLowerCase());
+  private boolean isForbiddenElement(SimpleXmlElement element) {
+    return FORBIDDEN_ELEMENTS.contains(element.getName().toLowerCase());
   }
 
-  protected void validateChildElements(Element element) {
-    for (Element childElement : element.children()) {
+  protected void validateChildElements(SimpleXmlElement element) {
+    for (SimpleXmlElement childElement : element.getChildren()) {
       validateElement(childElement, element);
     }
   }
 
-  protected void validateElement(Element element, Element parent) {
-    if (FORBIDDEN_ELEMENTS.contains(element.tagName().toLowerCase())) {
-      element.remove();
+  protected void validateElement(SimpleXmlElement element, SimpleXmlElement parent) {
+    if (FORBIDDEN_ELEMENTS.contains(element.getName())) {
+      parent.removeChild(element);
       return;
     }
 
@@ -169,23 +168,23 @@ public class BlacklistMarkupValidator extends AbstractMarkupValidator {
     validateChildElements(element);
   }
 
-  protected void validateAttributes(Element element) {
-    Iterator<Attribute> iterator = element.attributes().iterator();
-    while (iterator.hasNext()) {
-      Attribute attribute = iterator.next();
+  protected void validateAttributes(SimpleXmlElement element) {
+    Iterator<Entry<String, String>> attributeIterator = element.getAttributes().entrySet().iterator();
+    while (attributeIterator.hasNext()) {
+      Entry<String, String> attributeEntry = attributeIterator.next();
 
-      String attributeName = attribute.getKey();
-      String attributeValue = attribute.getValue();
+      String attributeName = attributeEntry.getKey();
+      String attributeValue = attributeEntry.getValue();
 
       if (isForbiddenAttributeName(attributeName)) {
         LOG.info("Removed attribute " + attributeName + " from element " + element.toString());
-        element.removeAttr(attributeName);
+        element.removeAttribute(attributeName);
         continue;
       }
 
       if (isForbiddenAttributeValue(attributeValue, attributeName)) {
         LOG.info("Removed attribute value " + attributeValue + " of attribute " + attributeName + " from element " + element.toString());
-        element.removeAttr(attributeName);
+        element.removeAttribute(attributeName);
       }
     }
   }

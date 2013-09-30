@@ -10,8 +10,6 @@
  ******************************************************************************/
 package org.eclipse.scout.commons.validation;
 
-import org.jsoup.Jsoup;
-import org.jsoup.safety.Whitelist;
 import org.junit.Test;
 
 /**
@@ -74,10 +72,10 @@ public class BlacklistMarkupValidatorTest {
 
   @Test
   public void testValidate() {
-//    BlacklistMarkupValidator validator = new BlacklistMarkupValidator();
-//    String validatedInput = validator.validate(INPUT2);
+    BlacklistMarkupValidator validator = new BlacklistMarkupValidator();
+    String validatedInput = validator.validate(INPUT);
 
-    String validatedInput = Jsoup.clean(INPUT, Whitelist.relaxed());
+//    String validatedInput = Jsoup.clean(INPUT, Whitelist.relaxed());
 
     System.out.println("validatedInput:\n " + validatedInput.toString());
   }
