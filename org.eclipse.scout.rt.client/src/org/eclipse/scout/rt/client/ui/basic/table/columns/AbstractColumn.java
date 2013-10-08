@@ -80,6 +80,8 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
   private boolean m_initialSortAscending;
   private boolean m_initialAlwaysIncludeSortAtBegin;
   private boolean m_initialAlwaysIncludeSortAtEnd;
+  private boolean m_hasHtmlMarkup;
+
   /**
    * Used for mutable tables to keep last valid value per row and column.
    */
@@ -471,6 +473,20 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
   }
 
   /**
+   * Configures whether the value of this column contains HTML markup. If set to true, the HTML tags will be
+   * interpreted. Otherwise, all HTML tags will be escaped.
+   * <p>
+   * Subclasses can override this method. Default is {@code false}.
+   * 
+   * @return {@code true} if this column value contains HTML markup, {@code false} otherwise.
+   */
+  @ConfigProperty(ConfigProperty.BOOLEAN)
+  @Order(220)
+  protected boolean getConfiguredHtmlMarkup() {
+    return false;
+  }
+
+  /**
    * Called after this column has been added to the column set of the surrounding table. This method may execute
    * additional initialization for this column (e.g. register listeners).
    * <p>
@@ -731,6 +747,7 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
     if (getConfiguredFont() != null) {
       setFont(FontSpec.parse(getConfiguredFont()));
     }
+    setHtmlMarkup(getConfiguredHtmlMarkup());
   }
 
   /*
@@ -1495,6 +1512,16 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
   @Override
   public void setAutoOptimizeWidth(boolean optimize) {
     propertySupport.setPropertyBool(PROP_AUTO_OPTIMIZE_WIDTH, optimize);
+  }
+
+  @Override
+  public boolean hasHtmlMarkup() {
+    return m_hasHtmlMarkup;
+  }
+
+  @Override
+  public void setHtmlMarkup(boolean hasHtmlMarkup) {
+    m_hasHtmlMarkup = hasHtmlMarkup;
   }
 
   @Override

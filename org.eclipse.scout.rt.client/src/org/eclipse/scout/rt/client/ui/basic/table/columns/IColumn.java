@@ -410,7 +410,11 @@ public interface IColumn<T> extends IPropertyObserver {
   void setAutoOptimizeWidth(boolean optimize);
 
   boolean isMandatory();
-  
+
   void setMandatory(boolean mandatory);
+
+  boolean hasHtmlMarkup();
+
+  void setHtmlMarkup(boolean hasHtmlMarkup);
 
 }

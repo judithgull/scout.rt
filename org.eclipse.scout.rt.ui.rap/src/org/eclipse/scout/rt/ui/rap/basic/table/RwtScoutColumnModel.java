@@ -107,13 +107,14 @@ public class RwtScoutColumnModel extends ColumnLabelProvider {
         // validate here
       }
     }
-
-    text = validateColumnText(text);
+    text = validateColumnText(text, columnIndex);
 
     return text;
   }
 
-  protected String validateColumnText(String text) {
+  protected String validateColumnText(String text, int columnIndex) {
+    IColumn<?> col = m_columnManager.getColumnByModelIndex(columnIndex - 1);
+
     boolean markupValidationDisabled = Boolean.TRUE.equals(getUiTable().getUiField().getData(MarkupValidator.MARKUP_VALIDATION_DISABLED));
     boolean markupEnabled = Boolean.TRUE.equals(getUiTable().getUiField().getData(RWT.MARKUP_ENABLED));
     boolean isHtmlMarkupText = HtmlTextUtility.isTextWithHtmlMarkup(text);
