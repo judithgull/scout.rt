@@ -19,6 +19,7 @@ import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 import org.eclipse.scout.rt.client.ui.basic.cell.Cell;
 import org.eclipse.scout.rt.client.ui.basic.cell.ICell;
 import org.eclipse.scout.rt.client.ui.basic.cell.ICellObserver;
+import org.eclipse.scout.rt.shared.validate.markup.IMarkupList;
 
 public class VirtualTreeNode implements IVirtualTreeNode, ICellObserver {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(VirtualTreeNode.class);
@@ -473,4 +474,16 @@ public class VirtualTreeNode implements IVirtualTreeNode, ICellObserver {
     return value;
   }
 
+  @Override
+  public boolean hasHtmlMarkup() {
+    return false;
+  }
+
+  @Override
+  public void setHtmlMarkup(boolean hasHtmlMarkup) {
+  }
+
+  @Override
+  public void extendMarkupList(IMarkupList markupList) {
+  }
 }

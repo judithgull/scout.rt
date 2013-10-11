@@ -17,7 +17,8 @@ Require-Bundle: org.eclipse.core.runtime;bundle-version="[3.4.0,4.0.0)";visibili
  org.eclipse.scout.rt.client;bundle-version="[3.10.0,3.11.0)";visibility:=reexport,
  org.jsoup;bundle-version="1.7.2"
 Import-Package: javax.servlet;version="[2.5.0,4.0.0)",
- javax.servlet.http;version="[2.5.0,4.0.0)"
+ javax.servlet.http;version="[2.5.0,4.0.0)",
+ org.apache.commons.lang;version="2.6.0"
 Export-Package: org.eclipse.scout.rt.ui.rap,
  org.eclipse.scout.rt.ui.rap.action,
  org.eclipse.scout.rt.ui.rap.basic,

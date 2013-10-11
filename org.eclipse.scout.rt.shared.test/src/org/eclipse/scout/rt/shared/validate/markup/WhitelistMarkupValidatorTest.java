@@ -8,12 +8,13 @@
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
-package org.eclipse.scout.commons.validation;
+package org.eclipse.scout.rt.shared.validate.markup;
 
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 /**
- *
+ * @since 3.10.0-M3
  */
 public class WhitelistMarkupValidatorTest {
 
@@ -70,13 +71,19 @@ public class WhitelistMarkupValidatorTest {
       "  </body>" +
       "</html>";
 
-  @Test
-  public void testValidate() {
-    OldWhitelistMarkupValidator validator = new OldWhitelistMarkupValidator();
-    String validatedInput = validator.validate(INPUT2);
+  private static IMarkupValidator markupValidator;
 
-    System.out.println("validatedInput:\n " + validatedInput.toString());
-
+  @BeforeClass
+  public static void setUp() {
+    markupValidator = new WhitelistMarkupValidator();
   }
 
+  @Test
+  public void testValidate() {
+    String validatedInput1 = markupValidator.validate(INPUT);
+    String validatedInput2 = markupValidator.validate(INPUT2);
+
+    System.out.println("Input 1:\n" + validatedInput1);
+    System.out.println("Input 2:\n" + validatedInput2);
+  }
 }

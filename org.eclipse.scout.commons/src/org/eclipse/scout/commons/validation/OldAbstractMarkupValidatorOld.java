@@ -26,7 +26,7 @@ import org.eclipse.scout.commons.xmlparser.SimpleXmlElement;
 /**
  * @since 3.10.0-M2
  */
-public abstract class AbstractMarkupValidatorOld implements IMarkupValidator {
+public abstract class OldAbstractMarkupValidatorOld implements OldIMarkupValidator {
   protected static final String ALL_ATTRIBUTES = "ALL_ATTRIBUTES";
 
   protected static Map<String, Set<String>> ALLOWED_ELEMENTS_ATTRIBUTES = createElementsAttributesWhitelist();

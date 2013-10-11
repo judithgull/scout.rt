@@ -31,6 +31,7 @@ import org.eclipse.scout.rt.client.ui.basic.cell.ICell;
 import org.eclipse.scout.rt.client.ui.basic.cell.ICellObserver;
 import org.eclipse.scout.rt.client.ui.profiler.DesktopProfiler;
 import org.eclipse.scout.rt.shared.services.common.security.IAccessControlService;
+import org.eclipse.scout.rt.shared.validate.markup.IMarkupList;
 import org.eclipse.scout.service.SERVICES;
 
 public abstract class AbstractTreeNode implements ITreeNode, ICellObserver {
@@ -64,6 +65,7 @@ public abstract class AbstractTreeNode implements ITreeNode, ICellObserver {
   private boolean m_visible;
   private boolean m_visibleGranted;
   private boolean m_visibleProperty;
+  private boolean m_hasHtmlMarkup;
   // hash code is received from a virtual tree node when resolving to this node
   // this node is not attached to a virtual node if m_hashCode is null
   private Integer m_hashCode = null;
@@ -122,6 +124,20 @@ public abstract class AbstractTreeNode implements ITreeNode, ICellObserver {
     return true;
   }
 
+  /**
+   * Configures whether the value of this tree node contains HTML markup. If set to true, the HTML tags will be
+   * interpreted. Otherwise, all HTML tags will be escaped.
+   * <p>
+   * Subclasses can override this method. Default is {@code false}.
+   * 
+   * @return {@code true} if this tree node contains HTML markup, {@code false} otherwise.
+   */
+  @ConfigProperty(ConfigProperty.BOOLEAN)
+  @Order(40)
+  protected boolean getConfiguredHtmlMarkup() {
+    return false;
+  }
+
   @ConfigOperation
   @Order(20)
   protected void execInitTreeNode() {
@@ -138,6 +154,19 @@ public abstract class AbstractTreeNode implements ITreeNode, ICellObserver {
     return node;
   }
 
+  /**
+   * Possibility to add custom tags and attributes to the markup list.
+   * <p>
+   * This method is only called if getConfiguredHtmlMarkup is set to <code>true</code>.
+   * 
+   * @param markupList
+   * @throws ProcessingException
+   */
+  @ConfigOperation
+  @Order(40)
+  protected void execExtendMarkupList(IMarkupList markupList) {
+  }
+
   private Class<? extends IMenu>[] getConfiguredMenus() {
     Class<?>[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
     Class<IMenu>[] foca = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(dca, IMenu.class);
@@ -149,6 +178,7 @@ public abstract class AbstractTreeNode implements ITreeNode, ICellObserver {
     setEnabledInternal(getConfiguredEnabled());
     setExpandedInternal(getConfiguredExpanded());
     m_defaultExpanded = getConfiguredExpanded();
+    setHtmlMarkup(getConfiguredHtmlMarkup());
     // menus
     ArrayList<IMenu> menuList = new ArrayList<IMenu>();
     Class<? extends IMenu>[] ma = getConfiguredMenus();
@@ -928,6 +958,23 @@ public abstract class AbstractTreeNode implements ITreeNode, ICellObserver {
           (it.next()).setTreeInternal(tree, includeSubtree);
         }
       }
+    }
+  }
+
+  @Override
+  public boolean hasHtmlMarkup() {
+    return m_hasHtmlMarkup;
+  }
+
+  @Override
+  public void setHtmlMarkup(boolean hasHtmlMarkup) {
+    m_hasHtmlMarkup = hasHtmlMarkup;
+  }
+
+  @Override
+  public void extendMarkupList(IMarkupList markupList) {
+    if (hasHtmlMarkup()) {
+      execExtendMarkupList(markupList);
     }
   }
 

@@ -9,14 +9,13 @@ import org.eclipse.jface.viewers.ViewerCell;
 import org.eclipse.rap.rwt.RWT;
 import org.eclipse.scout.commons.HTMLUtility;
 import org.eclipse.scout.commons.StringUtility;
-import org.eclipse.scout.commons.validation.BlacklistMarkupValidator;
-import org.eclipse.scout.commons.validation.IMarkupValidator;
 import org.eclipse.scout.rt.client.ui.basic.cell.ICell;
 import org.eclipse.scout.rt.client.ui.basic.table.ITable;
 import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.IColumn;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.ISmartColumn;
 import org.eclipse.scout.rt.shared.AbstractIcons;
+import org.eclipse.scout.rt.shared.validate.markup.WhitelistMarkupValidator;
 import org.eclipse.scout.rt.ui.rap.RwtIcons;
 import org.eclipse.scout.rt.ui.rap.extension.UiDecorationExtensionPoint;
 import org.eclipse.scout.rt.ui.rap.util.HtmlTextUtility;
@@ -24,10 +23,8 @@ import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.Font;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.Point;
-import org.eclipse.swt.internal.widgets.MarkupValidator;
 import org.eclipse.swt.widgets.Display;
 
-@SuppressWarnings("restriction")
 public class RwtScoutColumnModel extends ColumnLabelProvider {
   private static final long serialVersionUID = 1L;
 
@@ -44,7 +41,7 @@ public class RwtScoutColumnModel extends ColumnLabelProvider {
   private Color m_disabledForegroundColor;
   private int m_defaultRowHeight;
 
-  private IMarkupValidator m_markupValidator;
+  private final RwtScoutColumnValidator m_columnValidator;
 
   public RwtScoutColumnModel(ITable scoutTable, IRwtScoutTableForPatch uiTable, TableColumnManager columnManager) {
     m_scoutTable = scoutTable;
@@ -54,7 +51,7 @@ public class RwtScoutColumnModel extends ColumnLabelProvider {
     m_imgCheckboxFalse = getUiTable().getUiEnvironment().getIcon(RwtIcons.CheckboxNo);
     m_disabledForegroundColor = getUiTable().getUiEnvironment().getColor(UiDecorationExtensionPoint.getLookAndFeel().getColorForegroundDisabled());
     rebuildCache();
-    m_markupValidator = new BlacklistMarkupValidator();
+    m_columnValidator = new RwtScoutColumnValidator(uiTable, new WhitelistMarkupValidator()); // TODO: kle - Factory
   }
 
   protected ITable getScoutTable() {
@@ -107,26 +104,9 @@ public class RwtScoutColumnModel extends ColumnLabelProvider {
         // validate here
       }
     }
-    text = validateColumnText(text, columnIndex);
 
-    return text;
-  }
-
-  protected String validateColumnText(String text, int columnIndex) {
-    IColumn<?> col = m_columnManager.getColumnByModelIndex(columnIndex - 1);
-
-    boolean markupValidationDisabled = Boolean.TRUE.equals(getUiTable().getUiField().getData(MarkupValidator.MARKUP_VALIDATION_DISABLED));
-    boolean markupEnabled = Boolean.TRUE.equals(getUiTable().getUiField().getData(RWT.MARKUP_ENABLED));
-    boolean isHtmlMarkupText = HtmlTextUtility.isTextWithHtmlMarkup(text);
-
-    if (markupValidationDisabled && markupEnabled && isHtmlMarkupText) {
-      System.out.println("markupValidationDisabled: " + markupValidationDisabled + ", markup enabled: " + markupEnabled + ", isHtmlMarkupText: " + isHtmlMarkupText);
-      System.out.println("before validation: " + text);
-      text = m_markupValidator.validate(text);
-      System.out.println("after validation: " + text);
-    }
-
-    return text;
+    IColumn<?> column = m_columnManager.getColumnByModelIndex(columnIndex - 1);
+    return m_columnValidator.validateText(column, text);
   }
 
   protected int getDefaultRowHeight() {

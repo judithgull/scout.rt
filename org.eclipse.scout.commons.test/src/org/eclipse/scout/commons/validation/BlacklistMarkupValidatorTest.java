@@ -72,7 +72,7 @@ public class BlacklistMarkupValidatorTest {
 
   @Test
   public void testValidate() {
-    BlacklistMarkupValidator validator = new BlacklistMarkupValidator();
+    OldBlacklistMarkupValidator validator = new OldBlacklistMarkupValidator();
     String validatedInput = validator.validate(INPUT);
 
 //    String validatedInput = Jsoup.clean(INPUT, Whitelist.relaxed());

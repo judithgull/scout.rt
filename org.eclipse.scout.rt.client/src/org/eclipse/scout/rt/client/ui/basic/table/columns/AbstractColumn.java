@@ -56,6 +56,7 @@ import org.eclipse.scout.rt.shared.ScoutTexts;
 import org.eclipse.scout.rt.shared.data.basic.FontSpec;
 import org.eclipse.scout.rt.shared.data.form.AbstractFormData;
 import org.eclipse.scout.rt.shared.services.common.security.IAccessControlService;
+import org.eclipse.scout.rt.shared.validate.markup.IMarkupList;
 import org.eclipse.scout.service.SERVICES;
 
 public abstract class AbstractColumn<T> extends AbstractPropertyObserver implements IColumn<T> {
@@ -663,6 +664,19 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
         }
       }
     }
+  }
+
+  /**
+   * Possibility to add custom tags and attributes to the markup list.
+   * <p>
+   * This method is only called if getConfiguredHtmlMarkup is set to <code>true</code>.
+   * 
+   * @param markupList
+   * @throws ProcessingException
+   */
+  @ConfigOperation
+  @Order(70)
+  protected void execExtendMarkupList(IMarkupList markupList) {
   }
 
   /**
@@ -1522,6 +1536,13 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
   @Override
   public void setHtmlMarkup(boolean hasHtmlMarkup) {
     m_hasHtmlMarkup = hasHtmlMarkup;
+  }
+
+  @Override
+  public void extendMarkupList(IMarkupList markupList) {
+    if (hasHtmlMarkup()) {
+      execExtendMarkupList(markupList);
+    }
   }
 
   @Override

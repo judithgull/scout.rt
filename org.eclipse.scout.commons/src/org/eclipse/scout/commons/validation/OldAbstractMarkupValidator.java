@@ -13,7 +13,7 @@ package org.eclipse.scout.commons.validation;
 /**
  * @since 3.10.0-M2
  */
-public abstract class AbstractMarkupValidator implements IMarkupValidator {
+public abstract class OldAbstractMarkupValidator implements OldIMarkupValidator {
 
   //Window Event Attributes
   protected static final String[] WINDOW_EVENT_ATTRIBUTES = new String[]{

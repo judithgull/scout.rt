@@ -45,6 +45,11 @@ Export-Package: org.eclipse.scout.rt.shared,
  org.eclipse.scout.rt.shared.ui,
  org.eclipse.scout.rt.shared.validate,
  org.eclipse.scout.rt.shared.validate.annotations,
- org.eclipse.scout.rt.shared.validate.checks
+ org.eclipse.scout.rt.shared.validate.checks,
+ org.eclipse.scout.rt.shared.validate.markup
 Bundle-RequiredExecutionEnvironment: JavaSE-1.6
 Bundle-ActivationPolicy: lazy
+Import-Package: org.jsoup;version="1.7.2",
+ org.jsoup.nodes;version="1.7.2",
+ org.jsoup.safety;version="1.7.2",
+ org.jsoup.select;version="1.7.2"

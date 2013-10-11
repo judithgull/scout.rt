@@ -17,6 +17,7 @@ import org.eclipse.scout.rt.client.ui.form.fields.IValueField;
 import org.eclipse.scout.rt.client.ui.form.fields.browserfield.IBrowserField;
 import org.eclipse.scout.rt.client.ui.form.fields.documentfield.IDocumentField;
 import org.eclipse.scout.rt.shared.services.common.file.RemoteFile;
+import org.eclipse.scout.rt.shared.validate.markup.IMarkupListExtension;
 
 /**
  * This model represents a UI specific browser, in swing it is a JEditorPane html viewer/editor, in swt it is the native
@@ -28,7 +29,7 @@ import org.eclipse.scout.rt.shared.services.common.file.RemoteFile;
  * See also the {@link IBrowserField} for html viewing and {@link IDocumentField} for html editing (requires a fragment
  * such as microsoft word editor)
  */
-public interface IHtmlField extends IValueField<String> {
+public interface IHtmlField extends IValueField<String>, IMarkupListExtension {
 
   String PROP_MAX_LENGTH = "maxLength";
   String PROP_SCROLLBARS_ENABLED = "scrollBarsEnabled";

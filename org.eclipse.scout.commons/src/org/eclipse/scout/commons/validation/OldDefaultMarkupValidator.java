@@ -23,10 +23,10 @@ import org.eclipse.scout.commons.xmlparser.SimpleXmlElement;
 /**
  * @since 3.10.0-M2
  */
-public class DefaultMarkupValidator extends AbstractMarkupValidatorOld {
-  private static final IScoutLogger LOG = ScoutLogManager.getLogger(DefaultMarkupValidator.class);
+public class OldDefaultMarkupValidator extends OldAbstractMarkupValidatorOld {
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(OldDefaultMarkupValidator.class);
 
-  public DefaultMarkupValidator() {
+  public OldDefaultMarkupValidator() {
   }
 
   @Override

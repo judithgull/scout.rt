@@ -20,20 +20,17 @@ import org.eclipse.rap.rwt.RWT;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
-import org.eclipse.scout.commons.validation.BlacklistMarkupValidator;
-import org.eclipse.scout.commons.validation.IMarkupValidator;
 import org.eclipse.scout.rt.client.ui.basic.cell.ICell;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITree;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
+import org.eclipse.scout.rt.shared.validate.markup.WhitelistMarkupValidator;
 import org.eclipse.scout.rt.ui.rap.RwtIcons;
 import org.eclipse.scout.rt.ui.rap.extension.UiDecorationExtensionPoint;
 import org.eclipse.scout.rt.ui.rap.util.HtmlTextUtility;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.Font;
 import org.eclipse.swt.graphics.Image;
-import org.eclipse.swt.internal.widgets.MarkupValidator;
 
-@SuppressWarnings("restriction")
 public class RwtScoutTreeModel extends LabelProvider implements ITreeContentProvider, IFontProvider, IColorProvider {
   private static final long serialVersionUID = 1L;
 
@@ -45,7 +42,7 @@ public class RwtScoutTreeModel extends LabelProvider implements ITreeContentProv
   private Image m_imgCheckboxTrue;
   private Image m_imgCheckboxFalse;
   private Color m_disabledForegroundColor;
-  private final IMarkupValidator m_markupValidator;
+  private final RwtScoutTreeNodeValidator m_treeNodeValidator;
 
   public RwtScoutTreeModel(ITree tree, IRwtScoutTree uiTree, TreeViewer treeViewer) {
     m_scoutTree = tree;
@@ -54,7 +51,7 @@ public class RwtScoutTreeModel extends LabelProvider implements ITreeContentProv
     m_imgCheckboxTrue = getUiTree().getUiEnvironment().getIcon(RwtIcons.CheckboxYes);
     m_imgCheckboxFalse = getUiTree().getUiEnvironment().getIcon(RwtIcons.CheckboxNo);
     m_disabledForegroundColor = getUiTree().getUiEnvironment().getColor(UiDecorationExtensionPoint.getLookAndFeel().getColorForegroundDisabled());
-    m_markupValidator = new BlacklistMarkupValidator();
+    m_treeNodeValidator = new RwtScoutTreeNodeValidator(m_uiTree, new WhitelistMarkupValidator()); // TODO: kle - Factory
   }
 
   protected ITree getScoutTree() {
@@ -156,25 +153,9 @@ public class RwtScoutTreeModel extends LabelProvider implements ITreeContentProv
         }
       }
 
-      text = validateText(text);
-      return text;
+      return m_treeNodeValidator.validateText(scoutNode, text);
     }
     return "";
-  }
-
-  protected String validateText(String text) {
-    boolean markupValidationDisabled = Boolean.TRUE.equals(getUiTree().getUiField().getData(MarkupValidator.MARKUP_VALIDATION_DISABLED));
-    boolean markupEnabled = Boolean.TRUE.equals(getUiTree().getUiField().getData(RWT.MARKUP_ENABLED));
-    boolean isHtmlMarkupText = HtmlTextUtility.isTextWithHtmlMarkup(text);
-
-    if (markupValidationDisabled && markupEnabled && isHtmlMarkupText) {
-      System.out.println("markupValidationDisabled: " + markupValidationDisabled + ", markup enabled: " + markupEnabled + ", isHtmlMarkupText: " + isHtmlMarkupText);
-      System.out.println("before validation: " + text);
-      text = m_markupValidator.validate(text);
-      System.out.println("after validation: " + text);
-    }
-
-    return text;
   }
 
   @Override

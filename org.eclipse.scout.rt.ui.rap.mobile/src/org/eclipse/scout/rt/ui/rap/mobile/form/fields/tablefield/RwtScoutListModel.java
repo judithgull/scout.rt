@@ -20,17 +20,15 @@ import org.eclipse.jface.viewers.LabelProviderChangedEvent;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.rap.rwt.RWT;
 import org.eclipse.scout.commons.StringUtility;
-import org.eclipse.scout.commons.validation.BlacklistMarkupValidator;
-import org.eclipse.scout.commons.validation.IMarkupValidator;
 import org.eclipse.scout.rt.client.ui.basic.cell.ICell;
 import org.eclipse.scout.rt.client.ui.basic.table.ITable;
 import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.IColumn;
+import org.eclipse.scout.rt.shared.validate.markup.WhitelistMarkupValidator;
 import org.eclipse.scout.rt.ui.rap.basic.table.RwtScoutTableEvent;
 import org.eclipse.scout.rt.ui.rap.html.HtmlAdapter;
 import org.eclipse.scout.rt.ui.rap.util.HtmlTextUtility;
 import org.eclipse.swt.graphics.Image;
-import org.eclipse.swt.internal.widgets.MarkupValidator;
 
 @SuppressWarnings("restriction")
 public class RwtScoutListModel implements IRwtScoutListModel {
@@ -47,12 +45,12 @@ public class RwtScoutListModel implements IRwtScoutListModel {
   private final ITable m_scoutTable;
   private final RwtScoutList m_uiList;
   private boolean m_multiline;
-  private final IMarkupValidator m_markupValidator;
+  private final RwtScoutListValidator m_listValidator;
 
   public RwtScoutListModel(ITable scoutTable, RwtScoutList uiTable) {
     m_scoutTable = scoutTable;
     m_uiList = uiTable;
-    m_markupValidator = new BlacklistMarkupValidator();
+    m_listValidator = new RwtScoutListValidator(m_uiList, new WhitelistMarkupValidator()); // TODO: kle - Factory
   }
 
   @Override
@@ -140,7 +138,10 @@ public class RwtScoutListModel implements IRwtScoutListModel {
   }
 
   protected ICell getCell(Object row) {
-    IColumn<?> column = m_scoutTable.getColumnSet().getVisibleColumns()[0];
+    return getCell(getColumn(), row);
+  }
+
+  protected ICell getCell(IColumn<?> column, Object row) {
     if (column != null) {
       ITableRow tableRow = (ITableRow) row;
       return tableRow.getCell(column);
@@ -148,6 +149,10 @@ public class RwtScoutListModel implements IRwtScoutListModel {
     else {
       return null;
     }
+  }
+
+  private IColumn<?> getColumn() {
+    return m_scoutTable.getColumnSet().getVisibleColumns()[0];
   }
 
   @Override
@@ -167,7 +172,8 @@ public class RwtScoutListModel implements IRwtScoutListModel {
 
   @Override
   public String getText(Object element) {
-    ICell cell = getCell(element);
+    IColumn<?> column = getColumn();
+    ICell cell = getCell(column, element);
     if (cell == null) {
       return "";
     }
@@ -199,21 +205,6 @@ public class RwtScoutListModel implements IRwtScoutListModel {
       }
     }
 
-    text = validateText(text);
-    return text;
-  }
-
-  protected String validateText(String text) {
-    boolean markupValidationDisabled = Boolean.TRUE.equals(getUiList().getUiField().getData(MarkupValidator.MARKUP_VALIDATION_DISABLED));
-    boolean markupEnabled = Boolean.TRUE.equals(getUiList().getUiField().getData(RWT.MARKUP_ENABLED));
-    boolean isHtmlMarkupText = HtmlTextUtility.isTextWithHtmlMarkup(text);
-
-    if (markupValidationDisabled && markupEnabled && isHtmlMarkupText) {
-      System.out.println("markupValidationDisabled: " + markupValidationDisabled + ", markup enabled: " + markupEnabled + ", isHtmlMarkupText: " + isHtmlMarkupText);
-      System.out.println("before validation: " + text);
-      text = m_markupValidator.validate(text);
-      System.out.println("after validation: " + text);
-    }
-    return text;
+    return m_listValidator.validateText(column, text);
   }
 }

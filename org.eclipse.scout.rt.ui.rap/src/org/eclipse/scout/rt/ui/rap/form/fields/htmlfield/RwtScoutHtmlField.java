@@ -22,10 +22,11 @@ import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.TypeCastUtility;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
-import org.eclipse.scout.commons.validation.BlacklistMarkupValidator;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.htmlfield.IHtmlField;
 import org.eclipse.scout.rt.shared.services.common.file.RemoteFile;
+import org.eclipse.scout.rt.shared.validate.markup.IMarkupValidator;
+import org.eclipse.scout.rt.shared.validate.markup.WhitelistMarkupValidator;
 import org.eclipse.scout.rt.ui.rap.LogicalGridData;
 import org.eclipse.scout.rt.ui.rap.LogicalGridLayout;
 import org.eclipse.scout.rt.ui.rap.ext.StatusLabelEx;
@@ -47,10 +48,10 @@ public class RwtScoutHtmlField extends RwtScoutValueFieldComposite<IHtmlField> i
   private static final String VARIANT_HTMLFIELD = "htmlfield";
 
   private BrowserExtension m_browserExtension;
-  private BlacklistMarkupValidator m_markupValidator;
+  private final IMarkupValidator m_markupValidator;
 
   public RwtScoutHtmlField() {
-    m_markupValidator = new BlacklistMarkupValidator();
+    m_markupValidator = new WhitelistMarkupValidator(); // TODO: kle - Factory
   }
 
   @Override
@@ -185,10 +186,8 @@ public class RwtScoutHtmlField extends RwtScoutValueFieldComposite<IHtmlField> i
   }
 
   protected String validateHtmlText(String html) {
-    System.out.println("html before validation:\n " + html);
-    html = m_markupValidator.validate(html);
-    System.out.println("html after validation:\n " + html);
-    return html;
+    getScoutObject().extendMarkupList(m_markupValidator.getMarkupList());
+    return m_markupValidator.validate(html);
   }
 
   protected void setScrollToAnchorFromScout(String anchorName) {

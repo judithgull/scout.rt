@@ -20,8 +20,9 @@ import org.eclipse.scout.rt.client.ui.basic.table.ITable;
 import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.shared.data.basic.FontSpec;
+import org.eclipse.scout.rt.shared.validate.markup.IMarkupComponent;
 
-public interface IColumn<T> extends IPropertyObserver {
+public interface IColumn<T> extends IPropertyObserver, IMarkupComponent {
   /**
    * type boolean
    */
@@ -412,9 +413,5 @@ public interface IColumn<T> extends IPropertyObserver {
   boolean isMandatory();
 
   void setMandatory(boolean mandatory);
-
-  boolean hasHtmlMarkup();
-
-  void setHtmlMarkup(boolean hasHtmlMarkup);
 
 }

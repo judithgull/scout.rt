@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
  * 
  * @since 3.10.0-M2
  */
-public class DefaultMarkupValidatorConfigurator implements IMarkupValidatorConfigurator {
+public class OldDefaultMarkupValidatorConfigurator implements OldIMarkupValidatorConfigurator {
 
   @Override
   public void addElements(Set<String> elements) {

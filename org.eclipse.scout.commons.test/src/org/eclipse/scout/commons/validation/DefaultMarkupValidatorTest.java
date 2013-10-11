@@ -42,7 +42,7 @@ public class DefaultMarkupValidatorTest {
 
   @Test
   public void testValidate() {
-    DefaultMarkupValidator validator = new DefaultMarkupValidator();
+    OldDefaultMarkupValidator validator = new OldDefaultMarkupValidator();
     String validatedInput = validator.validate(INPUT);
 
     System.out.println("validatedInput " + validatedInput.toString());

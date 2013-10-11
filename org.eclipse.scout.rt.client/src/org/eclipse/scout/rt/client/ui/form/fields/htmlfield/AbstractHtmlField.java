@@ -28,6 +28,7 @@ import org.eclipse.scout.rt.client.ui.form.fields.documentfield.AbstractDocument
 import org.eclipse.scout.rt.shared.data.form.ValidationRule;
 import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.rt.shared.services.common.file.RemoteFile;
+import org.eclipse.scout.rt.shared.validate.markup.IMarkupList;
 import org.eclipse.scout.service.SERVICES;
 
 /**
@@ -88,6 +89,19 @@ public abstract class AbstractHtmlField extends AbstractValueField<String> imple
   @Order(230)
   protected void execHyperlinkAction(URL url, String path, boolean local) throws ProcessingException {
     LOG.info("execHyperlinkAction " + url + " (in " + getClass().getName() + ")");
+  }
+
+  /**
+   * Possibility to add custom tags and attributes to the markup list.
+   * <p>
+   * This method is only called if getConfiguredHtmlMarkup is set to <code>true</code>.
+   * 
+   * @param markupList
+   * @throws ProcessingException
+   */
+  @ConfigOperation
+  @Order(240)
+  protected void execExtendMarkupList(IMarkupList markupList) {
   }
 
   @Override
@@ -281,5 +295,10 @@ public abstract class AbstractHtmlField extends AbstractValueField<String> imple
    */
   public void setSpellCheckAsYouTypeEnabled(boolean monitorSpelling) {
     m_monitorSpelling = new Boolean(monitorSpelling);
+  }
+
+  @Override
+  public void extendMarkupList(IMarkupList markupList) {
+    execExtendMarkupList(markupList);
   }
 }

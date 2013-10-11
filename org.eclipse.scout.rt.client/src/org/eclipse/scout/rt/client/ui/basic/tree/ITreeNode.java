@@ -17,6 +17,7 @@ import org.eclipse.scout.rt.client.ui.action.ActionFinder;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 import org.eclipse.scout.rt.client.ui.basic.cell.Cell;
 import org.eclipse.scout.rt.client.ui.basic.cell.ICell;
+import org.eclipse.scout.rt.shared.validate.markup.IMarkupComponent;
 
 /**
  * Tree node used in {@link ITree}.
@@ -24,7 +25,7 @@ import org.eclipse.scout.rt.client.ui.basic.cell.ICell;
  * Note that a {@link IVirtualTreeNode} is equal to its resolved node {@link IVirtualTreeNode#getResolvedNode()} with
  * regard to {@link #equals(Object)} and {@link #hashCode()}
  */
-public interface ITreeNode {
+public interface ITreeNode extends IMarkupComponent {
   int STATUS_NON_CHANGED = 0;
   int STATUS_INSERTED = 1;
   int STATUS_UPDATED = 2;
@@ -329,4 +330,5 @@ public interface ITreeNode {
    * Convenience for getTree().updateNode(this);
    */
   void update();
+
 }

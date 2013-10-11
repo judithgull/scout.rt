@@ -24,7 +24,7 @@ import org.jsoup.safety.Whitelist;
 /**
  * @since 3.10.0-M2
  */
-public class WhitelistMarkupValidator implements IMarkupValidator {
+public class OldWhitelistMarkupValidator implements OldIMarkupValidator {
 
   protected static final String[] ALLOWED_TAGS = new String[]{"title", "style"};
 
@@ -50,7 +50,7 @@ public class WhitelistMarkupValidator implements IMarkupValidator {
     }
   }
 
-  public WhitelistMarkupValidator() {
+  public OldWhitelistMarkupValidator() {
     m_cleaner = new Cleaner(WHITELIST);
   }
 

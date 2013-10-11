@@ -4409,7 +4409,6 @@ public abstract class AbstractTable extends AbstractPropertyObserver implements 
         popUIProcessor();
       }
     }
-
   }
 
   private class P_CellLookup {
