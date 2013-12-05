@@ -14,6 +14,10 @@ package org.eclipse.scout.rt.shared.validate.markup;
  * @since 3.10.0-M4
  */
 public interface IMarkupList {
+
+  static final String ALL_TAGS = "*";
+  static final String ALL_ATTRIBUTES = "**";
+
   IMarkupList addTags(String... tagNames);
 
   IMarkupList addAttributes(String tagName, String... attributeNames);

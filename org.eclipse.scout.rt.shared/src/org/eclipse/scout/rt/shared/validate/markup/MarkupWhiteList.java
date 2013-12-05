@@ -104,7 +104,16 @@ public class MarkupWhiteList implements IMarkupList {
     if (StringUtility.isNullOrEmpty(tagName)) {
       return false;
     }
+
+    if (allTagsAllowed()) {
+      return true;
+    }
+
     return m_tags.contains(tagName.toLowerCase());
+  }
+
+  private boolean allTagsAllowed() {
+    return m_tags.contains(ALL_TAGS);
   }
 
   @Override
@@ -115,8 +124,15 @@ public class MarkupWhiteList implements IMarkupList {
 
     Set<String> attrs = m_attributes.get(tagName.toLowerCase());
     if (attrs != null) {
+      if (allAttributesAllowed(attrs)) {
+        return true;
+      }
       return attrs.contains(attributeName.toLowerCase());
     }
     return false;
+  }
+
+  private boolean allAttributesAllowed(Set<String> attrs) {
+    return attrs.contains(ALL_ATTRIBUTES);
   }
 }

@@ -13,6 +13,8 @@ package org.eclipse.scout.rt.shared.validate.markup;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.eclipse.scout.commons.logger.IScoutLogger;
+import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.jsoup.nodes.Attribute;
 import org.jsoup.nodes.DataNode;
 import org.jsoup.nodes.Element;
@@ -23,6 +25,8 @@ import org.jsoup.nodes.TextNode;
  * @since 3.10.0-M4
  */
 public class MarkupVisitor implements IMarkupVisitor {
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(MarkupVisitor.class);
+
   private final Element m_root;
   private final IMarkupList m_markupList;
   private final Set<Node> m_removedNodes;
@@ -35,26 +39,28 @@ public class MarkupVisitor implements IMarkupVisitor {
 
   @Override
   public void head(Node node, int depth) {
-    System.out.println("Visit node: " + node.nodeName() + ", depth: " + depth);
+    LOG.debug("Visit node: " + node.nodeName() + ", depth: " + depth);
 
     if (!(node instanceof TextNode) && !(node instanceof Element) && !(node instanceof DataNode)) {
+      LOG.debug("Removed node " + node.nodeName());
       removeNode(node);
       return;
     }
 
     if (node instanceof Element) {
       Element elem = (Element) node;
-      System.out.println("\tCheck element: " + elem.tagName());
+      LOG.debug("\tChecking element tag: " + elem.tagName());
+
       if (!m_markupList.isAllowedTag(elem.tagName()) && elem != m_root) {
-        System.out.println("\tRemove element: " + elem.tagName());
+        LOG.debug("\tRemove element tag: " + elem.tagName());
         removeNode(elem);
         return;
       }
 
       for (Attribute attr : elem.attributes()) {
-        System.out.println("\t\tCheck attribute: " + attr.getKey() + ", value: " + attr.getValue());
+        LOG.debug("\t\tChecking attribute key: " + attr.getKey() + ", attribute value: " + attr.getValue());
         if (!m_markupList.isAllowedAttribute(elem.tagName(), attr.getKey())) {
-          System.out.println("\t\tRemove attribute: " + attr.getKey() + ", value: " + attr.getValue());
+          LOG.debug("\t\tRemove attribute key: " + attr.getKey() + ", attribute value: " + attr.getValue());
           elem.removeAttr(attr.getKey());
         }
       }
