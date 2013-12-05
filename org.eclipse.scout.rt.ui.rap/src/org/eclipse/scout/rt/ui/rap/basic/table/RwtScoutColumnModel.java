@@ -16,7 +16,8 @@ import org.eclipse.scout.rt.client.ui.basic.table.columns.IColumn;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.ISmartColumn;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.IStringColumn;
 import org.eclipse.scout.rt.shared.AbstractIcons;
-import org.eclipse.scout.rt.shared.validate.markup.WhitelistMarkupValidator;
+import org.eclipse.scout.rt.shared.validate.markup.IMarkupValidatorFactory;
+import org.eclipse.scout.rt.shared.validate.markup.WhitelistMarkupValidatorFactory;
 import org.eclipse.scout.rt.ui.rap.RwtIcons;
 import org.eclipse.scout.rt.ui.rap.extension.UiDecorationExtensionPoint;
 import org.eclipse.scout.rt.ui.rap.util.HtmlTextUtility;
@@ -52,7 +53,15 @@ public class RwtScoutColumnModel extends ColumnLabelProvider {
     m_imgCheckboxFalse = getUiTable().getUiEnvironment().getIcon(RwtIcons.CheckboxNo);
     m_disabledForegroundColor = getUiTable().getUiEnvironment().getColor(UiDecorationExtensionPoint.getLookAndFeel().getColorForegroundDisabled());
     rebuildCache();
-    m_columnValidator = new RwtScoutColumnValidator(uiTable, new WhitelistMarkupValidator()); // TODO: kle - Factory
+    m_columnValidator = createColumnValidator(uiTable);
+  }
+
+  protected RwtScoutColumnValidator createColumnValidator(IRwtScoutTableForPatch uiTable) {
+    return new RwtScoutColumnValidator(uiTable, getMarkupValidatorFactory().createMarkupValidator());
+  }
+
+  protected IMarkupValidatorFactory getMarkupValidatorFactory() {
+    return new WhitelistMarkupValidatorFactory();
   }
 
   protected ITable getScoutTable() {
@@ -109,7 +118,9 @@ public class RwtScoutColumnModel extends ColumnLabelProvider {
         text = HtmlTextUtility.transformPlainTextToHtml(text, replaceBreakableChars);
       }
     }
-    return text;
+
+    IColumn<?> column = m_columnManager.getColumnByModelIndex(columnIndex - 1);
+    return m_columnValidator.validateText(column, text);
   }
 
   private boolean isMultiline(String text) {

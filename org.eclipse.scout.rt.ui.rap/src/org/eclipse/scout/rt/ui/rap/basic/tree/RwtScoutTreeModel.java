@@ -23,7 +23,8 @@ import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.basic.cell.ICell;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITree;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
-import org.eclipse.scout.rt.shared.validate.markup.WhitelistMarkupValidator;
+import org.eclipse.scout.rt.shared.validate.markup.IMarkupValidatorFactory;
+import org.eclipse.scout.rt.shared.validate.markup.WhitelistMarkupValidatorFactory;
 import org.eclipse.scout.rt.ui.rap.RwtIcons;
 import org.eclipse.scout.rt.ui.rap.extension.UiDecorationExtensionPoint;
 import org.eclipse.scout.rt.ui.rap.util.HtmlTextUtility;
@@ -51,7 +52,15 @@ public class RwtScoutTreeModel extends LabelProvider implements ITreeContentProv
     m_imgCheckboxTrue = getUiTree().getUiEnvironment().getIcon(RwtIcons.CheckboxYes);
     m_imgCheckboxFalse = getUiTree().getUiEnvironment().getIcon(RwtIcons.CheckboxNo);
     m_disabledForegroundColor = getUiTree().getUiEnvironment().getColor(UiDecorationExtensionPoint.getLookAndFeel().getColorForegroundDisabled());
-    m_treeNodeValidator = new RwtScoutTreeNodeValidator(m_uiTree, new WhitelistMarkupValidator()); // TODO: kle - Factory
+    m_treeNodeValidator = createTreeNodeValidator(m_uiTree);
+  }
+
+  protected RwtScoutTreeNodeValidator createTreeNodeValidator(IRwtScoutTree uiTree) {
+    return new RwtScoutTreeNodeValidator(uiTree, getMarkupValidatorFactory().createMarkupValidator());
+  }
+
+  protected IMarkupValidatorFactory getMarkupValidatorFactory() {
+    return new WhitelistMarkupValidatorFactory();
   }
 
   protected ITree getScoutTree() {

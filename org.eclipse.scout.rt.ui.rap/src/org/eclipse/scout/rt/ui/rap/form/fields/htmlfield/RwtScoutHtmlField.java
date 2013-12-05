@@ -26,7 +26,8 @@ import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.htmlfield.IHtmlField;
 import org.eclipse.scout.rt.shared.services.common.file.RemoteFile;
 import org.eclipse.scout.rt.shared.validate.markup.IMarkupValidator;
-import org.eclipse.scout.rt.shared.validate.markup.WhitelistMarkupValidator;
+import org.eclipse.scout.rt.shared.validate.markup.IMarkupValidatorFactory;
+import org.eclipse.scout.rt.shared.validate.markup.WhitelistMarkupValidatorFactory;
 import org.eclipse.scout.rt.ui.rap.LogicalGridData;
 import org.eclipse.scout.rt.ui.rap.LogicalGridLayout;
 import org.eclipse.scout.rt.ui.rap.ext.StatusLabelEx;
@@ -51,7 +52,11 @@ public class RwtScoutHtmlField extends RwtScoutValueFieldComposite<IHtmlField> i
   private final IMarkupValidator m_markupValidator;
 
   public RwtScoutHtmlField() {
-    m_markupValidator = new WhitelistMarkupValidator(); // TODO: kle - Factory
+    m_markupValidator = getMarkupValidatorFactory().createMarkupValidator();
+  }
+
+  protected IMarkupValidatorFactory getMarkupValidatorFactory() {
+    return new WhitelistMarkupValidatorFactory();
   }
 
   @Override
