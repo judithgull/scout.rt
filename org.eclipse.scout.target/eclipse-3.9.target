@@ -84,7 +84,7 @@
       <unit id="com.google.guava" version="12.0.0.v201212092141"/>
       <unit id="com.google.guava.source" version="12.0.0.v201212092141"/>
       <unit id="org.jsoup" version="1.7.2.v201304221138"/>
-      <unit id="org.cyberneko.html" version="1.9.14.v201105210654"/>
+      <unit id="org.jsoup.source" version="1.7.2.v201304221138"/>
     </location>
     <location includeAllPlatforms="true" includeMode="slicer" includeSource="true" type="InstallableUnit">
       <repository id="rap_2.2" location="http://download.eclipse.org/rt/rap/2.2/M3-20131111-1653.luna/"/>
