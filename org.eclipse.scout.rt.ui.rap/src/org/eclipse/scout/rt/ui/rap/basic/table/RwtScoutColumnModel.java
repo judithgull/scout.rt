@@ -14,6 +14,7 @@ import org.eclipse.scout.rt.client.ui.basic.table.ITable;
 import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.IColumn;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.ISmartColumn;
+import org.eclipse.scout.rt.client.ui.basic.table.columns.IStringColumn;
 import org.eclipse.scout.rt.shared.AbstractIcons;
 import org.eclipse.scout.rt.shared.validate.markup.WhitelistMarkupValidator;
 import org.eclipse.scout.rt.ui.rap.RwtIcons;
@@ -91,22 +92,39 @@ public class RwtScoutColumnModel extends ColumnLabelProvider {
       // validate here
     }
     else {
-      boolean multiline = false;
-      if (text.indexOf("\n") >= 0) {
-        multiline = getScoutTable().isMultilineText();
-        if (!multiline) {
-          text = StringUtility.replaceNewLines(text, " ");
-        }
+      boolean multiline = isMultiline(text);
+      if (!multiline) {
+        text = replaceLineBreaksInMultilineText(text);
       }
+      boolean isMultilineTable = getScoutTable().isMultilineText();
       boolean markupEnabled = Boolean.TRUE.equals(getUiTable().getUiField().getData(RWT.MARKUP_ENABLED));
+
       if (markupEnabled || multiline) {
-        text = HtmlTextUtility.transformPlainTextToHtml(text);
-        // validate here
+        boolean replaceBreakableChars = true;
+        IColumn<?> column = m_columnManager.getColumnByModelIndex(columnIndex - 1);
+        if (column instanceof IStringColumn && isMultilineTable) {
+          IStringColumn stringColumn = (IStringColumn) column;
+          replaceBreakableChars = !stringColumn.isTextWrap();
+        }
+        text = HtmlTextUtility.transformPlainTextToHtml(text, replaceBreakableChars);
       }
     }
+    return text;
+  }
 
-    IColumn<?> column = m_columnManager.getColumnByModelIndex(columnIndex - 1);
-    return m_columnValidator.validateText(column, text);
+  private boolean isMultiline(String text) {
+    return isMultilineText(text) && getScoutTable().isMultilineText();
+  }
+
+  private boolean isMultilineText(String text) {
+    return text.indexOf("\n") >= 0;
+  }
+
+  private String replaceLineBreaksInMultilineText(String text) {
+    if (isMultilineText(text)) {
+      text = StringUtility.replaceNewLines(text, " ");
+    }
+    return text;
   }
 
   protected int getDefaultRowHeight() {

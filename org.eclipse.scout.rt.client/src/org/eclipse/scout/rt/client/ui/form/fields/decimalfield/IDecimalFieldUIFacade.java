@@ -4,14 +4,20 @@
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- * 
+ *
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.form.fields.decimalfield;
 
-public interface IDecimalFieldUIFacade {
+import org.eclipse.scout.rt.client.ui.form.fields.IBasicFieldUIFacade;
+import org.eclipse.scout.rt.client.ui.form.fields.numberfield.INumberFieldUIFacade;
 
-  boolean setTextFromUI(String newText);
-
+/**
+ * @Deprecated Use {@link IBasicFieldUIFacade} instead
+ *             Will be removed with the M-Release
+ */
+@SuppressWarnings("deprecation")
+@Deprecated
+public interface IDecimalFieldUIFacade extends INumberFieldUIFacade {
 }

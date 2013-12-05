@@ -33,6 +33,7 @@ import org.eclipse.scout.rt.shared.services.common.ping.IPingService;
 import org.eclipse.scout.rt.shared.services.common.security.IAccessControlService;
 import org.eclipse.scout.service.AbstractService;
 import org.eclipse.scout.service.SERVICES;
+import org.osgi.framework.ServiceRegistration;
 
 /**
  * Implementations should override {@link #execLoadPermissions()}
@@ -108,11 +109,10 @@ public class AbstractAccessControlService extends AbstractService implements IAc
     return null;
   }
 
-  @SuppressWarnings("deprecation")
   @Override
-  public void initializeService() {
+  public void initializeService(ServiceRegistration registration) {
     m_accessControlStore = new AccessControlStore();
-    super.initializeService();
+    super.initializeService(registration);
   }
 
   @Override

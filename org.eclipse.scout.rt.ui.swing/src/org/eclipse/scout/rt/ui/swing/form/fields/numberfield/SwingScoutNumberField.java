@@ -12,25 +12,18 @@ package org.eclipse.scout.rt.ui.swing.form.fields.numberfield;
 
 import javax.swing.JComponent;
 import javax.swing.JTextField;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
-import javax.swing.text.AbstractDocument;
 import javax.swing.text.Document;
 import javax.swing.text.JTextComponent;
 
-import org.eclipse.scout.commons.CompareUtility;
-import org.eclipse.scout.commons.holders.Holder;
-import org.eclipse.scout.commons.job.JobEx;
 import org.eclipse.scout.rt.client.ui.form.fields.numberfield.INumberField;
 import org.eclipse.scout.rt.ui.swing.LogicalGridLayout;
 import org.eclipse.scout.rt.ui.swing.SwingUtility;
-import org.eclipse.scout.rt.ui.swing.basic.document.BasicDocumentFilter;
 import org.eclipse.scout.rt.ui.swing.ext.JPanelEx;
 import org.eclipse.scout.rt.ui.swing.ext.JStatusLabelEx;
 import org.eclipse.scout.rt.ui.swing.ext.JTextFieldEx;
-import org.eclipse.scout.rt.ui.swing.form.fields.SwingScoutValueFieldComposite;
+import org.eclipse.scout.rt.ui.swing.form.fields.SwingScoutBasicFieldComposite;
 
-public class SwingScoutNumberField extends SwingScoutValueFieldComposite<INumberField<?>> implements ISwingScoutNumberField {
+public class SwingScoutNumberField extends SwingScoutBasicFieldComposite<INumberField<?>> implements ISwingScoutNumberField {
   private static final long serialVersionUID = 1L;
 
   @Override
@@ -41,25 +34,8 @@ public class SwingScoutNumberField extends SwingScoutValueFieldComposite<INumber
     container.add(label);
     JTextFieldEx textField = new JTextFieldEx();
     Document doc = textField.getDocument();
-    if (doc instanceof AbstractDocument) {
-      ((AbstractDocument) doc).setDocumentFilter(new BasicDocumentFilter(60));
-    }
-    doc.addDocumentListener(new DocumentListener() {
-      @Override
-      public void removeUpdate(DocumentEvent e) {
-        setInputDirty(true);
-      }
-
-      @Override
-      public void insertUpdate(DocumentEvent e) {
-        setInputDirty(true);
-      }
-
-      @Override
-      public void changedUpdate(DocumentEvent e) {
-        setInputDirty(true);
-      }
-    });
+    addInputListenersForBasicField(textField, doc);
+    //
     container.add(textField);
     //
     setSwingContainer(container);
@@ -83,10 +59,6 @@ public class SwingScoutNumberField extends SwingScoutValueFieldComposite<INumber
     super.setForegroundFromScout(scoutColor);
   }
 
-  /*
-   * scout properties
-   */
-
   @Override
   protected void setHorizontalAlignmentFromScout(int scoutAlign) {
     int swingAlign = SwingUtility.createHorizontalAlignment(scoutAlign);
@@ -94,47 +66,12 @@ public class SwingScoutNumberField extends SwingScoutValueFieldComposite<INumber
   }
 
   @Override
-  protected void setDisplayTextFromScout(String s) {
-    JTextComponent swingField = getSwingTextField();
-    swingField.setText(s);
+  protected void setSelectionFromSwing() {
+    //Nothing to do: Selection is not stored in model for DecimalField.
   }
 
   @Override
-  protected boolean handleSwingInputVerifier() {
-    final String text = getSwingTextField().getText();
-    // only handle if text has changed
-    if (CompareUtility.equals(text, getScoutObject().getDisplayText()) && getScoutObject().getErrorStatus() == null) {
-      return true;
-    }
-    final Holder<Boolean> result = new Holder<Boolean>(Boolean.class, false);
-    // notify Scout
-    Runnable t = new Runnable() {
-      @Override
-      public void run() {
-        boolean b = getScoutObject().getUIFacade().setTextFromUI(text);
-        result.setValue(b);
-      }
-    };
-    JobEx job = getSwingEnvironment().invokeScoutLater(t, 0);
-    try {
-      job.join(2345);
-    }
-    catch (InterruptedException e) {
-      //nop
-    }
-    // end notify
-    getSwingEnvironment().dispatchImmediateSwingJobs();
-    return true; // continue always
+  protected boolean isSelectAllOnFocusInScout() {
+    return true; //No such property in Scout for DecimalField.
   }
-
-  @Override
-  protected void handleSwingFocusGained() {
-    super.handleSwingFocusGained();
-    JTextComponent swingField = getSwingTextField();
-    if (swingField.getDocument().getLength() > 0) {
-      swingField.setCaretPosition(swingField.getDocument().getLength());
-      swingField.moveCaretPosition(0);
-    }
-  }
-
 }

@@ -12,7 +12,6 @@ package org.eclipse.scout.rt.ui.rap.form.fields.stringfield;
 
 import java.beans.PropertyChangeEvent;
 
-import org.eclipse.scout.commons.CompareUtility;
 import org.eclipse.scout.commons.beans.IPropertyObserver;
 import org.eclipse.scout.commons.dnd.TransferObject;
 import org.eclipse.scout.commons.holders.Holder;
@@ -25,14 +24,12 @@ import org.eclipse.scout.rt.ui.rap.ext.StyledTextEx;
 import org.eclipse.scout.rt.ui.rap.ext.custom.StyledText;
 import org.eclipse.scout.rt.ui.rap.extension.UiDecorationExtensionPoint;
 import org.eclipse.scout.rt.ui.rap.form.fields.AbstractRwtScoutDndSupport;
-import org.eclipse.scout.rt.ui.rap.form.fields.RwtScoutValueFieldComposite;
+import org.eclipse.scout.rt.ui.rap.form.fields.RwtScoutBasicFieldComposite;
 import org.eclipse.scout.rt.ui.rap.internal.TextFieldEditableSupport;
 import org.eclipse.scout.rt.ui.rap.keystroke.IRwtKeyStroke;
 import org.eclipse.scout.rt.ui.rap.keystroke.RwtKeyStroke;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.dnd.DropTargetEvent;
-import org.eclipse.swt.events.ModifyEvent;
-import org.eclipse.swt.events.ModifyListener;
 import org.eclipse.swt.events.MouseAdapter;
 import org.eclipse.swt.events.MouseEvent;
 import org.eclipse.swt.events.MouseListener;
@@ -44,7 +41,7 @@ import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Event;
 
-public class RwtScoutStringField extends RwtScoutValueFieldComposite<IStringField> implements IRwtScoutStringField {
+public class RwtScoutStringField extends RwtScoutBasicFieldComposite<IStringField> implements IRwtScoutStringField {
 
   public static final int DEFAULT_CASE = 0;
   public static final int UPPER_CASE = 1;
@@ -54,10 +51,8 @@ public class RwtScoutStringField extends RwtScoutValueFieldComposite<IStringFiel
   private int m_characterType = -1;
   private MouseListener m_linkTrigger;
   // private MouseListener m_linkTrigger;
-  private boolean m_validateOnAnyKey;
   private boolean m_linkDecoration;
   private TextFieldEditableSupport m_editableSupport;
-  private P_RwtValidateOnAnyKeyModifyListener m_validateOnAnyKeyModifyListener;
   private P_UpperLowerCaseVerifyListener m_upperLowerCaseVerifyListener;
 
   public RwtScoutStringField() {
@@ -110,7 +105,6 @@ public class RwtScoutStringField extends RwtScoutValueFieldComposite<IStringFiel
     setDecorationLinkFromScout(f.isDecorationLink());
     setFormatFromScout(f.getFormat());
     setMaxLengthFromScout(f.getMaxLength());
-    setValidateOnAnyKeyFromScout(f.isValidateOnAnyKey());
     setSelectionFromScout(f.getSelectionStart(), f.getSelectionEnd());
     setTextWrapFromScout(f.isWrapText());
 
@@ -235,66 +229,6 @@ public class RwtScoutStringField extends RwtScoutValueFieldComposite<IStringFiel
     */
   }
 
-  @SuppressWarnings("unused")
-  @Override
-  protected void setDisplayTextFromScout(String s) {
-    //loop detection
-    if (m_validateOnAnyKey && getUiField().isFocusControl()) {
-      return;
-    }
-    StyledText field = getUiField();
-    String oldText = field.getText();
-    if (s == null) {
-      s = "";
-    }
-    if (oldText == null) {
-      oldText = "";
-    }
-    if (oldText.equals(s)) {
-      return;
-    }
-    //
-    int startIndex = field.getSelection().x;
-    //XXX rap     int caretOffset = field.getCaretOffset();
-    int endIndex = -field.getSelection().y;
-    field.setText(s);
-    // restore selection and caret
-    int textLength = field.getText().length();
-    //XXX rap
-    /*
-    if (caretOffset > 0) {
-      startIndex = Math.min(Math.max(startIndex, 0), textLength);
-      endIndex = Math.min(Math.max(endIndex, 0), textLength);
-      field.setCaretOffset(caretOffset);
-      field.setSelection(startIndex, endIndex);
-    }
-    */
-  }
-
-  protected void setValidateOnAnyKeyFromScout(boolean b) {
-    m_validateOnAnyKey = b;
-    if (b) {
-      addValidateOnAnyKeyModifyListener();
-    }
-    else {
-      removeValidateOnAnyKeyModifyListener();
-    }
-  }
-
-  protected void addValidateOnAnyKeyModifyListener() {
-    if (m_validateOnAnyKeyModifyListener == null) {
-      m_validateOnAnyKeyModifyListener = new P_RwtValidateOnAnyKeyModifyListener();
-      getUiField().addModifyListener(m_validateOnAnyKeyModifyListener);
-    }
-  }
-
-  protected void removeValidateOnAnyKeyModifyListener() {
-    if (m_validateOnAnyKeyModifyListener != null) {
-      getUiField().removeModifyListener(m_validateOnAnyKeyModifyListener);
-      m_validateOnAnyKeyModifyListener = null;
-    }
-  }
-
   protected void setSelectionFromScout(int startIndex, int endIndex) {
     StyledText field = getUiField();
     int start = field.getSelection().x;
@@ -328,9 +262,6 @@ public class RwtScoutStringField extends RwtScoutValueFieldComposite<IStringFiel
     }
     else if (name.equals(IStringField.PROP_INSERT_TEXT)) {
       setDoInsertFromScout((String) newValue);
-    }
-    else if (name.equals(IStringField.PROP_VALIDATE_ON_ANY_KEY)) {
-      setValidateOnAnyKeyFromScout(((Boolean) newValue).booleanValue());
     }
     else if (name.equals(IStringField.PROP_SELECTION_START)) {
       IStringField f = getScoutObject();
@@ -381,45 +312,6 @@ public class RwtScoutStringField extends RwtScoutValueFieldComposite<IStringFiel
   }
 
   @Override
-  protected void handleUiInputVerifier(boolean doit) {
-    if (!doit) {
-      return;
-    }
-    final String text = getUiField().getText();
-    // only handle if text has changed
-    if (CompareUtility.equals(text, getScoutObject().getDisplayText()) && getScoutObject().getErrorStatus() == null) {
-      return;
-    }
-    final Holder<Boolean> result = new Holder<Boolean>(Boolean.class, false);
-    // notify Scout
-    Runnable t = new Runnable() {
-      @Override
-      public void run() {
-        boolean b = getScoutObject().getUIFacade().setTextFromUI(text);
-        result.setValue(b);
-      }
-    };
-    JobEx job = getUiEnvironment().invokeScoutLater(t, 0);
-    try {
-      job.join(2345);
-    }
-    catch (InterruptedException e) {
-      //nop
-    }
-    doit = result.getValue();
-    getUiEnvironment().dispatchImmediateUiJobs();
-  }
-
-  @Override
-  protected void handleUiFocusGained() {
-    super.handleUiFocusGained();
-
-    if (isSelectAllOnFocusEnabled()) {
-      getUiField().setSelection(0, getUiField().getText().length());
-    }
-  }
-
-  @Override
   protected boolean isSelectAllOnFocusEnabled() {
     return super.isSelectAllOnFocusEnabled() && getScoutObject().isSelectAllOnFocus();
   }
@@ -439,39 +331,6 @@ public class RwtScoutStringField extends RwtScoutValueFieldComposite<IStringFiel
       }
     }
   } // end class P_TextVerifyListener
-
-  private class P_RwtValidateOnAnyKeyModifyListener implements ModifyListener {
-    private static final long serialVersionUID = 1L;
-
-    /*
-     * Do not call handleUiInputVerifier(), this can lead to endless loops.
-     */
-    @Override
-    public void modifyText(ModifyEvent e) {
-      if (!m_validateOnAnyKey) {
-        return;
-      }
-
-      if (getUpdateUiFromScoutLock().isReleased()) {
-        sendVerifyToScoutAndIgnoreResponses();
-      }
-    }
-
-    /*
-     * Do not call handleUiInputVerifier(), this can lead to endless loops.
-     */
-    private void sendVerifyToScoutAndIgnoreResponses() {
-      final String text = getUiField().getText();
-      // notify Scout
-      Runnable t = new Runnable() {
-        @Override
-        public void run() {
-          getScoutObject().getUIFacade().setTextFromUI(text);
-        }
-      };
-      getUiEnvironment().invokeScoutLater(t, 0);
-    }
-  } // end class P_RwtTextListener
 
   private class P_RwtLinkTrigger extends MouseAdapter {
     private static final long serialVersionUID = 1L;

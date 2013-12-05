@@ -10,28 +10,37 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.form.fields.numberfield;
 
+import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
+import java.text.ParsePosition;
 
 import org.eclipse.scout.commons.CompareUtility;
 import org.eclipse.scout.commons.LocaleThreadLocal;
+import org.eclipse.scout.commons.NumberUtility;
+import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.exception.VetoException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
-import org.eclipse.scout.rt.client.ui.form.fields.AbstractValueField;
+import org.eclipse.scout.rt.client.ui.form.fields.AbstractBasicField;
+import org.eclipse.scout.rt.client.ui.form.fields.decimalfield.AbstractDecimalField;
 import org.eclipse.scout.rt.shared.ScoutTexts;
 
-public abstract class AbstractNumberField<T extends Number> extends AbstractValueField<T> implements INumberField<T> {
+public abstract class AbstractNumberField<T extends Number> extends AbstractBasicField<T> implements INumberField<T> {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractNumberField.class);
 
+  @SuppressWarnings("deprecation")
   private INumberFieldUIFacade m_uiFacade;
   private String m_format;
   private boolean m_groupingUsed;
   private T m_minValue;
   private T m_maxValue;
+  private RoundingMode m_roundingMode;
 
   public AbstractNumberField() {
     this(true);
@@ -56,6 +65,34 @@ public abstract class AbstractNumberField<T extends Number> extends AbstractValu
     return true;
   }
 
+  /**
+   * Default used for {@link INumberField#setRoundingMode(RoundingMode)}
+   * <p>
+   * Sets the rounding mode used for formatting and parsing. When set to ROUND_UNNECESSARY the parsing accepts only
+   * values that can be assigned without rounding to the field's generic type and respect the maxFractionDigits property
+   * for decimal number fields.
+   * <p>
+   * When set to an invalid value, an {@link IllegalArgumentException} is thrown during {@link #initConfig()} Valid
+   * values are {@link BigDecimal#ROUND_DOWN}, {@link BigDecimal#ROUND_CEILING}, {@link BigDecimal#ROUND_FLOOR},
+   * {@link BigDecimal#ROUND_HALF_UP}, {@link BigDecimal#ROUND_HALF_DOWN}, {@link BigDecimal#ROUND_HALF_EVEN},
+   * {@link BigDecimal#ROUND_UNNECESSARY}
+   */
+  @ConfigProperty(ConfigProperty.ROUNDING_MODE)
+  @Order(250)
+  protected int getConfiguredRoundingMode() {
+    return BigDecimal.ROUND_UNNECESSARY;
+  }
+
+  /**
+   * Default for {@link INumberField#setMinValue(Number)}
+   */
+  protected abstract T getConfiguredMinValue();
+
+  /**
+   * Default for {@link INumberField#setMaxValue(Number)}
+   */
+  protected abstract T getConfiguredMaxValue();
+
   @Override
   protected int getConfiguredHorizontalAlignment() {
     return 1;
@@ -67,6 +104,19 @@ public abstract class AbstractNumberField<T extends Number> extends AbstractValu
     super.initConfig();
     setFormat(getConfiguredFormat());
     setGroupingUsed(getConfiguredGroupingUsed());
+    setRoundingMode(RoundingMode.valueOf(getConfiguredRoundingMode()));
+    setMinValue(getConfiguredMinValue());
+    setMaxValue(getConfiguredMaxValue());
+  }
+
+  @Override
+  public void setRoundingMode(RoundingMode roundingMode) {
+    m_roundingMode = roundingMode;
+  }
+
+  @Override
+  public RoundingMode getRoundingMode() {
+    return m_roundingMode;
   }
 
   @Override
@@ -176,33 +226,45 @@ public abstract class AbstractNumberField<T extends Number> extends AbstractValu
     if (validValue == null) {
       return "";
     }
-    String displayValue = createNumberFormat().format(validValue);
+    String displayValue = createDecimalFormat().format(validValue);
     return displayValue;
   }
 
+  /**
+   * @deprecated Will be removed with scout 3.11, use {@link #createDecimalFormat()}.
+   */
+  @Deprecated
   protected NumberFormat createNumberFormat() {
-    NumberFormat fmt = null;
+    return createDecimalFormat();
+  }
+
+  /**
+   * create a DecimalFormat instance for formatting and parsing
+   */
+  protected DecimalFormat createDecimalFormat() {
+    DecimalFormat fmt = (DecimalFormat) DecimalFormat.getNumberInstance(LocaleThreadLocal.get());
     if (getFormat() != null) {
-      DecimalFormat x = (DecimalFormat) DecimalFormat.getNumberInstance(LocaleThreadLocal.get());
-      x.applyPattern(getFormat());
-      x.setMinimumFractionDigits(0);
-      x.setMaximumFractionDigits(0);
-      fmt = x;
+      fmt.applyPattern(getFormat());
     }
     else {
-      fmt = NumberFormat.getNumberInstance(LocaleThreadLocal.get());
-      fmt.setMinimumFractionDigits(0);
-      fmt.setMaximumFractionDigits(0);
       fmt.setGroupingUsed(isGroupingUsed());
     }
+    fmt.setMinimumFractionDigits(0);
+    fmt.setMaximumFractionDigits(0);
+    fmt.setRoundingMode(getRoundingMode());
     return fmt;
   }
 
+  @SuppressWarnings("deprecation")
   @Override
   public INumberFieldUIFacade getUIFacade() {
     return m_uiFacade;
   }
 
+  /**
+   * When {@link INumberFieldUIFacade} is removed, this class will implements IBasicFieldUIFacade.
+   */
+  @SuppressWarnings("deprecation")
   private class P_UIFacade implements INumberFieldUIFacade {
     @Override
     public boolean setTextFromUI(String newText) {
@@ -212,5 +274,81 @@ public abstract class AbstractNumberField<T extends Number> extends AbstractValu
       // parse always, validity might change even if text is same
       return parseValue(newText);
     }
+  }
+
+  @Override
+  protected T parseValueInternal(String text) throws ProcessingException {
+    throw new ProcessingException("Not implemented");
+  }
+
+  /**
+   * Parses text input into a BigDecimal.
+   * <p>
+   * Callers can expect the resulting BigDecimal to lie in the range {@link #getMinValue()} --> {@link #getMaxValue()}
+   * and for subclasses of {@link AbstractDecimalField} to respect
+   * {@link AbstractDecimalField#getParsingFractionDigits()}. (The maximum fraction digits used for parsing is adapted
+   * to {@link AbstractDecimalField#getMultiplier()} if needed.)
+   * <p>
+   * If the parsing cannot be done complying these rules and considering {@link #getRoundingMode()} an exception is
+   * thrown.
+   * 
+   * @param text
+   * @return
+   * @throws ProcessingException
+   */
+  protected BigDecimal parseToBigDecimalInternal(String text) throws ProcessingException {
+    BigDecimal retVal = null;
+    text = StringUtility.nvl(text, "").trim();
+    if (text.length() > 0) {
+      text = ensureSuffix(text);
+      DecimalFormat df = createDecimalFormat();
+      df.setParseBigDecimal(true);
+      ParsePosition p = new ParsePosition(0);
+      BigDecimal valBeforeRounding = (BigDecimal) df.parse(text, p);
+      // check for bad syntax
+      if (p.getErrorIndex() >= 0 || p.getIndex() != text.length()) {
+        throw new ProcessingException(ScoutTexts.get("InvalidNumberMessageX", text));
+      }
+      try {
+        retVal = roundParsedValue(valBeforeRounding);
+      }
+      catch (ArithmeticException e) {
+        throw new ProcessingException(ScoutTexts.get("InvalidNumberMessageX", text));
+      }
+      // check for bad range
+      if (getMinValue() != null && retVal.compareTo(NumberUtility.numberToBigDecimal(getMinValue())) < 0) {
+        throw new ProcessingException(ScoutTexts.get("NumberTooSmallMessageXY", String.valueOf(getMinValue()), String.valueOf(getMaxValue())));
+      }
+      if (getMaxValue() != null && retVal.compareTo(NumberUtility.numberToBigDecimal(getMaxValue())) > 0) {
+        throw new ProcessingException(ScoutTexts.get("NumberTooLargeMessageXY", String.valueOf(getMinValue()), String.valueOf(getMaxValue())));
+      }
+    }
+    return retVal;
+  }
+
+  /**
+   * Rounds the parsed value according {@link #getRoundingMode()}.
+   * 
+   * @throws ArithmeticException
+   *           if roundingMode is {@link RoundingMode#UNNECESSARY} but rounding would be needed
+   */
+  protected BigDecimal roundParsedValue(BigDecimal valBeforeRounding) {
+    int precision = valBeforeRounding.toBigInteger().toString().length();
+    return valBeforeRounding.round(new MathContext(precision, getRoundingMode()));
+  }
+
+  private String ensureSuffix(String text) {
+    DecimalFormat df = createDecimalFormat();
+    String positiveSuffix = df.getPositiveSuffix();
+    String negativeSuffix = df.getNegativeSuffix();
+
+    if (positiveSuffix.equals(negativeSuffix)) {
+      String trimmedSuffix = StringUtility.trim(positiveSuffix);
+      if (text.endsWith(trimmedSuffix)) {
+        text = StringUtility.trim(text.substring(0, text.length() - trimmedSuffix.length()));
+      }
+      text = StringUtility.concatenateTokens(text, positiveSuffix);
+    }
+    return text;
   }
 }

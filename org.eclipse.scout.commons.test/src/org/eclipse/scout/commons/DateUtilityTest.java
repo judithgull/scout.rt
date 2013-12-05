@@ -19,11 +19,17 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.TimeZone;
 
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 /**
  * JUnit tests for {@link DateUtility}
+ * <p>
+ * Tests in this class change global state (timezone). Not designed to run in parallel.
+ * </p>
  */
 public class DateUtilityTest {
   private static final String EXPEC_DATE_1970_01_01_000000 = "1970-01-01_00:00:00.000";
@@ -80,6 +86,28 @@ public class DateUtilityTest {
   private static final String YEAR_DATE_TIME_PATTERN = "yyyy-MM-dd_HH:mm:ss.SSS";
   private static final int HOURS_IN_DAY = 24;
 
+  private static final double MINUTES_IN_HOURS = 60;
+  private static final double SECONDS_IN_MINUTES = 60;
+  private static final double SECONDS_IN_DAY = HOURS_IN_DAY * MINUTES_IN_HOURS * SECONDS_IN_MINUTES;
+
+  private TimeZone m_timezoneBackup;
+
+  /**
+   * Store original timezone, such that it can be changed in tests.
+   */
+  @Before
+  public void backupOriginalTimeZone() {
+    m_timezoneBackup = TimeZone.getDefault();
+  }
+
+  /**
+   * Reset the timezone to the original timezone.
+   */
+  @After
+  public void restoreOriginalTimeZone() {
+    TimeZone.setDefault(m_timezoneBackup);
+  }
+
   /**
    * Test for {@link DateUtility#addDays(Date, double)}
    * 
@@ -124,12 +152,14 @@ public class DateUtilityTest {
    */
   @Test
   public void testAddDays() {
-    double secondsInDay = 3600 * HOURS_IN_DAY;
-    for (int sec = 0; sec < secondsInDay; sec++) {
-      double d = sec / secondsInDay;
+    TimeZone.setDefault(TimeZone.getTimeZone("GMT+1"));
+    assertEquals("Test only works without day Daylight Saving Time", 0, TimeZone.getDefault().getDSTSavings());
+
+    for (int sec = 0; sec < SECONDS_IN_DAY; sec++) {
+      double d = sec / SECONDS_IN_DAY;
       Calendar cal = getCalendar(1, 0);
 
-      SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
+      SimpleDateFormat sdf = new SimpleDateFormat(YEAR_DATE_TIME_PATTERN);
       String result = sdf.format(DateUtility.addDays(cal.getTime(), d));
 
       cal.set(Calendar.SECOND, sec);
@@ -145,12 +175,14 @@ public class DateUtilityTest {
    */
   @Test
   public void testSubtractDays() {
-    double secondsInDay = 3600 * HOURS_IN_DAY;
-    for (int sec = 0; sec < secondsInDay; sec++) {
-      double d = -sec / secondsInDay;
+    TimeZone.setDefault(TimeZone.getTimeZone("GMT+1"));
+    assertEquals("Test only works without day Daylight Saving Time", 0, TimeZone.getDefault().getDSTSavings());
+
+    for (int sec = 0; sec < SECONDS_IN_DAY; sec++) {
+      double d = -sec / SECONDS_IN_DAY;
       Calendar cal = getCalendar(1, 0);
 
-      SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
+      SimpleDateFormat sdf = new SimpleDateFormat(YEAR_DATE_TIME_PATTERN);
       String result = sdf.format(DateUtility.addDays(cal.getTime(), d));
 
       cal.set(Calendar.SECOND, -sec);
@@ -198,18 +230,23 @@ public class DateUtilityTest {
 
   /**
    * Test for {@link DateUtility#addMilliseconds(Date, int)}
+   * <p>
+   * This test changes global state while running: Sets the default timezone to GMT+1 (no daylight safing time)
+   * </p>
    */
   @Test
   public void testAddMilliseconds() {
-    double minutes = 600 * HOURS_IN_DAY;
-    for (int i = 0; i < minutes; i++) {
+    TimeZone.setDefault(TimeZone.getTimeZone("GMT+1"));
+    assertEquals("Test only works without day Daylight Saving Time", 0, TimeZone.getDefault().getDSTSavings());
+
+    for (int i = 0; i < SECONDS_IN_DAY; i++) {
       Calendar cal = Calendar.getInstance();
       cal.set(Calendar.DATE, 1);
       cal.set(Calendar.HOUR_OF_DAY, 0);
       cal.set(Calendar.MINUTE, 0);
       cal.set(Calendar.SECOND, 0);
       cal.set(Calendar.MILLISECOND, 0);
-      SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss.SSS");
+      SimpleDateFormat sdf = new SimpleDateFormat(YEAR_DATE_TIME_PATTERN);
       String result = sdf.format(DateUtility.addMilliseconds(cal.getTime(), i));
       cal.set(Calendar.MILLISECOND, i);
       String expected = sdf.format(cal.getTime());
@@ -219,17 +256,22 @@ public class DateUtilityTest {
 
   /**
    * Test for {@link DateUtility#addSeconds(Date, int)}
+   * <p>
+   * This test changes global state while running: Sets the default timezone to GMT+1 (no daylight safing time)
+   * </p>
    */
   @Test
   public void testAddSeconds() {
-    double minutes = 600 * HOURS_IN_DAY;
+    TimeZone.setDefault(TimeZone.getTimeZone("GMT+1"));
+    assertEquals("Test only works without day Daylight Saving Time", 0, TimeZone.getDefault().getDSTSavings());
+
     Calendar cal = Calendar.getInstance();
-    for (int i = 0; i < minutes; i++) {
+    for (int i = 0; i < SECONDS_IN_DAY; i++) {
       cal.set(Calendar.DATE, 1);
       cal.set(Calendar.HOUR_OF_DAY, 0);
       cal.set(Calendar.MINUTE, 0);
       cal.set(Calendar.SECOND, 0);
-      SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
+      SimpleDateFormat sdf = new SimpleDateFormat(YEAR_DATE_TIME_PATTERN);
       String result = sdf.format(DateUtility.addSeconds(cal.getTime(), i));
       cal.set(Calendar.SECOND, i);
       String expected = sdf.format(cal.getTime());
@@ -239,21 +281,31 @@ public class DateUtilityTest {
 
   /**
    * Test for {@link DateUtility#addMinutes(Date, int)}
+   * <p>
+   * This test changes global state while running: Sets the default timezone to GMT+1 (no daylight safing time)
+   * </p>
    */
   @Test
   public void testAddMinutes() {
-    double minutes = 600 * HOURS_IN_DAY;
+    TimeZone.setDefault(TimeZone.getTimeZone("GMT+1"));
+    assertEquals("Test only works without day Daylight Saving Time", 0, TimeZone.getDefault().getDSTSavings());
+    //test adding minutes for 10 days
+    int testDays = 10;
+    double minutes = testDays * MINUTES_IN_HOURS * HOURS_IN_DAY;
+    SimpleDateFormat sdf = new SimpleDateFormat(YEAR_DATE_TIME_PATTERN);
     Calendar cal = Calendar.getInstance();
+
     for (int i = 0; i < minutes; i++) {
       cal.set(Calendar.DATE, 1);
       cal.set(Calendar.HOUR_OF_DAY, 0);
-      cal.set(Calendar.MINUTE, 0);
       cal.set(Calendar.SECOND, 0);
-      SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
-      String result = sdf.format(DateUtility.addMinutes(cal.getTime(), i));
+      cal.set(Calendar.MINUTE, 0);
+
+      String originalTime = sdf.format(cal.getTime());
+      String resultTime = sdf.format(DateUtility.addMinutes(cal.getTime(), i));
       cal.set(Calendar.MINUTE, i);
-      String expected = sdf.format(cal.getTime());
-      assertEquals(expected, result);
+      String expectedTime = sdf.format(cal.getTime());
+      assertEquals("Add " + i + "minutes to " + originalTime, expectedTime, resultTime);
     }
   }
 

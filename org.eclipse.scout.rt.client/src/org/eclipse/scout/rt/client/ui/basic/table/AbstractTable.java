@@ -96,7 +96,7 @@ import org.eclipse.scout.service.SERVICES;
  * for every inner column class there is a generated getXYColumn method directly
  * on the table
  */
-public abstract class AbstractTable extends AbstractPropertyObserver implements ITable2 {
+public abstract class AbstractTable extends AbstractPropertyObserver implements ITable {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractTable.class);
 
   private boolean m_initialized;
@@ -632,7 +632,7 @@ public abstract class AbstractTable extends AbstractPropertyObserver implements 
         SERVICES.getService(IExceptionHandlerService.class).handleException(ex);
       }
       catch (Throwable t) {
-        SERVICES.getService(IExceptionHandlerService.class).handleException(createNewUnexpectedProcessingExcpetion(t));
+        SERVICES.getService(IExceptionHandlerService.class).handleException(createNewUnexpectedProcessingException(t));
       }
     }
     else {
@@ -690,7 +690,8 @@ public abstract class AbstractTable extends AbstractPropertyObserver implements 
 
   private Class<? extends IMenu>[] getConfiguredMenus() {
     Class[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
-    Class<IMenu>[] foca = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(dca, IMenu.class);
+    Class[] filtered = ConfigurationUtility.filterClasses(dca, IMenu.class);
+    Class<IMenu>[] foca = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(filtered, IMenu.class);
     return ConfigurationUtility.removeReplacedClasses(foca);
   }
 
@@ -2566,11 +2567,11 @@ public abstract class AbstractTable extends AbstractPropertyObserver implements 
     wasEverValid(newIRow);
     synchronized (m_cachedRowsLock) {
       m_cachedRows = null;
+      int newIndex = m_rows.size();
+      newIRow.setRowIndex(newIndex);
+      newIRow.setTableInternal(this);
+      m_rows.add(newIRow);
     }
-    int newIndex = m_rows.size();
-    newIRow.setRowIndex(newIndex);
-    newIRow.setTableInternal(this);
-    m_rows.add(newIRow);
     enqueueDecorationTasks(newIRow);
     return newIRow;
   }
@@ -2620,9 +2621,9 @@ public abstract class AbstractTable extends AbstractPropertyObserver implements 
     if (targetIndex != sourceIndex) {
       synchronized (m_cachedRowsLock) {
         m_cachedRows = null;
+        ITableRow row = m_rows.remove(sourceIndex);
+        m_rows.add(targetIndex, row);
       }
-      ITableRow row = m_rows.remove(sourceIndex);
-      m_rows.add(targetIndex, row);
       // update row indexes
       int min = Math.min(sourceIndex, targetIndex);
       int max = Math.max(sourceIndex, targetIndex);
@@ -2692,8 +2693,8 @@ public abstract class AbstractTable extends AbstractPropertyObserver implements 
         //peformance quick-check
         if (rows == existingRows) {
           //remove all of them
-          m_rows.clear();
           synchronized (m_cachedRowsLock) {
+            m_rows.clear();
             m_cachedRows = null;
           }
           clearValidatedValuesOnAllColumns();
@@ -2710,11 +2711,14 @@ public abstract class AbstractTable extends AbstractPropertyObserver implements 
             ITableRow candidateRow = deletedRows[i];
             if (candidateRow != null) {
               // delete regardless if index is right
-              boolean removed = m_rows.remove(candidateRow);
-              if (removed) {
-                synchronized (m_cachedRowsLock) {
+              boolean removed = false;
+              synchronized (m_cachedRowsLock) {
+                removed = m_rows.remove(candidateRow);
+                if (removed) {
                   m_cachedRows = null;
                 }
+              }
+              if (removed) {
                 clearValidatedValueOnColumns(candidateRow);
                 clearRowValidity(candidateRow);
                 deleteRowImpl(candidateRow);
@@ -3039,7 +3043,7 @@ public abstract class AbstractTable extends AbstractPropertyObserver implements 
       if (filterManager != null && filterManager.getFilters() != null) {
         for (IColumn<?> col : getColumns()) {
           for (ITableColumnFilter<?> filter : filterManager.getFilters()) {
-            if (filter.getColumn().getClass().equals(col.getClass())) {
+            if (filter.getColumn().getColumnId().equals(col.getColumnId())) {
               filter.setColumn(col);
             }
           }
@@ -3580,7 +3584,7 @@ public abstract class AbstractTable extends AbstractPropertyObserver implements 
       SERVICES.getService(IExceptionHandlerService.class).handleException(e);
     }
     catch (Throwable t) {
-      SERVICES.getService(IExceptionHandlerService.class).handleException(createNewUnexpectedProcessingExcpetion(t));
+      SERVICES.getService(IExceptionHandlerService.class).handleException(createNewUnexpectedProcessingException(t));
     }
   }
 
@@ -3617,7 +3621,7 @@ public abstract class AbstractTable extends AbstractPropertyObserver implements 
       SERVICES.getService(IExceptionHandlerService.class).handleException(e);
     }
     catch (Throwable t) {
-      SERVICES.getService(IExceptionHandlerService.class).handleException(createNewUnexpectedProcessingExcpetion(t));
+      SERVICES.getService(IExceptionHandlerService.class).handleException(createNewUnexpectedProcessingException(t));
     }
   }
 
@@ -3736,7 +3740,7 @@ public abstract class AbstractTable extends AbstractPropertyObserver implements 
         SERVICES.getService(IExceptionHandlerService.class).handleException(ex);
       }
       catch (Throwable t) {
-        SERVICES.getService(IExceptionHandlerService.class).handleException(createNewUnexpectedProcessingExcpetion(t));
+        SERVICES.getService(IExceptionHandlerService.class).handleException(createNewUnexpectedProcessingException(t));
       }
     }
   }
@@ -3782,7 +3786,7 @@ public abstract class AbstractTable extends AbstractPropertyObserver implements 
             SERVICES.getService(IExceptionHandlerService.class).handleException(ex);
           }
           catch (Throwable t) {
-            SERVICES.getService(IExceptionHandlerService.class).handleException(createNewUnexpectedProcessingExcpetion(t));
+            SERVICES.getService(IExceptionHandlerService.class).handleException(createNewUnexpectedProcessingException(t));
           }
         }
       }
@@ -4086,7 +4090,7 @@ public abstract class AbstractTable extends AbstractPropertyObserver implements 
     return m_uiFacade;
   }
 
-  private ProcessingException createNewUnexpectedProcessingExcpetion(Throwable t) {
+  private ProcessingException createNewUnexpectedProcessingException(Throwable t) {
     return new ProcessingException("Unexpected", t);
   }
 

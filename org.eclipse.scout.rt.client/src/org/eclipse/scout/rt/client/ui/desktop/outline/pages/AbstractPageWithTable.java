@@ -14,7 +14,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.eclipse.core.runtime.IStatus;
 import org.eclipse.scout.commons.ConfigurationUtility;
+import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
 import org.eclipse.scout.commons.annotations.Order;
@@ -22,6 +24,7 @@ import org.eclipse.scout.commons.annotations.PageData;
 import org.eclipse.scout.commons.exception.IProcessingStatus;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.exception.ProcessingStatus;
+import org.eclipse.scout.commons.exception.VetoException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ClientSyncJob;
@@ -44,8 +47,11 @@ import org.eclipse.scout.rt.client.ui.form.FormListener;
 import org.eclipse.scout.rt.client.ui.form.IForm;
 import org.eclipse.scout.rt.shared.ContextMap;
 import org.eclipse.scout.rt.shared.ScoutTexts;
+import org.eclipse.scout.rt.shared.TEXTS;
+import org.eclipse.scout.rt.shared.data.page.AbstractTablePageData;
 import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.rt.shared.services.common.jdbc.SearchFilter;
+import org.eclipse.scout.rt.shared.ui.UserAgentUtility;
 import org.eclipse.scout.service.SERVICES;
 
 /**
@@ -60,6 +66,7 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
   private FormListener m_searchFormListener;
   private boolean m_searchRequired;
   private boolean m_searchActive;
+  private boolean m_limitedResult;
   private boolean m_showEmptySpaceMenus;
   private boolean m_showTableRowMenus;
   private final HashMap<ITableRow, IPage> m_tableRowToPageMap = new HashMap<ITableRow, IPage>();
@@ -273,6 +280,13 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
     }
     else {
       setPagePopulateStatus(null);
+    }
+    if (isLimitedResult()) {
+      String maxOutlineWarningKey = "MaxOutlineRowWarning";
+      if (UserAgentUtility.isTouchDevice()) {
+        maxOutlineWarningKey = "MaxOutlineRowWarningMobile";
+      }
+      setPagePopulateStatus(new ProcessingStatus(TEXTS.get(maxOutlineWarningKey, "" + getTable().getRowCount()), IStatus.WARNING));
     }
   }
 
@@ -633,6 +647,17 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
     }
   }
 
+  /**
+   * Indicates if the result displayed in the table is the whole result or if there is more data in the server (that
+   * wasn't sent to the client).
+   * Is set if {@link #importPageData(AbstractTablePageData)} was used.
+   * 
+   * @since 3.10.0-M3
+   */
+  protected boolean isLimitedResult() {
+    return m_limitedResult;
+  }
+
   @Override
   public void pageActivatedNotify() {
     ensureInitialized();
@@ -668,9 +693,20 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
   }
 
   /**
+   * Import the content of the tablePageData in the table of the page.
+   * 
+   * @param tablePageData
+   * @since 3.10.0-M3
+   */
+  protected void importPageData(AbstractTablePageData tablePageData) throws ProcessingException {
+    getTable().importFromTableBeanData(tablePageData);
+    m_limitedResult = tablePageData.isLimitedResult();
+  }
+
+  /**
    * load table data
    */
-  private void loadTableDataImpl() throws ProcessingException {
+  protected void loadTableDataImpl() throws ProcessingException {
     if (m_table != null) {
       try {
         m_table.setTableChanging(true);
@@ -692,7 +728,14 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
           setPagePopulateStatus(new ProcessingStatus(ScoutTexts.get("SearchWasCanceled"), ProcessingStatus.CANCEL));
         }
         else {
-          setPagePopulateStatus(new ProcessingStatus(ScoutTexts.get("ErrorWhileLoadingData"), ProcessingStatus.CANCEL));
+          String message = null;
+          if (pe instanceof VetoException) {
+            message = pe.getMessage();
+          }
+          if (StringUtility.isNullOrEmpty(message)) {
+            message = ScoutTexts.get("ErrorWhileLoadingData");
+          }
+          setPagePopulateStatus(new ProcessingStatus(message, ProcessingStatus.CANCEL));
         }
         throw pe;
       }

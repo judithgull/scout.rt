@@ -14,7 +14,7 @@ import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.eclipse.scout.commons.holders.ITableHolder;
+import org.eclipse.scout.commons.holders.ITableBeanRowHolder;
 
 /**
  * Bean that stores the contents of a scout table row. This class is intended to be extended for every table type and
@@ -22,28 +22,8 @@ import org.eclipse.scout.commons.holders.ITableHolder;
  * 
  * @since 3.8.2
  */
-public abstract class AbstractTableRowData implements Serializable {
+public abstract class AbstractTableRowData implements ITableBeanRowHolder, Serializable {
   private static final long serialVersionUID = 1L;
-
-  /**
-   * same value as {@link ITableHolder#STATUS_NON_CHANGED}.
-   */
-  public static final int STATUS_NON_CHANGED = ITableHolder.STATUS_NON_CHANGED;
-
-  /**
-   * same value as {@link ITableHolder#STATUS_INSERTED}.
-   */
-  public static final int STATUS_INSERTED = ITableHolder.STATUS_INSERTED;
-
-  /**
-   * same value as {@link ITableHolder#STATUS_UPDATED}.
-   */
-  public static final int STATUS_UPDATED = ITableHolder.STATUS_UPDATED;
-
-  /**
-   * same value as {@link ITableHolder#STATUS_DELETED}.
-   */
-  public static final int STATUS_DELETED = ITableHolder.STATUS_DELETED;
 
   private int m_rowState;
   private Map<String, Object> m_customColumnValues;
@@ -55,6 +35,7 @@ public abstract class AbstractTableRowData implements Serializable {
    * @see #STATUS_UPDATED
    * @see #STATUS_DELETED
    */
+  @Override
   public int getRowState() {
     return m_rowState;
   }
@@ -103,16 +84,14 @@ public abstract class AbstractTableRowData implements Serializable {
 
   /**
    * Sets a custom column value for the given <code>columnId</code>. If <code>value</code> is <code>null</code>, the
-   * custom column entry is removed from the map.
+   * custom column entry is removed by {@link #removeCustomColumnValue(String)}.
    * 
    * @param columnId
    * @param value
    */
   public void setCustomColumnValue(String columnId, Object value) {
     if (value == null) {
-      if (m_customColumnValues != null) {
-        m_customColumnValues.remove(columnId);
-      }
+      removeCustomColumnValue(columnId);
       return;
     }
 
@@ -120,5 +99,28 @@ public abstract class AbstractTableRowData implements Serializable {
       m_customColumnValues = new HashMap<String, Object>();
     }
     m_customColumnValues.put(columnId, value);
+  }
+
+  /**
+   * Removes the custom column value from the map.
+   * <p>
+   * Returns the custom column value to which the map previously associated the <code>columnId</code>, or
+   * <code>null</code> if the map contained no mapping for the <code>columnId</code>.
+   * </p>
+   * 
+   * @param columnId
+   *          columnId whose mapping is to be removed
+   * @return the previous custom column value associated with <code>columnId</code>, or <code>null</code> if there was
+   *         no mapping for <code>columnId</code>.
+   */
+  public Object removeCustomColumnValue(String columnId) {
+    if (m_customColumnValues == null) {
+      return null;
+    }
+    Object value = m_customColumnValues.remove(columnId);
+    if (m_customColumnValues.isEmpty()) {
+      m_customColumnValues = null;
+    }
+    return value;
   }
 }

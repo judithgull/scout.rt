@@ -248,7 +248,7 @@ public abstract class AbstractScheduler implements IScheduler {
   public Collection<ISchedulerJob> getRunningJobs(String groupId, String jobId) {
     synchronized (m_queueLock) {
       ArrayList<ISchedulerJob> jobs = new ArrayList<ISchedulerJob>();
-      for (ISchedulerJob job : m_availableJobs) {
+      for (ISchedulerJob job : m_runningJobs) {
         if (matches(job, groupId, jobId)) {
           jobs.add(job);
         }
@@ -360,14 +360,18 @@ public abstract class AbstractScheduler implements IScheduler {
       if (LOG.isInfoEnabled()) {
         LOG.info("scheduler started");
       }
+      TickSignal signal = m_ticker.waitForNextTick();
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("tick " + signal);
+      }
       while (!isStopSignal()) {
         try {
           if (isActive()) {
-            TickSignal signal = m_ticker.waitForNextTick();
+            visitAllJobs(signal);
+            signal = m_ticker.waitForNextTick();
             if (LOG.isDebugEnabled()) {
               LOG.debug("tick " + signal);
             }
-            visitAllJobs(signal);
           }
           else {
             if (LOG.isDebugEnabled()) {

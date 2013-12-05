@@ -36,6 +36,7 @@ import javax.mail.Message;
 import javax.mail.MessagingException;
 import javax.mail.Multipart;
 import javax.mail.Part;
+import javax.mail.Session;
 import javax.mail.internet.AddressException;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeBodyPart;
@@ -48,6 +49,7 @@ import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 
+@SuppressWarnings("restriction")
 public final class MailUtility {
 
   public static final IScoutLogger LOG = ScoutLogManager.getLogger(MailUtility.class);
@@ -662,13 +664,17 @@ public final class MailUtility {
   }
 
   public static MimeMessage createMessageFromBytes(byte[] bytes) throws ProcessingException {
-    return instance.createMessageFromBytesImpl(bytes);
+    return instance.createMessageFromBytesImpl(bytes, null);
   }
 
-  private MimeMessage createMessageFromBytesImpl(byte[] bytes) throws ProcessingException {
+  public static MimeMessage createMessageFromBytes(byte[] bytes, Session session) throws ProcessingException {
+    return instance.createMessageFromBytesImpl(bytes, session);
+  }
+
+  private MimeMessage createMessageFromBytesImpl(byte[] bytes, Session session) throws ProcessingException {
     try {
       ByteArrayInputStream st = new ByteArrayInputStream(bytes);
-      return new MimeMessage(null, st);
+      return new MimeMessage(session, st);
     }
     catch (Throwable t) {
       throw new ProcessingException("Unexpected: ", t);

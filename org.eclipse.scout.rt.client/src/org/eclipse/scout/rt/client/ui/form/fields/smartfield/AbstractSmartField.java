@@ -88,6 +88,8 @@ public abstract class AbstractSmartField<T> extends AbstractValueField<T> implem
   private boolean m_loadIncremental;
   private boolean m_allowCustomText;
 
+  private int m_proposalFormHeight;
+
   public AbstractSmartField() {
     this(true);
   }
@@ -213,6 +215,16 @@ public abstract class AbstractSmartField<T> extends AbstractValueField<T> implem
   }
 
   /**
+   * @return
+   *         default height: 280
+   */
+  @ConfigProperty(ConfigProperty.INTEGER)
+  @Order(280)
+  protected Integer getConfiguredProposalFormHeight() {
+    return 280;
+  }
+
+  /**
    * see {@link #getConfiguredBrowseNewText()}<br>
    * In most cases this method is implemented as opening a "New XY..." dialog.
    * <p>
@@ -334,7 +346,8 @@ public abstract class AbstractSmartField<T> extends AbstractValueField<T> implem
 
   private Class<? extends IMenu>[] getConfiguredMenus() {
     Class[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
-    Class<IMenu>[] foca = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(dca, IMenu.class);
+    Class[] filtered = ConfigurationUtility.filterClasses(dca, IMenu.class);
+    Class<IMenu>[] foca = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(filtered, IMenu.class);
     return ConfigurationUtility.removeReplacedClasses(foca);
   }
 
@@ -395,6 +408,7 @@ public abstract class AbstractSmartField<T> extends AbstractValueField<T> implem
     setBrowseMaxRowCount(getConfiguredBrowseMaxRowCount());
     setBrowseNewText(getConfiguredBrowseNewText());
     setAllowCustomText(getConfiguredAllowCustomText());
+    setProposalFormHeight(getConfiguredProposalFormHeight());
     setProposalFormProvider(createProposalFormProvider());
     // code type
     if (getConfiguredCodeType() != null) {
@@ -1610,4 +1624,13 @@ public abstract class AbstractSmartField<T> extends AbstractValueField<T> implem
     }
   }
 
+  @Override
+  public void setProposalFormHeight(int proposalFormHeight) {
+    m_proposalFormHeight = proposalFormHeight;
+  }
+
+  @Override
+  public int getProposalFormHeight() {
+    return m_proposalFormHeight;
+  }
 }
