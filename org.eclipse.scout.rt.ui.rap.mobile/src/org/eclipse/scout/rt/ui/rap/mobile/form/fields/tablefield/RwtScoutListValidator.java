@@ -13,17 +13,17 @@ package org.eclipse.scout.rt.ui.rap.mobile.form.fields.tablefield;
 import org.eclipse.rap.rwt.RWT;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.IColumn;
 import org.eclipse.scout.rt.shared.validate.markup.IMarkupValidator;
-import org.eclipse.scout.rt.ui.rap.basic.RwtScoutCompositeValidator;
+import org.eclipse.scout.rt.ui.rap.basic.RwtScoutComponentValidator;
 import org.eclipse.swt.internal.widgets.MarkupValidator;
 
 /**
  * @since 3.10.0-M3
  */
 @SuppressWarnings("restriction")
-public class RwtScoutListValidator extends RwtScoutCompositeValidator<IColumn> {
+public class RwtScoutListValidator extends RwtScoutComponentValidator<IColumn<?>> {
 
-  public RwtScoutListValidator(IRwtScoutList uiList, IMarkupValidator markupValidator) {
-    super(uiList, markupValidator);
+  public RwtScoutListValidator(IColumn<?> column, IRwtScoutList uiList, IMarkupValidator markupValidator) {
+    super(column, uiList, markupValidator);
   }
 
   @Override

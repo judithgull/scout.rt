@@ -53,6 +53,8 @@ import org.eclipse.scout.rt.client.services.common.exceptionhandler.ErrorHandler
 import org.eclipse.scout.rt.client.services.common.session.IClientSessionRegistryService;
 import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
 import org.eclipse.scout.rt.client.ui.basic.filechooser.IFileChooser;
+import org.eclipse.scout.rt.client.ui.basic.table.columns.IColumn;
+import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
 import org.eclipse.scout.rt.client.ui.desktop.DesktopEvent;
 import org.eclipse.scout.rt.client.ui.desktop.DesktopListener;
 import org.eclipse.scout.rt.client.ui.desktop.IDesktop;
@@ -63,8 +65,14 @@ import org.eclipse.scout.rt.shared.data.basic.FontSpec;
 import org.eclipse.scout.rt.shared.ui.UiDeviceType;
 import org.eclipse.scout.rt.shared.ui.UiLayer;
 import org.eclipse.scout.rt.shared.ui.UserAgent;
+import org.eclipse.scout.rt.shared.validate.markup.IMarkupValidator;
+import org.eclipse.scout.rt.shared.validate.markup.WhitelistMarkupValidator;
 import org.eclipse.scout.rt.ui.rap.basic.IRwtScoutComposite;
 import org.eclipse.scout.rt.ui.rap.basic.WidgetPrinter;
+import org.eclipse.scout.rt.ui.rap.basic.table.IRwtScoutTableForPatch;
+import org.eclipse.scout.rt.ui.rap.basic.table.RwtScoutColumnValidator;
+import org.eclipse.scout.rt.ui.rap.basic.tree.IRwtScoutTree;
+import org.eclipse.scout.rt.ui.rap.basic.tree.RwtScoutTreeNodeValidator;
 import org.eclipse.scout.rt.ui.rap.busy.RwtBusyHandler;
 import org.eclipse.scout.rt.ui.rap.concurrency.RwtScoutSynchronizer;
 import org.eclipse.scout.rt.ui.rap.extension.UiDecorationExtensionPoint;
@@ -1354,6 +1362,21 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
 
   protected void setActivateDesktopCalled(boolean activateDesktopCalled) {
     m_activateDesktopCalled = activateDesktopCalled;
+  }
+
+  @Override
+  public IMarkupValidator createMarkupValidator() {
+    return new WhitelistMarkupValidator();
+  }
+
+  @Override
+  public RwtScoutColumnValidator createColumnValidator(IColumn<?> column, IRwtScoutTableForPatch uiTable, IMarkupValidator markupValidator) {
+    return new RwtScoutColumnValidator(column, uiTable, markupValidator);
+  }
+
+  @Override
+  public RwtScoutTreeNodeValidator createTreeNodeValidator(ITreeNode treeNode, IRwtScoutTree uiTree, IMarkupValidator markupValidator) {
+    return new RwtScoutTreeNodeValidator(treeNode, uiTree, markupValidator);
   }
 
   private class P_LocaleListener implements ILocaleListener {

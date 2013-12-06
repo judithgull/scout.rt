@@ -13,17 +13,17 @@ package org.eclipse.scout.rt.ui.rap.basic.tree;
 import org.eclipse.rap.rwt.RWT;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
 import org.eclipse.scout.rt.shared.validate.markup.IMarkupValidator;
-import org.eclipse.scout.rt.ui.rap.basic.RwtScoutCompositeValidator;
+import org.eclipse.scout.rt.ui.rap.basic.RwtScoutComponentValidator;
 import org.eclipse.swt.internal.widgets.MarkupValidator;
 
 /**
  * @since 3.10.0-M3
  */
 @SuppressWarnings("restriction")
-public class RwtScoutTreeNodeValidator extends RwtScoutCompositeValidator<ITreeNode> {
+public class RwtScoutTreeNodeValidator extends RwtScoutComponentValidator<ITreeNode> {
 
-  public RwtScoutTreeNodeValidator(IRwtScoutTree uiTree, IMarkupValidator markupValidator) {
-    super(uiTree, markupValidator);
+  public RwtScoutTreeNodeValidator(ITreeNode treeNode, IRwtScoutTree uiTree, IMarkupValidator markupValidator) {
+    super(treeNode, uiTree, markupValidator);
   }
 
   @Override

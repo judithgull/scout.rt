@@ -18,11 +18,13 @@ import org.eclipse.scout.rt.ui.rap.util.HtmlTextUtility;
 /**
  * @since 3.10.0-M4
  */
-public abstract class RwtScoutCompositeValidator<T extends IMarkupComponent> {
+public abstract class RwtScoutComponentValidator<T extends IMarkupComponent> {
+  private final T m_component;
   private final IRwtScoutComposite<?> m_uiComposite;
   private final IMarkupValidator m_markupValidator;
 
-  public RwtScoutCompositeValidator(IRwtScoutComposite<?> uiComposite, IMarkupValidator markupValidator) {
+  public RwtScoutComponentValidator(T component, IRwtScoutComposite<?> uiComposite, IMarkupValidator markupValidator) {
+    m_component = component;
     m_uiComposite = uiComposite;
     m_markupValidator = markupValidator;
   }
@@ -39,15 +41,15 @@ public abstract class RwtScoutCompositeValidator<T extends IMarkupComponent> {
 
   protected abstract boolean isMarkupEnabledOnUiComposite();
 
-  public String validateText(T component, String text) {
+  public String validateText(String text) {
     boolean isHtmlMarkupText = HtmlTextUtility.isTextWithHtmlMarkup(text);
 
-    if (!component.hasHtmlMarkup() && isHtmlMarkupText) {
+    if (!m_component.hasHtmlMarkup() && isHtmlMarkupText) {
       return AbstractMarkupValidator.escapeHtml(text);
     }
 
-    if (component.hasHtmlMarkup() && isMarkupValidationDisabledOnUiComposite() && isMarkupEnabledOnUiComposite()) {
-      component.extendMarkupList(m_markupValidator.getMarkupList());
+    if (m_component.hasHtmlMarkup() && isMarkupValidationDisabledOnUiComposite() && isMarkupEnabledOnUiComposite()) {
+      m_component.extendMarkupList(m_markupValidator.getMarkupList());
       return m_markupValidator.validate(text);
     }
 

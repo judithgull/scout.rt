@@ -34,6 +34,10 @@ public class MarkupWhiteList implements IMarkupList {
 
   private Set<String> m_tags;
   private Map<String, Set<String>> m_attributes;
+  private boolean m_commentsAllowed;
+  private boolean m_dataAllowed;
+  private boolean m_documentTypeAllowed;
+  private boolean m_xmlDeclarationAllowed;
 
   public static MarkupWhiteList emptyList() {
     return new MarkupWhiteList();
@@ -41,6 +45,12 @@ public class MarkupWhiteList implements IMarkupList {
 
   public static MarkupWhiteList defaultList() {
     return new MarkupWhiteList()
+
+        .setCommentsAllowed(false)
+        .setDataAllowed(false)
+        .setDocumentTypeAllowed(false)
+        .setXmlDeclarationAllowed(false)
+
         .addTags(DEFAULT_TAGS)
 
         .addAttributes("a", "href", "title")
@@ -50,7 +60,7 @@ public class MarkupWhiteList implements IMarkupList {
         .addAttributes("colgroup", "span", "width")
         .addAttributes("div", "id")
         .addAttributes("font", "color")
-        .addAttributes("img", "align", "alt", "height", "src", "title", "width")
+        //        .addAttributes("img", "align", "alt", "height", "src", "title", "width")
         .addAttributes("meta", "http-equiv", "content")
         .addAttributes("ol", "start", "type")
         .addAttributes("q", "cite")
@@ -159,5 +169,49 @@ public class MarkupWhiteList implements IMarkupList {
   @Override
   public boolean areAllTagsAndAttributesAllowed() {
     return allTagsAllowed() && allAttributesAllowed(ALL_TAGS);
+  }
+
+  @Override
+  public boolean isCommentsAllowed() {
+    return m_commentsAllowed;
+  }
+
+  @Override
+  public MarkupWhiteList setCommentsAllowed(boolean commentAllowed) {
+    m_commentsAllowed = commentAllowed;
+    return this;
+  }
+
+  @Override
+  public boolean isDataAllowed() {
+    return m_dataAllowed;
+  }
+
+  @Override
+  public MarkupWhiteList setDataAllowed(boolean dataAllowed) {
+    m_dataAllowed = dataAllowed;
+    return this;
+  }
+
+  @Override
+  public boolean isDocumentTypeAllowed() {
+    return m_documentTypeAllowed;
+  }
+
+  @Override
+  public MarkupWhiteList setDocumentTypeAllowed(boolean documentTypeAllowed) {
+    m_documentTypeAllowed = documentTypeAllowed;
+    return this;
+  }
+
+  @Override
+  public boolean isXmlDeclarationAllowed() {
+    return m_xmlDeclarationAllowed;
+  }
+
+  @Override
+  public MarkupWhiteList setXmlDeclarationAllowed(boolean xmlDeclarationAllowed) {
+    m_xmlDeclarationAllowed = xmlDeclarationAllowed;
+    return this;
   }
 }

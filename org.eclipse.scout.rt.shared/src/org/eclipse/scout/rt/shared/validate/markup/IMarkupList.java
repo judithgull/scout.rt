@@ -28,4 +28,19 @@ public interface IMarkupList {
 
   boolean areAllTagsAndAttributesAllowed();
 
+  boolean isCommentsAllowed();
+
+  IMarkupList setCommentsAllowed(boolean commentsAllowed);
+
+  boolean isDataAllowed();
+
+  IMarkupList setDataAllowed(boolean dataAllowed);
+
+  boolean isDocumentTypeAllowed();
+
+  IMarkupList setDocumentTypeAllowed(boolean documentTypeAllowed);
+
+  boolean isXmlDeclarationAllowed();
+
+  IMarkupList setXmlDeclarationAllowed(boolean xmlDeclarationAllowed);
 }

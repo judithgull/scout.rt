@@ -10,12 +10,11 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.shared.validate.markup;
 
-import org.jsoup.nodes.Node;
-import org.jsoup.select.NodeVisitor;
-
 /**
  * @since 3.10.0-M4
  */
-public interface IMarkupVisitor extends NodeVisitor {
-  boolean isRemovedNode(Node node);
+public interface IMarkupVisitor {
+
+  boolean visit(NodeBean nodeBean);
+
 }

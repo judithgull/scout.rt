@@ -10,13 +10,25 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.shared.validate.markup;
 
+import org.jsoup.nodes.Node;
+
 /**
  * @since 3.10.0-M4
  */
-public class WhitelistMarkupValidatorFactory implements IMarkupValidatorFactory {
+public class NodeBean {
+  private final Node m_node;
+  private final int m_depth;
 
-  @Override
-  public IMarkupValidator createMarkupValidator() {
-    return new WhitelistMarkupValidator();
+  public NodeBean(Node node, int depth) {
+    m_node = node;
+    m_depth = depth;
+  }
+
+  public final Node getNode() {
+    return m_node;
+  }
+
+  public final int getDepth() {
+    return m_depth;
   }
 }

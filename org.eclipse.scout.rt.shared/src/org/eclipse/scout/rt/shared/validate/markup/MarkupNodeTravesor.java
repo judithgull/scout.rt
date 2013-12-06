@@ -10,6 +10,7 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.shared.validate.markup;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -30,42 +31,25 @@ public class MarkupNodeTravesor implements IMarkupNodeTravesor {
     // traverses nodes using BFS
     int depth = 0;
     LinkedList<NodeBean> toVisit = new LinkedList<NodeBean>();
-    insert(toVisit, depth, root);
+    List<Node> rootList = new ArrayList<Node>();
+    rootList.add(root);
+    insert(toVisit, depth, rootList);
 
     while (!toVisit.isEmpty()) {
       NodeBean bean = toVisit.removeFirst();
       Node node = bean.getNode();
-      depth = bean.getDepth();
 
-      m_visitor.head(node, depth);
-      if (!m_visitor.isRemovedNode(node) && node.childNodeSize() > 0) {
+      boolean continueVisiting = m_visitor.visit(bean);
+      if (continueVisiting && node.childNodeSize() > 0) {
         List<Node> childNodes = node.childNodes();
-        insert(toVisit, depth + 1, childNodes.toArray(new Node[childNodes.size()]));
+        insert(toVisit, bean.getDepth() + 1, childNodes);
       }
     }
   }
 
-  private void insert(List<NodeBean> nodeBeans, int depth, Node... nodes) {
+  private void insert(List<NodeBean> nodeBeans, int depth, List<Node> nodes) {
     for (Node node : nodes) {
       nodeBeans.add(new NodeBean(node, depth));
-    }
-  }
-
-  private static class NodeBean {
-    private final Node m_node;
-    private final int m_depth;
-
-    public NodeBean(Node node, int depth) {
-      m_node = node;
-      m_depth = depth;
-    }
-
-    public final Node getNode() {
-      return m_node;
-    }
-
-    public final int getDepth() {
-      return m_depth;
     }
   }
 }

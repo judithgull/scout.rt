@@ -17,13 +17,20 @@ import org.eclipse.scout.commons.job.JobEx;
 import org.eclipse.scout.rt.client.ClientJob;
 import org.eclipse.scout.rt.client.IClientSession;
 import org.eclipse.scout.rt.client.ui.basic.filechooser.IFileChooser;
+import org.eclipse.scout.rt.client.ui.basic.table.columns.IColumn;
+import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
 import org.eclipse.scout.rt.client.ui.desktop.IDesktop;
 import org.eclipse.scout.rt.client.ui.form.IForm;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.client.ui.messagebox.IMessageBox;
 import org.eclipse.scout.rt.shared.data.basic.FontSpec;
 import org.eclipse.scout.rt.shared.servicetunnel.DefaultServiceTunnelContentHandler;
+import org.eclipse.scout.rt.shared.validate.markup.IMarkupValidator;
 import org.eclipse.scout.rt.ui.rap.basic.IRwtScoutComposite;
+import org.eclipse.scout.rt.ui.rap.basic.table.IRwtScoutTableForPatch;
+import org.eclipse.scout.rt.ui.rap.basic.table.RwtScoutColumnValidator;
+import org.eclipse.scout.rt.ui.rap.basic.tree.IRwtScoutTree;
+import org.eclipse.scout.rt.ui.rap.basic.tree.RwtScoutTreeNodeValidator;
 import org.eclipse.scout.rt.ui.rap.form.IRwtScoutForm;
 import org.eclipse.scout.rt.ui.rap.form.fields.IRwtScoutFormField;
 import org.eclipse.scout.rt.ui.rap.form.fields.RwtScoutFieldComposite;
@@ -238,4 +245,11 @@ public interface IRwtEnvironment {
   void addEnvironmentListener(IRwtEnvironmentListener listener);
 
   void removeEnvironmentListener(IRwtEnvironmentListener listener);
+
+  IMarkupValidator createMarkupValidator();
+
+  RwtScoutColumnValidator createColumnValidator(IColumn<?> column, IRwtScoutTableForPatch uiTable, IMarkupValidator markupValidator);
+
+  RwtScoutTreeNodeValidator createTreeNodeValidator(ITreeNode treeNode, IRwtScoutTree uiTree, IMarkupValidator markupValidator);
+
 }

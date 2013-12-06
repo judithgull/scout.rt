@@ -16,10 +16,12 @@ import java.util.Set;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.jsoup.nodes.Attribute;
+import org.jsoup.nodes.Comment;
 import org.jsoup.nodes.DataNode;
+import org.jsoup.nodes.DocumentType;
 import org.jsoup.nodes.Element;
 import org.jsoup.nodes.Node;
-import org.jsoup.nodes.TextNode;
+import org.jsoup.nodes.XmlDeclaration;
 
 /**
  * @since 3.10.0-M4
@@ -38,47 +40,67 @@ public class MarkupVisitor implements IMarkupVisitor {
   }
 
   @Override
-  public void head(Node node, int depth) {
-    LOG.debug("Visit node: " + node.nodeName() + ", depth: " + depth);
+  public boolean visit(NodeBean nodeBean) {
+    Node node = nodeBean.getNode();
+    int depth = nodeBean.getDepth();
 
-    if (!(node instanceof TextNode) && !(node instanceof Element) && !(node instanceof DataNode)) {
-      LOG.debug("Removed node " + node.nodeName());
-      removeNode(node);
-      return;
+    LOG.warn("Visit node: " + node.nodeName() + ", depth: " + depth);
+
+    if (!checkAllowedNodes(node)) {
+      return false;
     }
 
     if (node instanceof Element) {
       Element elem = (Element) node;
-      LOG.debug("\tChecking element tag: " + elem.tagName());
+      LOG.warn("\tChecking element tag: " + elem.tagName());
 
       if (!m_markupList.isAllowedTag(elem.tagName()) && elem != m_root) {
-        LOG.debug("\tRemove element tag: " + elem.tagName());
-        removeNode(elem);
-        return;
+        LOG.warn("\tRemove element tag: " + elem.tagName());
+        node.remove();
+        return false;
       }
 
       for (Attribute attr : elem.attributes()) {
-        LOG.debug("\t\tChecking attribute key: " + attr.getKey() + ", attribute value: " + attr.getValue());
+        LOG.warn("\t\tChecking attribute key: " + attr.getKey() + ", attribute value: " + attr.getValue());
         if (!m_markupList.isAllowedAttribute(elem.tagName(), attr.getKey())) {
-          LOG.debug("\t\tRemove attribute key: " + attr.getKey() + ", attribute value: " + attr.getValue());
+          LOG.warn("\t\tRemove attribute key: " + attr.getKey() + ", attribute value: " + attr.getValue());
           elem.removeAttr(attr.getKey());
         }
       }
     }
+
+    return true;
   }
 
-  @Override
-  public boolean isRemovedNode(Node node) {
-    return m_removedNodes.contains(node);
-  }
+  private boolean checkAllowedNodes(Node node) {
+    // remove comments nodes if not allowed
+    if (m_markupList.isCommentsAllowed() && node instanceof Comment) {
+      LOG.warn("Removed comments node " + node.nodeName());
+      node.remove();
+      return false;
+    }
 
-  private void removeNode(Node node) {
-    node.remove();
-    m_removedNodes.add(node);
-  }
+    // remove data nodes if not allowed
+    if (!m_markupList.isDataAllowed() && node instanceof DataNode) {
+      LOG.warn("Removed data node " + node.nodeName());
+      node.remove();
+      return false;
+    }
 
-  @Override
-  public void tail(Node node, int depth) {
-    // no operation
+    // remove document type nodes if not allowed
+    if (!m_markupList.isDocumentTypeAllowed() && node instanceof DocumentType) {
+      LOG.warn("Removed document type node " + node.nodeName());
+      node.remove();
+      return false;
+    }
+
+    // remove xml declaration nodes if not allowed
+    if (!m_markupList.isXmlDeclarationAllowed() && node instanceof XmlDeclaration) {
+      LOG.warn("Removed xml declaration node " + node.nodeName());
+      node.remove();
+      return false;
+    }
+
+    return true;
   }
 }

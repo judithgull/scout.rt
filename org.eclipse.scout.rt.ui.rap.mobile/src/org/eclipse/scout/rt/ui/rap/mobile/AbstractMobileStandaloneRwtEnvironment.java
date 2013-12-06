@@ -15,10 +15,12 @@ import org.eclipse.scout.rt.client.IClientSession;
 import org.eclipse.scout.rt.client.mobile.ui.form.AbstractMobileForm;
 import org.eclipse.scout.rt.client.mobile.ui.form.outline.IMainPageForm;
 import org.eclipse.scout.rt.client.mobile.ui.form.outline.IOutlineChooserForm;
+import org.eclipse.scout.rt.client.ui.basic.table.columns.IColumn;
 import org.eclipse.scout.rt.client.ui.form.IForm;
 import org.eclipse.scout.rt.shared.ui.UiDeviceType;
 import org.eclipse.scout.rt.shared.ui.UiLayer;
 import org.eclipse.scout.rt.shared.ui.UserAgent;
+import org.eclipse.scout.rt.shared.validate.markup.IMarkupValidator;
 import org.eclipse.scout.rt.ui.rap.AbstractStandaloneRwtEnvironment;
 import org.eclipse.scout.rt.ui.rap.busy.RwtBusyHandler;
 import org.eclipse.scout.rt.ui.rap.form.IRwtScoutForm;
@@ -27,6 +29,8 @@ import org.eclipse.scout.rt.ui.rap.mobile.form.RwtScoutMobileForm;
 import org.eclipse.scout.rt.ui.rap.mobile.form.RwtScoutMobileFormFooter;
 import org.eclipse.scout.rt.ui.rap.mobile.form.RwtScoutMobileFormHeader;
 import org.eclipse.scout.rt.ui.rap.mobile.form.RwtScoutMobileOutlineFormHeader;
+import org.eclipse.scout.rt.ui.rap.mobile.form.fields.tablefield.IRwtScoutList;
+import org.eclipse.scout.rt.ui.rap.mobile.form.fields.tablefield.RwtScoutListValidator;
 import org.eclipse.scout.rt.ui.rap.mobile.patches.TouchScrollingPatch;
 import org.eclipse.scout.rt.ui.rap.mobile.window.MobileBrowserWindowHandler;
 import org.eclipse.scout.rt.ui.rap.mobile.window.desktop.RwtScoutMobileDesktop;
@@ -43,7 +47,7 @@ import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Shell;
 import org.osgi.framework.Bundle;
 
-public abstract class AbstractMobileStandaloneRwtEnvironment extends AbstractStandaloneRwtEnvironment {
+public abstract class AbstractMobileStandaloneRwtEnvironment extends AbstractStandaloneRwtEnvironment implements IMobileStandaloneRwtEnvironment {
   //TODO CGU move to look and feel decoration
   private static final int FORM_HEADER_HEIGHT = 43;
 
@@ -137,5 +141,10 @@ public abstract class AbstractMobileStandaloneRwtEnvironment extends AbstractSta
   @Override
   protected RwtBusyHandler createBusyHandler() {
     return new RwtMobileBusyHandler(getClientSession(), this);
+  }
+
+  @Override
+  public RwtScoutListValidator createListValidator(IColumn<?> column, IRwtScoutList uiList, IMarkupValidator markupValidator) {
+    return new RwtScoutListValidator(column, uiList, markupValidator);
   }
 }

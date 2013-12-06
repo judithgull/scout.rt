@@ -13,17 +13,17 @@ package org.eclipse.scout.rt.ui.rap.basic.table;
 import org.eclipse.rap.rwt.RWT;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.IColumn;
 import org.eclipse.scout.rt.shared.validate.markup.IMarkupValidator;
-import org.eclipse.scout.rt.ui.rap.basic.RwtScoutCompositeValidator;
+import org.eclipse.scout.rt.ui.rap.basic.RwtScoutComponentValidator;
 import org.eclipse.swt.internal.widgets.MarkupValidator;
 
 /**
  * @since 3.10.0-M3
  */
 @SuppressWarnings("restriction")
-public class RwtScoutColumnValidator extends RwtScoutCompositeValidator<IColumn<?>> {
+public class RwtScoutColumnValidator extends RwtScoutComponentValidator<IColumn<?>> {
 
-  public RwtScoutColumnValidator(IRwtScoutTableForPatch uiTable, IMarkupValidator markupValidator) {
-    super(uiTable, markupValidator);
+  public RwtScoutColumnValidator(IColumn<?> column, IRwtScoutTableForPatch uiTable, IMarkupValidator markupValidator) {
+    super(column, uiTable, markupValidator);
   }
 
   @Override

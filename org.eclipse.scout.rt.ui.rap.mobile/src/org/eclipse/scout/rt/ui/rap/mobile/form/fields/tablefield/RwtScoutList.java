@@ -40,6 +40,7 @@ import org.eclipse.scout.rt.ui.rap.basic.RwtScoutComposite;
 import org.eclipse.scout.rt.ui.rap.basic.table.RwtScoutTable;
 import org.eclipse.scout.rt.ui.rap.basic.table.RwtScoutTableEvent;
 import org.eclipse.scout.rt.ui.rap.keystroke.RwtKeyStroke;
+import org.eclipse.scout.rt.ui.rap.mobile.IMobileStandaloneRwtEnvironment;
 import org.eclipse.scout.rt.ui.rap.util.RwtUtility;
 import org.eclipse.scout.rt.ui.rap.util.UiRedrawHandler;
 import org.eclipse.swt.SWT;
@@ -184,6 +185,11 @@ public class RwtScoutList extends RwtScoutComposite<ITable> implements IRwtScout
       getScoutObject().removeTableListener(m_scoutTableListener);
       m_scoutTableListener = null;
     }
+  }
+
+  @Override
+  public IMobileStandaloneRwtEnvironment getUiEnvironment() {
+    return (IMobileStandaloneRwtEnvironment) super.getUiEnvironment();
   }
 
   @Override

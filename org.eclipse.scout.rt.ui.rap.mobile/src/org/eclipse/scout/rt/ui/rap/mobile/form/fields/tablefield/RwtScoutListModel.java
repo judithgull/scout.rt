@@ -24,10 +24,10 @@ import org.eclipse.scout.rt.client.ui.basic.cell.ICell;
 import org.eclipse.scout.rt.client.ui.basic.table.ITable;
 import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.IColumn;
-import org.eclipse.scout.rt.shared.validate.markup.IMarkupValidatorFactory;
-import org.eclipse.scout.rt.shared.validate.markup.WhitelistMarkupValidatorFactory;
+import org.eclipse.scout.rt.shared.validate.markup.IMarkupValidator;
 import org.eclipse.scout.rt.ui.rap.basic.table.RwtScoutTableEvent;
 import org.eclipse.scout.rt.ui.rap.html.HtmlAdapter;
+import org.eclipse.scout.rt.ui.rap.mobile.IMobileStandaloneRwtEnvironment;
 import org.eclipse.scout.rt.ui.rap.util.HtmlTextUtility;
 import org.eclipse.swt.graphics.Image;
 
@@ -46,20 +46,19 @@ public class RwtScoutListModel implements IRwtScoutListModel {
   private final ITable m_scoutTable;
   private final RwtScoutList m_uiList;
   private boolean m_multiline;
+  private final IMobileStandaloneRwtEnvironment m_env;
   private final RwtScoutListValidator m_listValidator;
 
   public RwtScoutListModel(ITable scoutTable, RwtScoutList uiTable) {
     m_scoutTable = scoutTable;
     m_uiList = uiTable;
+    m_env = m_uiList.getUiEnvironment();
     m_listValidator = createListValidator(m_uiList);
   }
 
   protected RwtScoutListValidator createListValidator(IRwtScoutList uiList) {
-    return new RwtScoutListValidator(uiList, getMarkupValidatorFactory().createMarkupValidator());
-  }
-
-  protected IMarkupValidatorFactory getMarkupValidatorFactory() {
-    return new WhitelistMarkupValidatorFactory();
+    IMarkupValidator markupValidator = m_env.createMarkupValidator();
+    return m_env.createListValidator(getColumn(), uiList, markupValidator);
   }
 
   @Override
@@ -214,6 +213,6 @@ public class RwtScoutListModel implements IRwtScoutListModel {
       }
     }
 
-    return m_listValidator.validateText(column, text);
+    return m_listValidator.validateText(text);
   }
 }

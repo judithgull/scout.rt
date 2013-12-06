@@ -10,6 +10,8 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.shared.validate.markup;
 
+import java.util.regex.Pattern;
+
 import org.eclipse.scout.commons.StringUtility;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -20,7 +22,22 @@ import org.jsoup.nodes.Element;
  */
 public abstract class AbstractMarkupValidator implements IMarkupValidator {
 
-  private final IMarkupList m_markupList = createMarkupList();
+  private static final Pattern htmlMarkupAmp = Pattern.compile("[&]");
+  private static final Pattern htmlMarkupLt = Pattern.compile("[<]");
+  private static final Pattern htmlMarkupGt = Pattern.compile("[>]");
+  private static final Pattern htmlMarkupQuot = Pattern.compile("[\"]");
+  private static final Pattern htmlMarkupApo = Pattern.compile("[']");
+  private static final Pattern htmlMarkupSlash = Pattern.compile("[/]");
+
+  private final IMarkupList m_markupList;
+
+  public AbstractMarkupValidator() {
+    m_markupList = createMarkupList();
+  }
+
+  public AbstractMarkupValidator(IMarkupList markupList) {
+    m_markupList = markupList;
+  }
 
   @Override
   public String validate(String text) {
@@ -62,12 +79,13 @@ public abstract class AbstractMarkupValidator implements IMarkupValidator {
     if (htmlText == null) {
       return null;
     }
-    htmlText = htmlText.replaceAll("[&]", "&amp;");
-    htmlText = htmlText.replaceAll("[<]", "&lt;");
-    htmlText = htmlText.replaceAll("[>]", "&gt;");
-    htmlText = htmlText.replaceAll("[\"]", "&quot;");
-    htmlText = htmlText.replaceAll("[']", "&#x27;");
-    htmlText = htmlText.replaceAll("[/]", "&#x2F;");
+
+    htmlText = htmlMarkupAmp.matcher(htmlText).replaceAll("&amp;");
+    htmlText = htmlMarkupLt.matcher(htmlText).replaceAll("&lt;");
+    htmlText = htmlMarkupGt.matcher(htmlText).replaceAll("&gt;");
+    htmlText = htmlMarkupQuot.matcher(htmlText).replaceAll("&quot;");
+    htmlText = htmlMarkupApo.matcher(htmlText).replaceAll("&#x27;");
+    htmlText = htmlMarkupSlash.matcher(htmlText).replaceAll("&#x2F;");
 
     return htmlText;
   }

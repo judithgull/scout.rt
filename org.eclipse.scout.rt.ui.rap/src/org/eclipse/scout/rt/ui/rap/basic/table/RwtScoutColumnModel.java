@@ -1,6 +1,7 @@
 package org.eclipse.scout.rt.ui.rap.basic.table;
 
 import java.util.HashMap;
+import java.util.Map;
 
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.ListenerList;
@@ -16,8 +17,8 @@ import org.eclipse.scout.rt.client.ui.basic.table.columns.IColumn;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.ISmartColumn;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.IStringColumn;
 import org.eclipse.scout.rt.shared.AbstractIcons;
-import org.eclipse.scout.rt.shared.validate.markup.IMarkupValidatorFactory;
-import org.eclipse.scout.rt.shared.validate.markup.WhitelistMarkupValidatorFactory;
+import org.eclipse.scout.rt.shared.validate.markup.IMarkupValidator;
+import org.eclipse.scout.rt.ui.rap.IRwtEnvironment;
 import org.eclipse.scout.rt.ui.rap.RwtIcons;
 import org.eclipse.scout.rt.ui.rap.extension.UiDecorationExtensionPoint;
 import org.eclipse.scout.rt.ui.rap.util.HtmlTextUtility;
@@ -42,26 +43,24 @@ public class RwtScoutColumnModel extends ColumnLabelProvider {
   private Image m_imgCheckboxTrue;
   private Color m_disabledForegroundColor;
   private int m_defaultRowHeight;
-
-  private final RwtScoutColumnValidator m_columnValidator;
+  private final IRwtEnvironment m_env;
+  private Map<IColumn<?>, RwtScoutColumnValidator> m_columnValidatorMap;
 
   public RwtScoutColumnModel(ITable scoutTable, IRwtScoutTableForPatch uiTable, TableColumnManager columnManager) {
     m_scoutTable = scoutTable;
     m_uiTable = uiTable;
     m_columnManager = columnManager;
-    m_imgCheckboxTrue = getUiTable().getUiEnvironment().getIcon(RwtIcons.CheckboxYes);
-    m_imgCheckboxFalse = getUiTable().getUiEnvironment().getIcon(RwtIcons.CheckboxNo);
+    m_env = getUiTable().getUiEnvironment();
+    m_imgCheckboxTrue = m_env.getIcon(RwtIcons.CheckboxYes);
+    m_imgCheckboxFalse = m_env.getIcon(RwtIcons.CheckboxNo);
     m_disabledForegroundColor = getUiTable().getUiEnvironment().getColor(UiDecorationExtensionPoint.getLookAndFeel().getColorForegroundDisabled());
     rebuildCache();
-    m_columnValidator = createColumnValidator(uiTable);
+    m_columnValidatorMap = new HashMap<IColumn<?>, RwtScoutColumnValidator>();
   }
 
-  protected RwtScoutColumnValidator createColumnValidator(IRwtScoutTableForPatch uiTable) {
-    return new RwtScoutColumnValidator(uiTable, getMarkupValidatorFactory().createMarkupValidator());
-  }
-
-  protected IMarkupValidatorFactory getMarkupValidatorFactory() {
-    return new WhitelistMarkupValidatorFactory();
+  protected RwtScoutColumnValidator createColumnValidator(IColumn<?> column, IRwtScoutTableForPatch uiTable) {
+    IMarkupValidator markupValidator = m_env.createMarkupValidator();
+    return m_env.createColumnValidator(column, uiTable, markupValidator);
   }
 
   protected ITable getScoutTable() {
@@ -96,9 +95,8 @@ public class RwtScoutColumnModel extends ColumnLabelProvider {
       text = "";
     }
     else if (HtmlTextUtility.isTextWithHtmlMarkup(text)) {
-      text = getUiTable().getUiEnvironment().adaptHtmlCell(getUiTable(), text);
-      text = getUiTable().getUiEnvironment().convertLinksWithLocalUrlsInHtmlCell(getUiTable(), text);
-      // validate here
+      text = m_env.adaptHtmlCell(getUiTable(), text);
+      text = m_env.convertLinksWithLocalUrlsInHtmlCell(getUiTable(), text);
     }
     else {
       boolean multiline = isMultiline(text);
@@ -120,7 +118,13 @@ public class RwtScoutColumnModel extends ColumnLabelProvider {
     }
 
     IColumn<?> column = m_columnManager.getColumnByModelIndex(columnIndex - 1);
-    return m_columnValidator.validateText(column, text);
+    RwtScoutColumnValidator columnValidator = m_columnValidatorMap.get(column);
+    if (columnValidator == null) {
+      columnValidator = createColumnValidator(column, m_uiTable);
+      m_columnValidatorMap.put(column, columnValidator);
+    }
+
+    return columnValidator.validateText(text);
   }
 
   private boolean isMultiline(String text) {

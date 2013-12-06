@@ -10,6 +10,9 @@
  *******************************************************************************/
 package org.eclipse.scout.rt.ui.rap.basic.tree;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.eclipse.jface.viewers.IColorProvider;
 import org.eclipse.jface.viewers.IFontProvider;
 import org.eclipse.jface.viewers.ITreeContentProvider;
@@ -23,8 +26,8 @@ import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.basic.cell.ICell;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITree;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
-import org.eclipse.scout.rt.shared.validate.markup.IMarkupValidatorFactory;
-import org.eclipse.scout.rt.shared.validate.markup.WhitelistMarkupValidatorFactory;
+import org.eclipse.scout.rt.shared.validate.markup.IMarkupValidator;
+import org.eclipse.scout.rt.ui.rap.IRwtEnvironment;
 import org.eclipse.scout.rt.ui.rap.RwtIcons;
 import org.eclipse.scout.rt.ui.rap.extension.UiDecorationExtensionPoint;
 import org.eclipse.scout.rt.ui.rap.util.HtmlTextUtility;
@@ -43,24 +46,23 @@ public class RwtScoutTreeModel extends LabelProvider implements ITreeContentProv
   private Image m_imgCheckboxTrue;
   private Image m_imgCheckboxFalse;
   private Color m_disabledForegroundColor;
-  private final RwtScoutTreeNodeValidator m_treeNodeValidator;
+  private final IRwtEnvironment m_env;
+  private Map<ITreeNode, RwtScoutTreeNodeValidator> m_treeNodeValidatorMap;
 
   public RwtScoutTreeModel(ITree tree, IRwtScoutTree uiTree, TreeViewer treeViewer) {
     m_scoutTree = tree;
     m_uiTree = uiTree;
     m_treeViewer = treeViewer;
-    m_imgCheckboxTrue = getUiTree().getUiEnvironment().getIcon(RwtIcons.CheckboxYes);
-    m_imgCheckboxFalse = getUiTree().getUiEnvironment().getIcon(RwtIcons.CheckboxNo);
-    m_disabledForegroundColor = getUiTree().getUiEnvironment().getColor(UiDecorationExtensionPoint.getLookAndFeel().getColorForegroundDisabled());
-    m_treeNodeValidator = createTreeNodeValidator(m_uiTree);
+    m_env = getUiTree().getUiEnvironment();
+    m_imgCheckboxTrue = m_env.getIcon(RwtIcons.CheckboxYes);
+    m_imgCheckboxFalse = m_env.getIcon(RwtIcons.CheckboxNo);
+    m_disabledForegroundColor = m_env.getColor(UiDecorationExtensionPoint.getLookAndFeel().getColorForegroundDisabled());
+    m_treeNodeValidatorMap = new HashMap<ITreeNode, RwtScoutTreeNodeValidator>();
   }
 
-  protected RwtScoutTreeNodeValidator createTreeNodeValidator(IRwtScoutTree uiTree) {
-    return new RwtScoutTreeNodeValidator(uiTree, getMarkupValidatorFactory().createMarkupValidator());
-  }
-
-  protected IMarkupValidatorFactory getMarkupValidatorFactory() {
-    return new WhitelistMarkupValidatorFactory();
+  protected RwtScoutTreeNodeValidator createTreeNodeValidator(ITreeNode treeNode, IRwtScoutTree uiTree) {
+    IMarkupValidator markupValidator = m_env.createMarkupValidator();
+    return m_env.createTreeNodeValidator(treeNode, uiTree, markupValidator);
   }
 
   protected ITree getScoutTree() {
@@ -123,7 +125,7 @@ public class RwtScoutTreeModel extends LabelProvider implements ITreeContentProv
     //deco
     String iconId = scoutNode.getCell().getIconId();
     Image decoImage = null;
-    decoImage = getUiTree().getUiEnvironment().getIcon(iconId);
+    decoImage = m_env.getIcon(iconId);
     //merge
     if (checkBoxImage != null && decoImage != null) {
       //TODO rap/rwt: new GC(Image) is not possible since in rwt an image does not implement Drawable.
@@ -149,8 +151,8 @@ public class RwtScoutTreeModel extends LabelProvider implements ITreeContentProv
       }
 
       if (HtmlTextUtility.isTextWithHtmlMarkup(cell.getText())) {
-        text = getUiTree().getUiEnvironment().adaptHtmlCell(getUiTree(), text);
-        text = getUiTree().getUiEnvironment().convertLinksWithLocalUrlsInHtmlCell(getUiTree(), text);
+        text = m_env.adaptHtmlCell(getUiTree(), text);
+        text = m_env.convertLinksWithLocalUrlsInHtmlCell(getUiTree(), text);
       }
       else {
         if (text.indexOf("\n") >= 0) {
@@ -162,7 +164,13 @@ public class RwtScoutTreeModel extends LabelProvider implements ITreeContentProv
         }
       }
 
-      return m_treeNodeValidator.validateText(scoutNode, text);
+      RwtScoutTreeNodeValidator treeNodeValidator = m_treeNodeValidatorMap.get(scoutNode);
+      if (treeNodeValidator == null) {
+        treeNodeValidator = createTreeNodeValidator(scoutNode, m_uiTree);
+        m_treeNodeValidatorMap.put(scoutNode, treeNodeValidator);
+      }
+
+      return treeNodeValidator.validateText(text);
     }
     return "";
   }
@@ -171,7 +179,7 @@ public class RwtScoutTreeModel extends LabelProvider implements ITreeContentProv
   public Font getFont(Object element) {
     ITreeNode scoutNode = (ITreeNode) element;
     if (scoutNode.getCell().getFont() != null) {
-      return getUiTree().getUiEnvironment().getFont(scoutNode.getCell().getFont(), m_treeViewer.getTree().getFont());
+      return m_env.getFont(scoutNode.getCell().getFont(), m_treeViewer.getTree().getFont());
     }
     return null;
   }
@@ -180,7 +188,7 @@ public class RwtScoutTreeModel extends LabelProvider implements ITreeContentProv
   public Color getForeground(Object element) {
     ITreeNode scoutNode = (ITreeNode) element;
     ICell scoutCell = scoutNode.getCell();
-    Color col = getUiTree().getUiEnvironment().getColor(scoutCell.getForegroundColor());
+    Color col = m_env.getColor(scoutCell.getForegroundColor());
     if (col == null) {
       if (!scoutCell.isEnabled()) {
         col = m_disabledForegroundColor;
@@ -193,7 +201,7 @@ public class RwtScoutTreeModel extends LabelProvider implements ITreeContentProv
   public Color getBackground(Object element) {
     ITreeNode scoutNode = (ITreeNode) element;
     if (scoutNode.getCell().getBackgroundColor() != null) {
-      return getUiTree().getUiEnvironment().getColor(scoutNode.getCell().getBackgroundColor());
+      return m_env.getColor(scoutNode.getCell().getBackgroundColor());
     }
     return null;
   }
