@@ -129,10 +129,35 @@ public class MarkupWhiteList implements IMarkupList {
       }
       return attrs.contains(attributeName.toLowerCase());
     }
+
+    // check if attribute is defined in ALL_TAG
+    attrs = m_attributes.get(ALL_TAGS);
+    if (attrs != null) {
+      if (allAttributesAllowed(attrs)) {
+        return true;
+      }
+      return attrs.contains(attributeName.toLowerCase());
+    }
+
     return false;
   }
 
   private boolean allAttributesAllowed(Set<String> attrs) {
     return attrs.contains(ALL_ATTRIBUTES);
+  }
+
+  private boolean allAttributesAllowed(String tagName) {
+    Set<String> attrs = m_attributes.get(tagName.toLowerCase());
+    if (attrs != null) {
+      if (allAttributesAllowed(attrs)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @Override
+  public boolean areAllTagsAndAttributesAllowed() {
+    return allTagsAllowed() && allAttributesAllowed(ALL_TAGS);
   }
 }

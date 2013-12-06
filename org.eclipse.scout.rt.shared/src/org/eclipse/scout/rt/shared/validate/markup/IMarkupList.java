@@ -26,4 +26,6 @@ public interface IMarkupList {
 
   boolean isAllowedAttribute(String tagName, String attributeName);
 
+  boolean areAllTagsAndAttributesAllowed();
+
 }

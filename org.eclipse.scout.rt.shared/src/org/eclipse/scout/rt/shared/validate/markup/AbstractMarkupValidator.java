@@ -24,7 +24,7 @@ public abstract class AbstractMarkupValidator implements IMarkupValidator {
 
   @Override
   public String validate(String text) {
-    if (StringUtility.isNullOrEmpty(text)) {
+    if (StringUtility.isNullOrEmpty(text) || m_markupList.areAllTagsAndAttributesAllowed()) { // optimization
       return text;
     }
 

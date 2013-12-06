@@ -18,6 +18,7 @@ import org.jsoup.nodes.Element;
 public class WhitelistMarkupValidator extends AbstractMarkupValidator {
   @Override
   protected IMarkupList createMarkupList() {
+    // TODO: customizable lists?
     return MarkupWhiteList.defaultList();
   }
 
