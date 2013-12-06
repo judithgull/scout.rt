@@ -29,7 +29,6 @@ Export-Package: org.eclipse.scout.commons,
  org.eclipse.scout.commons.runtime,
  org.eclipse.scout.commons.security,
  org.eclipse.scout.commons.serialization,
- org.eclipse.scout.commons.validation,
  org.eclipse.scout.commons.xmlparser
 Bundle-RequiredExecutionEnvironment: JavaSE-1.6
 Bundle-ActivationPolicy: lazy
