@@ -27,9 +27,9 @@ public class MarkupWhiteList implements IMarkupList {
       "html", "head", "body", "style", "type",
       "a", "b", "blockquote", "br", "caption", "cite", "code", "col",
       "colgroup", "dd", "div", "dl", "dt", "em", "font", "h1", "h2", "h3", "h4", "h5", "h6", "hr",
-      "i", "img", "li", "meta", "ol", "p", "pre", "q", "small", "strike", "strong",
+      "i", "li", "meta", "ol", "p", "pre", "q", "small", "strike", "strong",
       "sub", "sup", "table", "tbody", "td", "tfoot", "th", "thead", "tr", "u",
-      "ul", "title", "style", "html"
+      "ul", "title", "style"
   };
 
   private Set<String> m_tags;
