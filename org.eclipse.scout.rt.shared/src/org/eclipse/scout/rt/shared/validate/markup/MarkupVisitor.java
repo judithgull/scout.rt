@@ -44,7 +44,7 @@ public class MarkupVisitor implements IMarkupVisitor {
     Node node = nodeBean.getNode();
     int depth = nodeBean.getDepth();
 
-    LOG.warn("Visit node: " + node.nodeName() + ", depth: " + depth);
+    LOG.debug("Visit node: " + node.nodeName() + ", depth: " + depth);
 
     if (!checkAllowedNodes(node)) {
       return false;
@@ -52,18 +52,18 @@ public class MarkupVisitor implements IMarkupVisitor {
 
     if (node instanceof Element) {
       Element elem = (Element) node;
-      LOG.warn("\tChecking element tag: " + elem.tagName());
+      LOG.debug("\tChecking element tag: " + elem.tagName());
 
       if (!m_markupList.isAllowedTag(elem.tagName()) && elem != m_root) {
-        LOG.warn("\tRemove element tag: " + elem.tagName());
+        LOG.debug("\tRemove element tag: " + elem.tagName());
         node.remove();
         return false;
       }
 
       for (Attribute attr : elem.attributes()) {
-        LOG.warn("\t\tChecking attribute key: " + attr.getKey() + ", attribute value: " + attr.getValue());
+        LOG.debug("\t\tChecking attribute key: " + attr.getKey() + ", attribute value: " + attr.getValue());
         if (!m_markupList.isAllowedAttribute(elem.tagName(), attr.getKey())) {
-          LOG.warn("\t\tRemove attribute key: " + attr.getKey() + ", attribute value: " + attr.getValue());
+          LOG.debug("\t\tRemove attribute key: " + attr.getKey() + ", attribute value: " + attr.getValue());
           elem.removeAttr(attr.getKey());
         }
       }
@@ -75,28 +75,28 @@ public class MarkupVisitor implements IMarkupVisitor {
   private boolean checkAllowedNodes(Node node) {
     // remove comments nodes if not allowed
     if (m_markupList.isCommentsAllowed() && node instanceof Comment) {
-      LOG.warn("Removed comments node " + node.nodeName());
+      LOG.debug("Removed comments node " + node.nodeName());
       node.remove();
       return false;
     }
 
     // remove data nodes if not allowed
     if (!m_markupList.isDataAllowed() && node instanceof DataNode) {
-      LOG.warn("Removed data node " + node.nodeName());
+      LOG.debug("Removed data node " + node.nodeName());
       node.remove();
       return false;
     }
 
     // remove document type nodes if not allowed
     if (!m_markupList.isDocumentTypeAllowed() && node instanceof DocumentType) {
-      LOG.warn("Removed document type node " + node.nodeName());
+      LOG.debug("Removed document type node " + node.nodeName());
       node.remove();
       return false;
     }
 
     // remove xml declaration nodes if not allowed
     if (!m_markupList.isXmlDeclarationAllowed() && node instanceof XmlDeclaration) {
-      LOG.warn("Removed xml declaration node " + node.nodeName());
+      LOG.debug("Removed xml declaration node " + node.nodeName());
       node.remove();
       return false;
     }
