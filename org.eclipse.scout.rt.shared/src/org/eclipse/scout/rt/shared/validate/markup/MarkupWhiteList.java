@@ -27,7 +27,7 @@ public class MarkupWhiteList implements IMarkupList {
       "html", "head", "body", "style", "type",
       "a", "b", "blockquote", "br", "caption", "cite", "code", "col",
       "colgroup", "dd", "div", "dl", "dt", "em", "font", "h1", "h2", "h3", "h4", "h5", "h6", "hr",
-      "i", "li", "meta", "ol", "p", "pre", "q", "small", "strike", "strong",
+      "i", "li", "meta", "ol", "p", "pre", "q", "small", "span", "strike", "strong",
       "sub", "sup", "table", "tbody", "td", "tfoot", "th", "thead", "tr", "u",
       "ul", "title", "style"
   };
@@ -64,9 +64,10 @@ public class MarkupWhiteList implements IMarkupList {
         .addAttributes("meta", "http-equiv", "content")
         .addAttributes("ol", "start", "type")
         .addAttributes("q", "cite")
+        .addAttributes("span", "style")
         .addAttributes("style", "type")
-        .addAttributes("table", "summary", "width")
-        .addAttributes("td", "abbr", "axis", "colspan", "rowspan", "width")
+        .addAttributes("table", "summary", "width", "height", "border", "cellspacing", "cellpadding", "style")
+        .addAttributes("td", "abbr", "align", "axis", "colspan", "rowspan", "width", "style")
         .addAttributes("th", "abbr", "axis", "colspan", "rowspan", "scope", "width")
         .addAttributes("ul", "type");
   }

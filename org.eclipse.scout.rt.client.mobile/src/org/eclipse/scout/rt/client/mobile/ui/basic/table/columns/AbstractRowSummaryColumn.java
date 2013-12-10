@@ -32,6 +32,7 @@ import org.eclipse.scout.rt.client.ui.basic.table.columns.IColumn;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.ISmartColumn;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.IStringColumn;
 import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
+import org.eclipse.scout.rt.shared.validate.markup.IMarkupList;
 import org.eclipse.scout.service.SERVICES;
 
 /**
@@ -90,6 +91,17 @@ public class AbstractRowSummaryColumn extends AbstractStringColumn implements IR
     catch (Throwable t) {
       throw new ProcessingException("Exception while loading html cell template for mobile table", t);
     }
+  }
+
+  @Override
+  protected boolean getConfiguredHtmlMarkup() {
+    return true; // column has to support html
+  }
+
+  @Override
+  protected void execExtendMarkupList(IMarkupList markupList) {
+    markupList.addTags("img");
+    markupList.addAttributes("img", "width", "height", "src");
   }
 
   @Override
