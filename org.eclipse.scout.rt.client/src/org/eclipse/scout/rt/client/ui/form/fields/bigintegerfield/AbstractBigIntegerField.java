@@ -10,21 +10,23 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.form.fields.bigintegerfield;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.text.ParsePosition;
 
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.form.fields.numberfield.AbstractNumberField;
-import org.eclipse.scout.rt.shared.ScoutTexts;
 import org.eclipse.scout.rt.shared.data.form.ValidationRule;
 
+@ClassId("4c09f9f0-84fe-4c6c-95dd-1f51e92058d8")
 public abstract class AbstractBigIntegerField extends AbstractNumberField<BigInteger> implements IBigIntegerField {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractBigIntegerField.class);
+  private static final BigInteger DEFAULT_MIN_VALUE = new BigInteger("-999999999999999999999999999999999999999999999999999999999999");
+  private static final BigInteger DEFAULT_MAX_VALUE = new BigInteger("999999999999999999999999999999999999999999999999999999999999");
 
   public AbstractBigIntegerField() {
     this(true);
@@ -37,45 +39,31 @@ public abstract class AbstractBigIntegerField extends AbstractNumberField<BigInt
   /*
    * Configuration
    */
-  @ConfigProperty(ConfigProperty.LONG)
+  @ConfigProperty(ConfigProperty.BIG_INTEGER)
   @Order(250)
-  @ConfigPropertyValue("null")
   @ValidationRule(ValidationRule.MIN_VALUE)
-  protected Long getConfiguredMinValue() {
-    return null;
-  }
-
-  @ConfigProperty(ConfigProperty.LONG)
-  @Order(260)
-  @ConfigPropertyValue("null")
-  @ValidationRule(ValidationRule.MAX_VALUE)
-  protected Long getConfiguredMaxValue() {
-    return null;
+  @Override
+  protected BigInteger getConfiguredMinValue() {
+    return AbstractBigIntegerField.DEFAULT_MIN_VALUE;
   }
 
   @Override
-  protected void initConfig() {
-    super.initConfig();
-    setMinValue(getConfiguredMinValue() != null ? BigInteger.valueOf(getConfiguredMinValue()) : null);
-    setMaxValue(getConfiguredMaxValue() != null ? BigInteger.valueOf(getConfiguredMaxValue()) : null);
+  @ConfigProperty(ConfigProperty.BIG_INTEGER)
+  @Order(260)
+  @ValidationRule(ValidationRule.MAX_VALUE)
+  protected BigInteger getConfiguredMaxValue() {
+    return AbstractBigIntegerField.DEFAULT_MAX_VALUE;
   }
 
+  /**
+   * uses {@link #parseToBigDecimalInternal(String)} to parse text and returns the result as BigInteger
+   */
   @Override
   protected BigInteger parseValueInternal(String text) throws ProcessingException {
     BigInteger retVal = null;
-    if (text == null) {
-      text = "";
-    }
-    else {
-      text = text.trim();
-    }
-    if (text.length() > 0) {
-      ParsePosition p = new ParsePosition(0);
-      Number n = createNumberFormat().parse(text, p);
-      if (p.getErrorIndex() >= 0 || p.getIndex() != text.length()) {
-        throw new ProcessingException(ScoutTexts.get("InvalidNumberMessageX", text));
-      }
-      retVal = new BigInteger("" + n.toString());
+    BigDecimal parsedVal = parseToBigDecimalInternal(text);
+    if (parsedVal != null) {
+      retVal = parsedVal.toBigIntegerExact();
     }
     return retVal;
   }

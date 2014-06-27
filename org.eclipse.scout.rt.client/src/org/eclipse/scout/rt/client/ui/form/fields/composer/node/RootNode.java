@@ -4,19 +4,20 @@
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- * 
+ *
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.form.fields.composer.node;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.ui.action.menu.AbstractMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.AbstractMenuSeparator;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
-import org.eclipse.scout.rt.client.ui.action.menu.MenuSeparator;
 import org.eclipse.scout.rt.client.ui.basic.cell.Cell;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
 import org.eclipse.scout.rt.client.ui.form.fields.composer.IComposerField;
@@ -31,7 +32,7 @@ public class RootNode extends AbstractComposerNode {
 
   @Override
   protected void execInitTreeNode() {
-    ArrayList<IMenu> menus = new ArrayList<IMenu>();
+    List<IMenu> menus = new ArrayList<IMenu>();
     for (IMenu m : getMenus()) {
       if (m.getClass() == AddEntityPlaceholderOnRootMenu.class) {
         attachAddEntityMenus(menus);
@@ -40,7 +41,7 @@ public class RootNode extends AbstractComposerNode {
         menus.add(m);
       }
     }
-    setMenus(menus.toArray(new IMenu[menus.size()]));
+    setMenus(menus);
   }
 
   @Override
@@ -75,11 +76,11 @@ public class RootNode extends AbstractComposerNode {
   }
 
   @Order(30)
-  public class Separator1Menu extends MenuSeparator {
+  public class Separator1Menu extends AbstractMenuSeparator {
   }
 
   @Order(40)
-  public class AddEntityPlaceholderOnRootMenu extends MenuSeparator {
+  public class AddEntityPlaceholderOnRootMenu extends AbstractMenuSeparator {
   }
 
 }

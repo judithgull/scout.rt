@@ -28,7 +28,10 @@ public @interface ConfigProperty {
    * Double
    */
   String DOUBLE = "DOUBLE";
-
+  /**
+   * BigDecimal
+   */
+  String BIG_DECIMAL = "BIG_DECIMAL";
   /**
    * String
    */
@@ -41,6 +44,10 @@ public @interface ConfigProperty {
    * Long
    */
   String LONG = "LONG";
+  /**
+   * BigInteger
+   */
+  String BIG_INTEGER = "BIG_INTEGER";
   /**
    * Plain-String
    */
@@ -71,15 +78,23 @@ public @interface ConfigProperty {
    */
   String BUTTON_SYSTEM_TYPE = "BUTTON_SYSTEM_TYPE";
   /**
+   * Class&lt;? extends LookupCall&gt;
+   */
+  String GROUP_BOX_BODY_GRID = "GROUP_BOX_BODY_GRID";
+
+  /**
    * Class&lt;? extends ICodeType&gt;
    */
   String CODE_TYPE = "CODE_TYPE";
+
+// XXX[aho]
+  String CODE_ROW = "CODE_ROW";
   /**
    * int
    */
   String COMPOSER_ATTRIBUTE_TYPE = "COMPOSER_ATTRIBUTE_TYPE";
   /**
-   * String[]
+   * List<String>
    */
   String FILE_EXTENSIONS = "FILE_EXTENSIONS";
   /**
@@ -157,11 +172,6 @@ public @interface ConfigProperty {
    */
   String TEXT = "TEXT";
   /**
-   * NLS translated Strings referencing text provider services flagged with
-   * <code>IDocumentationTextProviderService</code>.
-   */
-  String DOC = "DOC";
-  /**
    * int
    */
   String VERTICAL_ALIGNMENT = "VERTICAL_ALIGNMENT";
@@ -200,4 +210,16 @@ public @interface ConfigProperty {
    * Border decoration enumeration according to the BORDER_DECORATION_* constants
    */
   String BORDER_DECORATION = "BORDER_DECORATION";
+  /**
+   * java.math.RoundingMode
+   */
+  String ROUNDING_MODE = "ROUNDING_MODE";
+  /**
+   * int one of [TOOLBAR_FORM_HEADER, TOOLBAR_VIEW_PART] of IForm
+   */
+  String TOOLBAR_LOCATION = "TOOLBAR_LOCATION";
+  /**
+   * Set of menu type enum values
+   */
+  String MENU_TYPE = "MENU_TYPE";
 }

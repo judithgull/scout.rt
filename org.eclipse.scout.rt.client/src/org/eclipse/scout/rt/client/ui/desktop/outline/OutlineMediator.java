@@ -10,9 +10,11 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.desktop.outline;
 
+import java.util.List;
+
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.dnd.TransferObject;
 import org.eclipse.scout.commons.exception.ProcessingException;
-import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 import org.eclipse.scout.rt.client.ui.basic.table.ITable;
 import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
 import org.eclipse.scout.rt.client.ui.basic.table.TableEvent;
@@ -47,7 +49,7 @@ public class OutlineMediator {
   }
 
   public void mediateTreeNodesDragRequest(TreeEvent e, IPageWithTable<? extends ITable> pageWithTable) {
-    ITableRow[] rows = pageWithTable.getTableRowsFor(e.getNodes());
+    List<ITableRow> rows = pageWithTable.getTableRowsFor(e.getNodes());
     ITable table = pageWithTable.getTable();
     table.getUIFacade().setSelectedRowsFromUI(rows);
     TransferObject t = table.getUIFacade().fireRowsDragRequestFromUI();
@@ -68,36 +70,8 @@ public class OutlineMediator {
       /*
        * ticket 78684: this line added
        */
-      table.getUIFacade().setSelectedRowsFromUI(new ITableRow[]{row});
+      table.getUIFacade().setSelectedRowsFromUI(CollectionUtility.arrayList(row));
       table.getUIFacade().fireRowActionFromUI(row);
-    }
-  }
-
-  public void fetchTableRowMenus(TreeEvent e, IPageWithTable<? extends ITable> pageWithTable) {
-    if (!pageWithTable.isShowTableRowMenus()) {
-      return;
-    }
-
-    ITableRow row = pageWithTable.getTableRowFor(e.getNode());
-    ITable table = pageWithTable.getTable();
-    if (row != null) {
-      table.getUIFacade().setSelectedRowsFromUI(new ITableRow[]{row});
-      IMenu[] menus = table.getUIFacade().fireRowPopupFromUI();
-      if (menus != null) {
-        e.addPopupMenus(menus);
-      }
-    }
-  }
-
-  public void fetchTableEmptySpaceMenus(TreeEvent e, IPageWithTable<? extends ITable> pageWithTable) {
-    ITable table = pageWithTable.getTable();
-    if (!pageWithTable.isShowEmptySpaceMenus()) {
-      return;
-    }
-
-    IMenu[] menus = table.getUIFacade().fireEmptySpacePopupFromUI();
-    if (menus != null) {
-      e.addPopupMenus(menus);
     }
   }
 
@@ -109,29 +83,29 @@ public class OutlineMediator {
     page.getTree().applyNodeFilters();
   }
 
-  public void mediateTableRowOrderChanged(TableEvent e, IPageWithTable pageWithTable) {
+  public void mediateTableRowOrderChanged(TableEvent e, IPageWithTable<?> pageWithTable) {
     if (pageWithTable == null || pageWithTable.getTree() == null || pageWithTable.isLeaf()) {
       return;
     }
 
-    IPage[] childNodes = pageWithTable.getUpdatedChildPagesFor(e.getRows());
+    List<IPage> childNodes = pageWithTable.getUpdatedChildPagesFor(e.getRows());
     if (pageWithTable.getTree() != null) {
       pageWithTable.getTree().updateChildNodeOrder(pageWithTable, childNodes);
     }
   }
 
-  public void mediateTableRowsUpdated(TableEvent e, IPageWithTable pageWithTable) {
+  public void mediateTableRowsUpdated(TableEvent e, IPageWithTable<?> pageWithTable) {
     if (pageWithTable == null || pageWithTable.getTree() == null || pageWithTable.isLeaf()) {
       return;
     }
 
-    IPage[] childNodes = pageWithTable.getUpdatedChildPagesFor(e.getRows());
+    List<IPage> childNodes = pageWithTable.getUpdatedChildPagesFor(e.getRows());
     if (pageWithTable.getTree() != null) {
       pageWithTable.getTree().updateChildNodes(pageWithTable, childNodes);
     }
   }
 
-  public void mediateTableRowsInserted(ITableRow[] tableRows, IPage[] childPages, IPageWithTable pageWithTable) {
+  public void mediateTableRowsInserted(List<? extends ITableRow> tableRows, List<? extends IPage> childPages, IPageWithTable pageWithTable) {
     if (pageWithTable == null || pageWithTable.getTree() == null || pageWithTable.isLeaf()) {
       return;
     }
@@ -139,7 +113,7 @@ public class OutlineMediator {
     pageWithTable.getTree().addChildNodes(pageWithTable, childPages);
   }
 
-  public void mediateTableRowsDeleted(IPage[] childNodes, IPageWithTable pageWithTable) {
+  public void mediateTableRowsDeleted(List<? extends IPage> childNodes, IPageWithTable pageWithTable) {
     if (pageWithTable == null || pageWithTable.getTree() == null || pageWithTable.isLeaf()) {
       return;
     }
@@ -179,20 +153,4 @@ public class OutlineMediator {
     }
   }
 
-  public void mediateTableRowPopup(TableEvent e, IPageWithNodes pageWithNodes) {
-    ITreeNode node = pageWithNodes.getTreeNodeFor(e.getFirstRow());
-    if (node instanceof IPageWithTable<?>) {
-      IPageWithTable<?> tablePage = (IPageWithTable<?>) node;
-      IMenu[] menus = tablePage.getTable().fetchMenusForRowsInternal(new ITableRow[0]);
-      if (menus != null) {
-        e.addPopupMenus(menus);
-      }
-    }
-    else if (node instanceof IPageWithNodes) {
-      IMenu[] menus = pageWithNodes.getTree().fetchMenusForNodesInternal(new ITreeNode[]{node});
-      if (menus != null) {
-        e.addPopupMenus(menus);
-      }
-    }
-  }
 }

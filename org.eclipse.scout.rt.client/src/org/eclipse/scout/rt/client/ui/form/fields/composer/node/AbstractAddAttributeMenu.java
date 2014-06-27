@@ -10,6 +10,8 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.form.fields.composer.node;
 
+import java.util.List;
+
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.ui.action.menu.AbstractMenu;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
@@ -35,6 +37,11 @@ public abstract class AbstractAddAttributeMenu extends AbstractMenu {
     return ScoutTexts.get("ExtendedSearchAddAttributeMenu");
   }
 
+  /**
+   * replace with listener in execInitAction and updateVisibility support. Therefore the parentNode must be held as a
+   * property on {@link ITreeNode}
+   */
+  @SuppressWarnings("deprecation")
   @Override
   protected void execPrepareAction() throws ProcessingException {
     EntityNode eNode = null;
@@ -46,14 +53,14 @@ public abstract class AbstractAddAttributeMenu extends AbstractMenu {
       }
       n = n.getParentNode();
     }
-    IDataModelAttribute[] atts;
+    List<IDataModelAttribute> atts;
     if (eNode != null) {
       atts = eNode.getEntity().getAttributes();
     }
     else {
       atts = m_field.getAttributes();
     }
-    setVisible(atts.length > 0);
+    setVisible(atts.size() > 0);
   }
 
   @Override
@@ -79,8 +86,8 @@ public abstract class AbstractAddAttributeMenu extends AbstractMenu {
     if (form.isFormStored()) {
       IDataModelAttribute a = form.getSelectedAttribute();
       IDataModelAttributeOp op = form.getSelectedOp();
-      Object[] values = form.getSelectedValues();
-      String[] displayValues = form.getSelectedDisplayValues();
+      List<Object> values = form.getSelectedValues();
+      List<String> displayValues = form.getSelectedDisplayValues();
       m_field.addAttributeNode(m_parentNode, a, null, op, values, displayValues);
     }
   }

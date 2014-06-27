@@ -2,18 +2,19 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: Scout Server
 Bundle-SymbolicName: org.eclipse.scout.rt.server;singleton:=true
-Bundle-Version: 3.9.2.qualifier
+Bundle-Version: 4.0.0.qualifier
 Bundle-Activator: org.eclipse.scout.rt.server.internal.Activator
 Bundle-Vendor: Eclipse Scout Project
 Require-Bundle: org.eclipse.core.runtime;bundle-version="[3.4.0,4.0.0)",
  org.eclipse.equinox.http.registry;bundle-version="[1.0.100,2.0.0)";visibility:=reexport,
- org.eclipse.scout.service;bundle-version="[3.7.0,4.0.0)";visibility:=reexport,
- org.eclipse.scout.commons;bundle-version="[3.7.0,4.0.0)";visibility:=reexport,
- org.eclipse.scout.rt.shared;bundle-version="[3.7.0,4.0.0)";visibility:=reexport,
- org.eclipse.scout.http.servletfilter;bundle-version="[3.7.0,4.0.0)"
+ org.eclipse.scout.service;bundle-version="[3.7.0,4.1.0)";visibility:=reexport,
+ org.eclipse.scout.commons;bundle-version="[3.7.0,4.1.0)";visibility:=reexport,
+ org.eclipse.scout.rt.shared;bundle-version="[3.7.0,4.1.0)";visibility:=reexport,
+ org.eclipse.scout.rt.server.commons;bundle-version="[3.7.0,4.1.0)"
 Import-Package: javax.servlet;version="[2.5.0,4.0.0)",
  javax.servlet.http;version="[2.5.0,4.0.0)"
 Export-Package: org.eclipse.scout.rt.server,
+ org.eclipse.scout.rt.server.admin.diagnostic,
  org.eclipse.scout.rt.server.admin.html,
  org.eclipse.scout.rt.server.admin.html.view,
  org.eclipse.scout.rt.server.admin.inspector,
@@ -23,6 +24,9 @@ Export-Package: org.eclipse.scout.rt.server,
  org.eclipse.scout.rt.server.services.common.bookmark,
  org.eclipse.scout.rt.server.services.common.calendar,
  org.eclipse.scout.rt.server.services.common.clientnotification,
+ org.eclipse.scout.rt.server.services.common.clientnotification.internal;x-internal:=true,
+ org.eclipse.scout.rt.server.services.common.clustersync,
+ org.eclipse.scout.rt.server.services.common.clustersync.internal;x-internal:=true,
  org.eclipse.scout.rt.server.services.common.code,
  org.eclipse.scout.rt.server.services.common.csv,
  org.eclipse.scout.rt.server.services.common.file,
@@ -39,12 +43,9 @@ Export-Package: org.eclipse.scout.rt.server,
  org.eclipse.scout.rt.server.services.common.security,
  org.eclipse.scout.rt.server.services.common.session,
  org.eclipse.scout.rt.server.services.common.smtp,
- org.eclipse.scout.rt.server.services.common.test,
  org.eclipse.scout.rt.server.services.common.useractivity,
  org.eclipse.scout.rt.server.services.common.workflow,
  org.eclipse.scout.rt.server.services.lookup,
- org.eclipse.scout.rt.server.servlet.filter,
- org.eclipse.scout.rt.server.servlet.test,
  org.eclipse.scout.rt.server.transaction
 Eclipse-BuddyPolicy: registered
 Bundle-RequiredExecutionEnvironment: JavaSE-1.6

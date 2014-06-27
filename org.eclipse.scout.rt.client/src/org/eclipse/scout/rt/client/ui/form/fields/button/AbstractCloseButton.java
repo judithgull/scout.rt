@@ -10,9 +10,10 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.form.fields.button;
 
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.rt.shared.ScoutTexts;
 
+@ClassId("008cee2c-630b-4377-a76f-a1a48a69ec2c")
 public abstract class AbstractCloseButton extends AbstractButton implements IButton {
 
   public AbstractCloseButton() {
@@ -27,19 +28,16 @@ public abstract class AbstractCloseButton extends AbstractButton implements IBut
    * Configuration
    */
   @Override
-  @ConfigPropertyValue("SYSTEM_TYPE_CLOSE")
   protected int getConfiguredSystemType() {
     return SYSTEM_TYPE_CLOSE;
   }
 
   @Override
-  @ConfigPropertyValue("\"CloseButton\"")
   protected String getConfiguredLabel() {
     return ScoutTexts.get("CloseButton");
   }
 
   @Override
-  @ConfigPropertyValue("\"CloseButtonTooltip\"")
   protected String getConfiguredTooltipText() {
     return ScoutTexts.get("CloseButtonTooltip");
   }

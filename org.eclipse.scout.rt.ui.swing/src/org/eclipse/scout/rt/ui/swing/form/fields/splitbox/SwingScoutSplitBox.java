@@ -10,11 +10,16 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.ui.swing.form.fields.splitbox;
 
+import java.awt.Component;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.util.List;
 
 import javax.swing.JSplitPane;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.OptimisticLock;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
@@ -31,7 +36,7 @@ import org.eclipse.scout.rt.ui.swing.form.fields.SwingScoutFieldComposite;
  */
 public class SwingScoutSplitBox extends SwingScoutFieldComposite<ISplitBox> implements ISwingScoutSplitBox {
 
-  private static IScoutLogger LOG = ScoutLogManager.getLogger(SwingScoutSplitBox.class);
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(SwingScoutSplitBox.class);
   private OptimisticLock lockSplitter;
 
   public SwingScoutSplitBox() {
@@ -43,35 +48,50 @@ public class SwingScoutSplitBox extends SwingScoutFieldComposite<ISplitBox> impl
     JSplitPane container = new JSplitPane(getScoutObject().isSplitHorizontal() ? JSplitPane.HORIZONTAL_SPLIT : JSplitPane.VERTICAL_SPLIT, true);
     container.setName(getScoutObject().getClass().getSimpleName() + ".container");
     container.setBorder(null);
-    IFormField[] scoutFields = getScoutObject().getFields();
-    if (scoutFields.length == 2) {
-      ISwingScoutFormField swingScoutComposite = getSwingEnvironment().createFormField(container, scoutFields[0]);
+    List<IFormField> scoutFields = getScoutObject().getFields();
+    if (scoutFields.size() == 2) {
+      ISwingScoutFormField swingScoutComposite = getSwingEnvironment().createFormField(container, CollectionUtility.firstElement(scoutFields));
       container.add(swingScoutComposite.getSwingContainer());
-      ISwingScoutFormField swingScoutComposite1 = getSwingEnvironment().createFormField(container, scoutFields[1]);
+      ISwingScoutFormField swingScoutComposite1 = getSwingEnvironment().createFormField(container, CollectionUtility.getElement(scoutFields, 1));
       container.add(swingScoutComposite1.getSwingContainer());
-      container.addPropertyChangeListener(JSplitPane.DIVIDER_LOCATION_PROPERTY, new PropertyChangeListener() {
-        @Override
-        public void propertyChange(PropertyChangeEvent evt) {
-          setSplitterPositionFromSwing();
-        }
-      });
     }
     else {
       LOG.error("SplitBox allows exact 2 inner fields.");
     }
+
+    container.addComponentListener(new ComponentAdapter() {
+      @Override
+      public void componentResized(ComponentEvent e) {
+        Component component = e.getComponent();
+
+        boolean horizontal = getScoutObject().isSplitHorizontal();
+        if ((horizontal && (component.getHeight() > 0)
+        || (!horizontal && (component.getWidth() > 0)))) {
+          initializeSplitterPosition();
+          component.removeComponentListener(this);
+        }
+      }
+    });
+
     setSwingContainer(container);
   }
 
-  @Override
-  protected void attachScout() {
-    super.attachScout();
-
+  private void initializeSplitterPosition() {
+    //Set Splitter Position:
     if (getScoutObject().isCacheSplitterPosition()) {
       setCachedSplitterPosition();
     }
     else {
       setSplitterPositionFromScout();
     }
+
+    //Install Listener to get the position update form Swing:
+    getSwingContainer().addPropertyChangeListener(JSplitPane.DIVIDER_LOCATION_PROPERTY, new PropertyChangeListener() {
+      @Override
+      public void propertyChange(PropertyChangeEvent evt) {
+        setSplitterPositionFromSwing();
+      }
+    });
   }
 
   protected void setCachedSplitterPosition() {
@@ -87,8 +107,8 @@ public class SwingScoutSplitBox extends SwingScoutFieldComposite<ISplitBox> impl
   protected void setSplitterPositionFromScout() {
     try {
       if (lockSplitter.acquire()) {
-        double p = getScoutObject().getSplitterPosition();
-        if (p > 0 && p < 1.0) {
+        final double p = getScoutObject().getSplitterPosition();
+        if (p >= 0 && p <= 1.0) {
           getSwingContainer().setDividerLocation(p);
           getSwingContainer().setResizeWeight(p);
         }
@@ -100,14 +120,15 @@ public class SwingScoutSplitBox extends SwingScoutFieldComposite<ISplitBox> impl
   }
 
   protected void setSplitterPosition(int leftWidth, int rightWidth) {
+    if (leftWidth < 0 || rightWidth < 0) {
+      return;
+    }
     try {
       if (lockSplitter.acquire()) {
         double total = leftWidth + rightWidth;
-        if (total > 0 && leftWidth > 0) {
+        if (total > 0) {
           double d = leftWidth / total;
-          // getSwingContainer().setDividerLocation(d);
-          // hmu 2010.03.24
-          getSwingContainer().setDividerLocation(leftWidth);
+          getSwingContainer().setDividerLocation(d);
           getSwingContainer().setResizeWeight(d);
         }
       }

@@ -63,9 +63,12 @@ import org.osgi.framework.Bundle;
  * 
  * @author Andreas Hoegger
  * @since 1.0.8 31.03.2011
+ * @deprecated will be removed with the M-release.
  */
+@Deprecated
+@SuppressWarnings("deprecation")
 public abstract class AbstractRwtWorkbenchEnvironment extends AbstractRwtEnvironment implements IRwtWorkbenchEnvironment {
-  private static IScoutLogger LOG = ScoutLogManager.getLogger(AbstractRwtWorkbenchEnvironment.class);
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractRwtWorkbenchEnvironment.class);
 
   private Display m_display;
   private HashMap<String, String> m_scoutPartIdToUiPartId;

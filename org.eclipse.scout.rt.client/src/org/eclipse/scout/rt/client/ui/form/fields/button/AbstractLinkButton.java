@@ -10,8 +10,9 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.form.fields.button;
 
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
+import org.eclipse.scout.commons.annotations.ClassId;
 
+@ClassId("bd045e80-5577-459c-a212-3d5c655e304a")
 public abstract class AbstractLinkButton extends AbstractButton implements IButton {
 
   public AbstractLinkButton() {
@@ -23,7 +24,6 @@ public abstract class AbstractLinkButton extends AbstractButton implements IButt
   }
 
   @Override
-  @ConfigPropertyValue("DISPLAY_STYLE_LINK")
   protected int getConfiguredDisplayStyle() {
     return DISPLAY_STYLE_LINK;
   }

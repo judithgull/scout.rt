@@ -16,6 +16,7 @@ import java.awt.Dialog;
 import java.awt.Font;
 import java.awt.Frame;
 import java.awt.Image;
+import java.awt.Insets;
 import java.awt.KeyboardFocusManager;
 import java.awt.Rectangle;
 import java.awt.Window;
@@ -40,12 +41,15 @@ import javax.swing.SwingUtilities;
 import javax.swing.UIDefaults;
 import javax.swing.UIManager;
 import javax.swing.border.LineBorder;
+import javax.swing.plaf.ColorUIResource;
 
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.Platform;
+import org.eclipse.scout.commons.BundleContextUtility;
 import org.eclipse.scout.commons.CSSPatch;
 import org.eclipse.scout.commons.HTMLUtility;
 import org.eclipse.scout.commons.HTMLUtility.DefaultFont;
+import org.eclipse.scout.commons.ITypeWithClassId;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.beans.IPropertyObserver;
 import org.eclipse.scout.commons.job.JobEx;
@@ -56,13 +60,13 @@ import org.eclipse.scout.rt.client.IClientSession;
 import org.eclipse.scout.rt.client.busy.IBusyManagerService;
 import org.eclipse.scout.rt.client.ui.ClientUIPreferences;
 import org.eclipse.scout.rt.client.ui.action.IAction;
+import org.eclipse.scout.rt.client.ui.action.IActionFilter;
 import org.eclipse.scout.rt.client.ui.basic.filechooser.IFileChooser;
 import org.eclipse.scout.rt.client.ui.basic.table.ITable;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.IColumn;
 import org.eclipse.scout.rt.client.ui.desktop.DesktopEvent;
 import org.eclipse.scout.rt.client.ui.desktop.DesktopListener;
 import org.eclipse.scout.rt.client.ui.desktop.IDesktop;
-import org.eclipse.scout.rt.client.ui.form.FormEvent;
 import org.eclipse.scout.rt.client.ui.form.IForm;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.groupbox.IGroupBox;
@@ -70,6 +74,7 @@ import org.eclipse.scout.rt.client.ui.form.fields.htmlfield.IHtmlField;
 import org.eclipse.scout.rt.client.ui.form.fields.mailfield.IMailField;
 import org.eclipse.scout.rt.client.ui.messagebox.IMessageBox;
 import org.eclipse.scout.rt.ui.swing.action.ISwingScoutAction;
+import org.eclipse.scout.rt.ui.swing.basic.ISwingScoutComposite;
 import org.eclipse.scout.rt.ui.swing.basic.SwingScoutComposite;
 import org.eclipse.scout.rt.ui.swing.basic.table.ISwingScoutTable;
 import org.eclipse.scout.rt.ui.swing.basic.table.SwingScoutTable;
@@ -81,13 +86,14 @@ import org.eclipse.scout.rt.ui.swing.ext.JFrameEx;
 import org.eclipse.scout.rt.ui.swing.ext.JStatusLabelEx;
 import org.eclipse.scout.rt.ui.swing.ext.JStatusLabelTop;
 import org.eclipse.scout.rt.ui.swing.ext.busy.SwingBusyHandler;
-import org.eclipse.scout.rt.ui.swing.focus.SwingScoutFocusTraversalPolicy;
 import org.eclipse.scout.rt.ui.swing.form.ISwingScoutForm;
 import org.eclipse.scout.rt.ui.swing.form.SwingScoutForm;
 import org.eclipse.scout.rt.ui.swing.form.fields.ISwingScoutFormField;
 import org.eclipse.scout.rt.ui.swing.form.fields.OnFieldLabelDecorator;
 import org.eclipse.scout.rt.ui.swing.form.fields.tabbox.ISwingScoutTabItem;
 import org.eclipse.scout.rt.ui.swing.form.fields.tabbox.SwingScoutTabItem;
+import org.eclipse.scout.rt.ui.swing.icons.CheckboxIcon;
+import org.eclipse.scout.rt.ui.swing.icons.CheckboxWithMarginIcon;
 import org.eclipse.scout.rt.ui.swing.inject.ActionInjector;
 import org.eclipse.scout.rt.ui.swing.inject.AppendActionsInjector;
 import org.eclipse.scout.rt.ui.swing.inject.InitLookAndFeelInjector;
@@ -113,6 +119,9 @@ import org.eclipse.scout.service.SERVICES;
 
 public abstract class AbstractSwingEnvironment implements ISwingEnvironment {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractSwingEnvironment.class);
+
+  public static final String PROP_WIDGET_IDS_ENABLED = "org.eclipse.scout.rt.widgetIdsEnabled";
+  public static final String WIDGET_ID_KEY = "TEST_COMP_NAME"; //default used for testing in jubula
 
   private boolean m_initialized;
   private IClientSession m_scoutSession;
@@ -478,27 +487,6 @@ public abstract class AbstractSwingEnvironment implements ISwingEnvironment {
     return m_scoutSession;
   }
 
-  /**
-   * @deprecated replaced by {@link SwingBusyHandler}. Will be removed in Release 3.10.
-   */
-  @SuppressWarnings("deprecation")
-  @Override
-  @Deprecated
-  public boolean isBusy() {
-    //replaced by SwingBusyHandler
-    return false;
-  }
-
-  /**
-   * @deprecated replaced by {@link SwingBusyHandler}. Will be removed in Release 3.10.
-   */
-  @SuppressWarnings("deprecation")
-  @Override
-  @Deprecated
-  public void setBusyFromSwing(boolean b) {
-    //replaced by SwingBusyHandler
-  }
-
   @Override
   public void postImmediateSwingJob(Runnable r) {
     synchronized (m_immediateSwingJobsLock) {
@@ -617,7 +605,7 @@ public abstract class AbstractSwingEnvironment implements ISwingEnvironment {
    * </pre>
    */
   protected void decorateAppZone(RootPaneContainer root) {
-    String zone = Activator.getDefault().getBundle().getBundleContext().getProperty("app.zone");
+    String zone = BundleContextUtility.getProperty("app.zone");
     if (zone == null) {
       //production
     }
@@ -870,6 +858,7 @@ public abstract class AbstractSwingEnvironment implements ISwingEnvironment {
       m_formFieldFactory = new FormFieldFactory();
     }
     ISwingScoutFormField ui = m_formFieldFactory.createFormField(parent, field, this);
+    assignWidgetId(field, ui);
     decorate(field, ui);
     return ui;
   }
@@ -882,6 +871,11 @@ public abstract class AbstractSwingEnvironment implements ISwingEnvironment {
   @Override
   public JDialogEx createJDialogEx(Frame swingParent) {
     return new JDialogEx(swingParent);
+  }
+
+  @Override
+  public JFrameEx createJFrameEx() {
+    return new JFrameEx();
   }
 
   @Override
@@ -1019,6 +1013,7 @@ public abstract class AbstractSwingEnvironment implements ISwingEnvironment {
   public ISwingScoutForm createForm(JComponent parent, IForm model) {
     ISwingScoutForm ui = new SwingScoutForm(this, model);
     ui.createField(model, this);
+    assignWidgetId(model, ui);
     decorate(model, ui);
     return ui;
   }
@@ -1027,8 +1022,22 @@ public abstract class AbstractSwingEnvironment implements ISwingEnvironment {
   public ISwingScoutForm createForm(ISwingScoutView targetViewComposite, IForm model) {
     ISwingScoutForm ui = new SwingScoutForm(this, targetViewComposite, model);
     ui.createField(model, this);
+    assignWidgetId(model, ui);
     decorate(model, ui);
     return ui;
+  }
+
+  protected void assignWidgetId(ITypeWithClassId model, ISwingScoutComposite uiField) {
+    if (isWidgetIdsEnabled()) {
+      JComponent swingField = uiField.getSwingField();
+      if (swingField != null) {
+        swingField.putClientProperty(WIDGET_ID_KEY, model.classId());
+      }
+    }
+  }
+
+  protected boolean isWidgetIdsEnabled() {
+    return StringUtility.parseBoolean(System.getProperty(PROP_WIDGET_IDS_ENABLED));
   }
 
   @Override
@@ -1040,35 +1049,15 @@ public abstract class AbstractSwingEnvironment implements ISwingEnvironment {
   }
 
   @Override
-  public void appendActions(JComponent parent, List<? extends IAction> actions) {
-    new AppendActionsInjector().inject(this, parent, actions);
+  public void appendActions(JComponent parent, List<? extends IAction> actions, IActionFilter filter) {
+    new AppendActionsInjector().inject(this, parent, actions, filter);
   }
 
   @Override
-  public ISwingScoutAction createAction(JComponent parent, IAction action) {
-    ISwingScoutAction ui = new ActionInjector().inject(this, parent, action);
+  public ISwingScoutAction createAction(JComponent parent, IAction action, IActionFilter filter) {
+    ISwingScoutAction ui = new ActionInjector().inject(this, parent, action, filter);
     decorate(action, ui);
     return ui;
-  }
-
-  /**
-   * @return true if component can realistically gain focus
-   */
-  @Override
-  @SuppressWarnings("deprecation")
-  public boolean acceptAsFocusTarget(Component comp) {
-    checkThread();
-    return new SwingScoutFocusTraversalPolicy().accept(comp);
-  }
-
-  /**
-   * @deprecated use {@link #createStatusLabel(IFormField)} instead. Will be removed in Release 3.10.
-   */
-  @SuppressWarnings("deprecation")
-  @Override
-  @Deprecated
-  public JStatusLabelEx createStatusLabel() {
-    return createStatusLabel(null);
   }
 
   @Override
@@ -1119,6 +1108,8 @@ public abstract class AbstractSwingEnvironment implements ISwingEnvironment {
       cleanHtml = "";
     }
 
+    ColorUIResource hyperlinkColor = (ColorUIResource) UIManager.getDefaults().get("Hyperlink.foreground");
+
     if (uiComposite.getScoutObject() instanceof IHtmlField) {
       IHtmlField htmlField = (IHtmlField) uiComposite.getScoutObject();
       if (htmlField.isHtmlEditor()) {
@@ -1133,11 +1124,11 @@ public abstract class AbstractSwingEnvironment implements ISwingEnvironment {
         }
       }
       else {
-        cleanHtml = HTMLUtility.cleanupHtml(cleanHtml, false, true, createDefaultFontSettings(uiComposite.getSwingField()));
+        cleanHtml = HTMLUtility.cleanupHtml(cleanHtml, false, true, createDefaultFontSettings(uiComposite.getSwingField()), hyperlinkColor);
       }
     }
     else if (uiComposite.getScoutObject() instanceof IMailField) {
-      cleanHtml = HTMLUtility.cleanupHtml(cleanHtml, false, true, createDefaultFontSettings(uiComposite.getSwingField()));
+      cleanHtml = HTMLUtility.cleanupHtml(cleanHtml, false, true, createDefaultFontSettings(uiComposite.getSwingField()), hyperlinkColor);
     }
 
     return cleanHtml;
@@ -1162,16 +1153,6 @@ public abstract class AbstractSwingEnvironment implements ISwingEnvironment {
     if (!SwingUtilities.isEventDispatchThread()) {
       throw new IllegalStateException("Must be called in swing thread");
     }
-  }
-
-  /**
-   * @deprecated use {@link IForm#getEventHistory()}. Will be removed in Release 3.10.
-   */
-  @SuppressWarnings("deprecation")
-  @Override
-  @Deprecated
-  public FormEvent[] fetchPendingPrintEvents(IForm form) {
-    return new FormEvent[0];
   }
 
   /**
@@ -1208,6 +1189,11 @@ public abstract class AbstractSwingEnvironment implements ISwingEnvironment {
   @Override
   public SwingTableColumn createColumn(int swingModelIndex, IColumn scoutColumn) {
     return new SwingTableColumn(swingModelIndex, scoutColumn);
+  }
+
+  @Override
+  public CheckboxIcon createCheckboxWithMarginIcon(Insets insets) {
+    return new CheckboxWithMarginIcon(insets);
   }
 
 }

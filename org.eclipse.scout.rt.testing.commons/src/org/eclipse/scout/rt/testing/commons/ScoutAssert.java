@@ -10,15 +10,20 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.testing.commons;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
+
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 
 import org.eclipse.core.runtime.jobs.Job;
+import org.eclipse.scout.commons.IOUtility;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.job.JobEx;
-import org.junit.Assert;
 
 public final class ScoutAssert {
 
@@ -32,10 +37,10 @@ public final class ScoutAssert {
   public static <T> void assertSetEquals(Collection<T> expected,
       Collection<T> actual) {
     if (actual == null) {
-      Assert.fail(format("sets are not equal", expected, actual));
+      fail(format("sets are not equal", expected, actual));
     }
     if (!new HashSet<T>(expected).equals(new HashSet<T>(actual))) {
-      Assert.fail(format("sets are not equal", expected, actual));
+      fail(format("sets are not equal", expected, actual));
     }
   }
 
@@ -46,10 +51,10 @@ public final class ScoutAssert {
   public static <T> void assertListEquals(Collection<T> expected,
       Collection<T> actual) {
     if (actual == null) {
-      Assert.fail(format("lists are not equal", expected, actual));
+      fail(format("lists are not equal", expected, actual));
     }
     if (!new ArrayList<T>(expected).equals(new ArrayList<T>(actual))) {
-      Assert.fail(format("lists are not equal", expected, actual));
+      fail(format("lists are not equal", expected, actual));
     }
   }
 
@@ -64,7 +69,7 @@ public final class ScoutAssert {
       return;
     }
     if (expected == null || actual == null) {
-      Assert.fail();
+      fail();
     }
     int actualIndex = 0;
     expectedLoop: for (Object expectedElement : expected) {
@@ -74,8 +79,37 @@ public final class ScoutAssert {
           continue expectedLoop;
         }
       }
-      Assert.fail(format(message, expected, actual));
+      fail(format(message, expected, actual));
     }
+  }
+
+  /**
+   * Compare 2 comparable with {@link Comparable#compareTo(Object)} (expect to obtain 0).
+   * This can be useful when two {@link java.math.BigDecimal} are compared.
+   * 
+   * @since 3.10.0-M3
+   */
+  public static <T extends Comparable<T>> void assertComparableEquals(T expected, T actual) {
+    assertComparableEquals(null, expected, actual);
+  }
+
+  /**
+   * Compare 2 comparable with {@link Comparable#compareTo(Object)} (expect to obtain 0).
+   * This can be useful when two {@link java.math.BigDecimal} are compared.
+   * 
+   * @since 3.10.0-M3
+   */
+  public static <T extends Comparable<T>> void assertComparableEquals(String message, T expected, T actual) {
+    if (expected == null && actual == null) {
+      return;
+    }
+    else if (expected == null || actual == null) {
+      fail(format(message, expected, actual));
+    }
+    else if (expected.compareTo(actual) == 0) {
+      return;
+    }
+    fail(format(message, expected, actual));
   }
 
   private static String format(String message, Object expected, Object actual) {
@@ -87,7 +121,7 @@ public final class ScoutAssert {
   }
 
   public static void jobSuccessfullyCompleted(JobEx job) throws Throwable {
-    Assert.assertEquals(job.getState(), Job.NONE);
+    assertEquals(job.getState(), Job.NONE);
     try {
       job.throwOnError();
     }
@@ -103,8 +137,28 @@ public final class ScoutAssert {
     }
     // if there is no exception, but job result is not ok
     if (job.getResult() != null && !job.getResult().isOK()) {
-      Assert.fail(job.getResult().getMessage());
+      fail(job.getResult().getMessage());
     }
   }
 
+  /**
+   * compares two textfiles
+   * 
+   * @param expectedFile
+   * @param actualFile
+   * @param charsetName
+   *          The name of a supported {@link java.nio.charset.Charset </code>charset<code>}
+   * @throws ProcessingException
+   */
+  public static void assertTextFileEquals(File expectedFile, File actualFile, String charsetName) throws ProcessingException {
+    if (!expectedFile.exists()) {
+      fail("File does not exists:" + expectedFile.getPath());
+    }
+    if (!actualFile.exists()) {
+      fail("File does not exists:" + expectedFile.getPath());
+    }
+    List<String> expectedLines = IOUtility.readLines(expectedFile, charsetName);
+    List<String> actualLines = IOUtility.readLines(actualFile, charsetName);
+    assertListEquals(expectedLines, actualLines);
+  }
 }

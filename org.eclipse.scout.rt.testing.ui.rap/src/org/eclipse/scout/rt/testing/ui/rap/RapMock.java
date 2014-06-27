@@ -29,16 +29,17 @@ import org.eclipse.scout.commons.beans.IPropertyObserver;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ClientSyncJob;
-import org.eclipse.scout.rt.client.IClientSession;
 import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
 import org.eclipse.scout.rt.testing.shared.TestingUtility;
 import org.eclipse.scout.rt.testing.shared.WaitCondition;
 import org.eclipse.scout.rt.ui.rap.IRwtEnvironment;
+import org.eclipse.scout.rt.ui.rap.basic.ColorUtility;
 import org.eclipse.scout.rt.ui.rap.basic.IRwtScoutComposite;
 import org.eclipse.scout.rt.ui.rap.basic.RwtScoutComposite;
-import org.eclipse.scout.rt.ui.rap.ext.IDropDownButtonForPatch;
+import org.eclipse.scout.rt.ui.rap.ext.DropDownButton;
 import org.eclipse.scout.rt.ui.rap.ext.custom.StyledText;
 import org.eclipse.scout.rt.ui.rap.util.RwtUtility;
+import org.eclipse.scout.testing.client.AbstractGuiMock;
 import org.eclipse.scout.testing.client.IGuiMock;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.CTabItem;
@@ -76,16 +77,12 @@ import org.openqa.selenium.remote.service.DriverService;
 /**
  *
  */
-public class RapMock implements IGuiMock {
+public class RapMock extends AbstractGuiMock {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(RapMock.class);
-
-  static interface MockRunnable<T> extends WaitCondition<T> {
-  }
 
   private static DriverService m_service = null;
   private WebDriver m_driver;
   private RAPSelenium m_bot;
-  private IClientSession m_session;
   private int m_sleepDelay = 40;
 
   private final ElementFinder m_elementFinder = new ElementFinder(new JavascriptLibrary());
@@ -93,14 +90,14 @@ public class RapMock implements IGuiMock {
   private WebElement m_currentElement = null;
   private boolean m_modifierPressed = false;
   private Actions m_actionBuilder = null;
-  private List<CharSequence> m_keyList = new ArrayList<CharSequence>();
 
   private static boolean useChrome = false;
   private static boolean useFirefox = !useChrome;
-  private static boolean useFirebug = false && useFirefox;
 
-  public void setClientSession(IClientSession session) {
-    m_session = session;
+  private static boolean useFirebug = false;// && useFirefox;
+
+  public RapMock() {
+    super(null);
   }
 
   @Override
@@ -153,7 +150,6 @@ public class RapMock implements IGuiMock {
         }
 
         m_driver = new FirefoxDriver(firefoxProfile);
-//        m_driver = new FirefoxDriver(new FirefoxProfile(new File("C:/Temp/webdriver-profile")));
       }
     }
     if (m_driver == null) {
@@ -198,14 +194,14 @@ public class RapMock implements IGuiMock {
     //
     for (int pass = 0; pass < 1; pass++) {
       //wait until gui queue is empty
-      syncExec(new MockRunnable<Object>() {
+      syncExec(new WaitCondition<Object>() {
         @Override
         public Object run() throws Throwable {
           return null;
         }
       });
       //wait until model queue is empty
-      ClientSyncJob idleJob = new ClientSyncJob("Check for idle", m_session) {
+      ClientSyncJob idleJob = new ClientSyncJob("Check for idle", getClientSession()) {
         @Override
         protected void runVoid(IProgressMonitor m) throws Throwable {
         }
@@ -301,7 +297,7 @@ public class RapMock implements IGuiMock {
 
   @Override
   public boolean isWindowActive(final String title) {
-    return syncExec(new MockRunnable<Boolean>() {
+    return syncExec(new WaitCondition<Boolean>() {
       @Override
       public Boolean run() throws Throwable {
         CTabItem view = findWorkbenchView(title);
@@ -319,7 +315,7 @@ public class RapMock implements IGuiMock {
 
   @Override
   public boolean isWindowOpen(final String title) {
-    return syncExec(new MockRunnable<Boolean>() {
+    return syncExec(new WaitCondition<Boolean>() {
       @Override
       public Boolean run() throws Throwable {
         CTabItem view = findWorkbenchView(title);
@@ -338,7 +334,7 @@ public class RapMock implements IGuiMock {
   @Override
   public void activateWindow(final String title) {
     waitForOpenWindow(title);
-    syncExec(new MockRunnable<Object>() {
+    syncExec(new WaitCondition<Object>() {
       @Override
       public Object run() throws Throwable {
         CTabItem view = findWorkbenchView(title);
@@ -360,7 +356,7 @@ public class RapMock implements IGuiMock {
   @Override
   public FieldState getFieldState(FieldType type, int index) {
     final Control c = waitForIndexedField(type, index);
-    return syncExec(new MockRunnable<FieldState>() {
+    return syncExec(new WaitCondition<FieldState>() {
       @Override
       public FieldState run() throws Throwable {
         return getFieldStateInternal(c);
@@ -371,7 +367,7 @@ public class RapMock implements IGuiMock {
   @Override
   public FieldState getScoutFieldState(String name) {
     final Control c = waitForScoutField(name);
-    return syncExec(new MockRunnable<FieldState>() {
+    return syncExec(new WaitCondition<FieldState>() {
       @Override
       public FieldState run() throws Throwable {
         return getFieldStateInternal(c);
@@ -382,7 +378,7 @@ public class RapMock implements IGuiMock {
   @Override
   public FieldState getScoutFieldContainerState(String name) {
     final Control c = waitForScoutField(name);
-    return syncExec(new MockRunnable<FieldState>() {
+    return syncExec(new WaitCondition<FieldState>() {
       @Override
       public FieldState run() throws Throwable {
         IRwtScoutComposite swtScoutComposite = RwtScoutComposite.getCompositeOnWidget(c);
@@ -397,7 +393,7 @@ public class RapMock implements IGuiMock {
 
   @Override
   public List<FieldState> getFieldStates(final FieldType type) {
-    return syncExec(new MockRunnable<List<FieldState>>() {
+    return syncExec(new WaitCondition<List<FieldState>>() {
       @Override
       public List<FieldState> run() throws Throwable {
         List<FieldState> list = new ArrayList<FieldState>();
@@ -416,7 +412,7 @@ public class RapMock implements IGuiMock {
 
   @Override
   public FieldState getFocusFieldState() {
-    return syncExec(new MockRunnable<FieldState>() {
+    return syncExec(new WaitCondition<FieldState>() {
       @Override
       public FieldState run() throws Throwable {
         Control c = getDisplay().getFocusControl();
@@ -431,7 +427,7 @@ public class RapMock implements IGuiMock {
   @Override
   public void clickOnPushButton(String text) {
     final Control c = waitForPushButtonWithLabel(text);
-    syncExec(new MockRunnable<Object>() {
+    syncExec(new WaitCondition<Object>() {
       @Override
       public Object run() throws Throwable {
         Point p = c.toDisplay(5, 5);
@@ -454,6 +450,17 @@ public class RapMock implements IGuiMock {
 
   @Override
   public void gotoScoutField(String name) {
+    gotoScoutField(name, 0.5, 0.5);
+  }
+
+  @Override
+  public void gotoScoutField(String name, double x, double y) {
+    if (x < 0 || x > 1) {
+      throw new IllegalArgumentException("x should be in [0, 1] range.");
+    }
+    if (y < 0 || y > 1) {
+      throw new IllegalArgumentException("y should be in [0, 1] range.");
+    }
     final Control c = waitForScoutField(name);
     setCurrentWidgetId(WidgetUtil.getAdapter(c).getId());
     if (c instanceof Text) {
@@ -464,7 +471,7 @@ public class RapMock implements IGuiMock {
   @Override
   public void gotoTable(int tableIndex, final int rowIndex, final int columnIndex) {
     final Table table = (Table) waitForIndexedField(FieldType.Table, tableIndex);
-    syncExec(new MockRunnable<Object>() {
+    syncExec(new WaitCondition<Object>() {
       @Override
       public Object run() throws Throwable {
         setCurrentWidgetId(WidgetUtil.getAdapter(table).getId());
@@ -481,7 +488,7 @@ public class RapMock implements IGuiMock {
   @Override
   public void gotoTableHeader(int tableIndex, final int columnIndex) {
     final Table table = (Table) waitForIndexedField(FieldType.Table, tableIndex);
-    syncExec(new MockRunnable<Object>() {
+    syncExec(new WaitCondition<Object>() {
       @SuppressWarnings("null")
       @Override
       public Object run() throws Throwable {
@@ -511,7 +518,7 @@ public class RapMock implements IGuiMock {
   @Override
   public void gotoTree(int treeIndex, final String nodeText) {
     final Tree tree = (Tree) waitForIndexedField(FieldType.Tree, treeIndex);
-    syncExec(new MockRunnable<Object>() {
+    syncExec(new WaitCondition<Object>() {
       @Override
       public Object run() throws Throwable {
         setCurrentWidgetId(WidgetUtil.getAdapter(tree).getId());
@@ -535,7 +542,7 @@ public class RapMock implements IGuiMock {
       String label = names[i];
       final boolean lastItem = i == names.length - 1;
       final MenuItem m = waitForMenuItem(label);
-      syncExec(new MockRunnable<Boolean>() {
+      syncExec(new WaitCondition<Boolean>() {
         @Override
         public Boolean run() throws Throwable {
           //toggle
@@ -562,7 +569,7 @@ public class RapMock implements IGuiMock {
   @Override
   public List<String> getTableCells(int tableIndex, final int columnIndex) {
     final Table table = (Table) waitForIndexedField(FieldType.Table, tableIndex);
-    return syncExec(new MockRunnable<List<String>>() {
+    return syncExec(new WaitCondition<List<String>>() {
       @Override
       public List<String> run() throws Throwable {
         ArrayList<String> list = new ArrayList<String>();
@@ -578,7 +585,7 @@ public class RapMock implements IGuiMock {
   @Override
   public List<String> getTreeNodes(final int treeIndex) {
     final Tree tree = (Tree) waitForIndexedField(FieldType.Tree, treeIndex);
-    return syncExec(new MockRunnable<List<String>>() {
+    return syncExec(new WaitCondition<List<String>>() {
       @Override
       public List<String> run() throws Throwable {
         ArrayList<String> list = new ArrayList<String>();
@@ -591,7 +598,7 @@ public class RapMock implements IGuiMock {
   @Override
   public Set<String> getSelectedTableCells(int tableIndex, final int columnIndex) {
     final Table table = (Table) waitForIndexedField(FieldType.Table, tableIndex);
-    return syncExec(new MockRunnable<Set<String>>() {
+    return syncExec(new WaitCondition<Set<String>>() {
       @Override
       public Set<String> run() throws Throwable {
         TreeSet<String> set = new TreeSet<String>();
@@ -610,7 +617,7 @@ public class RapMock implements IGuiMock {
   @Override
   public Set<String> getSelectedTreeNodes(int treeIndex) {
     final Tree tree = (Tree) waitForIndexedField(FieldType.Tree, treeIndex);
-    return syncExec(new MockRunnable<Set<String>>() {
+    return syncExec(new WaitCondition<Set<String>>() {
       @Override
       public Set<String> run() throws Throwable {
         TreeSet<String> set = new TreeSet<String>();
@@ -628,7 +635,7 @@ public class RapMock implements IGuiMock {
   @Override
   public Set<String> getCheckedTableCells(int tableIndex, final int columnIndex) {
     final Table table = (Table) waitForIndexedField(FieldType.Table, tableIndex);
-    return syncExec(new MockRunnable<Set<String>>() {
+    return syncExec(new WaitCondition<Set<String>>() {
       @Override
       public Set<String> run() throws Throwable {
         TreeSet<String> check = new TreeSet<String>();
@@ -661,7 +668,7 @@ public class RapMock implements IGuiMock {
   @Override
   public void clickLeft() {
     m_bot.clickAndWait(getCurrentWidgetId_());
-    syncExec(new MockRunnable<Object>() {
+    syncExec(new WaitCondition<Object>() {
       @Override
       public Object run() throws Throwable {
         Control focusControl = Display.getCurrent().getFocusControl();
@@ -682,13 +689,6 @@ public class RapMock implements IGuiMock {
   public void drag(int x1, int y1, int x2, int y2) {
     //XXX RAP
     throw new UnsupportedOperationException("not implemented");
-    /*
-    gotoPoint(x1, y1);
-    m_bot.pressLeft();
-    gotoPoint(x2, y2);
-    m_bot.releaseLeft();
-    waitForIdle();
-     */
   }
 
   @Override
@@ -704,8 +704,6 @@ public class RapMock implements IGuiMock {
   public void typeText(final String text) {
     if (m_modifierPressed) {
       m_actionBuilder.sendKeys(text.toUpperCase());
-//    m_bot.typeKeys(getCurrentWidgetId(), text);
-//      m_keyList.add(text);
     }
     else {
       m_actionBuilder.sendKeys(text).perform();
@@ -717,13 +715,6 @@ public class RapMock implements IGuiMock {
   public void paste(String text) {
     //XXX RAP
     throw new UnsupportedOperationException("not implemented");
-    /*
-    Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text), null);
-    //press paste (ctrl-V)
-    m_bot.pressKey(Key.Control);
-    m_bot.typeText("v");
-    m_bot.releaseKey(Key.Control);
-     */
   }
 
   @Override
@@ -735,9 +726,6 @@ public class RapMock implements IGuiMock {
         break;
       case Control:
         m_actionBuilder.keyDown(Keys.CONTROL);
-//        m_bot.controlKeyDown();
-//        m_bot.keyDownNative("17");
-//        m_keyList.add(Keys.CONTROL);
         m_modifierPressed = true;
         break;
       case Alt:
@@ -751,7 +739,6 @@ public class RapMock implements IGuiMock {
       default:
         m_actionBuilder.sendKeys(toSeleniumKey(key).toString());
         m_actionBuilder.perform();
-//        m_bot.keyDown(m_currentWidgetId, toSeleniumKey(key));
         waitForIdle();
         break;
     }
@@ -766,12 +753,6 @@ public class RapMock implements IGuiMock {
         break;
       case Control:
         m_actionBuilder.keyUp(Keys.CONTROL);
-//        m_bot.controlKeyUp();
-//        m_bot.keyUpNative("17");
-//        getCurrentElement().sendKeys(m_keyList.toArray(new CharSequence[m_keyList.size()]));
-//        m_keyList.clear();
-
-//        getCurrentElement().sendKeys(Keys.CONTROL, "a");
         m_modifierPressed = false;
         break;
       case Alt:
@@ -784,7 +765,6 @@ public class RapMock implements IGuiMock {
         break;
       default:
         m_actionBuilder.keyUp(toSeleniumKey(key));
-//        m_bot.keyUp(m_currentWidgetId, toSeleniumKey(key));
         break;
     }
     m_actionBuilder.perform();
@@ -798,14 +778,13 @@ public class RapMock implements IGuiMock {
     }
     else {
       m_actionBuilder.sendKeys(getCurrentElement(), toSeleniumKey(key)).perform();
-//      m_bot.keyPress(toSeleniumKey(key).toString());
     }
     waitForIdle();
   }
 
   @Override
   public WindowState getWindowState(final String title) {
-    return syncExec(new MockRunnable<WindowState>() {
+    return syncExec(new WaitCondition<WindowState>() {
       @Override
       public WindowState run() throws Throwable {
         checkActiveShell();
@@ -838,20 +817,30 @@ public class RapMock implements IGuiMock {
   @Override
   public String getClipboardText() {
     waitForIdle();
-    return syncExec(new MockRunnable<String>() {
+    return syncExec(new WaitCondition<String>() {
       @Override
       public String run() throws Throwable {
         //XXX RAP
-//        Clipboard b = new Clipboard(getDisplay());
-//        return (String) b.getContents(TextTransfer.getInstance());
         return "";
       }
     });
   }
 
   @Override
+  public void setClipboardText(String value) {
+    waitForIdle();
+    syncExec(new WaitCondition<Object>() {
+      @Override
+      public String run() throws Throwable {
+        //XXX RAP
+        return null;
+      }
+    });
+  }
+
+  @Override
   public Object internal0(final Object o) {
-    return syncExec(new MockRunnable<String>() {
+    return syncExec(new WaitCondition<String>() {
       @Override
       public String run() throws Throwable {
         return null;
@@ -880,6 +869,10 @@ public class RapMock implements IGuiMock {
     state.y = p.y;
     state.width = c.getBounds().width;
     state.height = c.getBounds().height;
+
+    state.foregroundColor = ColorUtility.createStringFromColor(c.getForeground());
+    state.backgroundColor = ColorUtility.createStringFromColor(c.getBackground());
+
     //text
     if (c instanceof Label) {
       state.text = ((Label) c).getText();
@@ -891,8 +884,15 @@ public class RapMock implements IGuiMock {
       state.text = ((StyledText) c).getText();
     }
     if (c instanceof Button) {
-      state.text = ((Button) c).getText();
+      Button button = (Button) c;
+      state.text = button.getText();
+      // selection
+      state.selected = button.getSelection();
     }
+    // visibility
+    state.visible = c.isVisible();
+    state.widget = c;
+
     return state;
   }
 
@@ -919,7 +919,7 @@ public class RapMock implements IGuiMock {
     if (c instanceof Tree) {
       return FieldType.Tree;
     }
-    if (c instanceof IDropDownButtonForPatch) {
+    if (c instanceof DropDownButton) {
       return FieldType.DropdownButton;
     }
     if (c instanceof Button) {
@@ -949,7 +949,7 @@ public class RapMock implements IGuiMock {
   }
 
   protected Display getDisplay() {
-    IRwtEnvironment env = (IRwtEnvironment) m_session.getData(IRwtEnvironment.ENVIRONMENT_KEY);
+    IRwtEnvironment env = (IRwtEnvironment) getClientSession().getData(IRwtEnvironment.ENVIRONMENT_KEY);
     return env.getDisplay();
   }
 
@@ -990,7 +990,7 @@ public class RapMock implements IGuiMock {
   }
 
   protected List<Composite> enumerateParentContainers() {
-    return syncExec(new MockRunnable<ArrayList<Composite>>() {
+    return syncExec(new WaitCondition<ArrayList<Composite>>() {
       @Override
       public ArrayList<Composite> run() throws Throwable {
         ArrayList<Composite> list = new ArrayList<Composite>();
@@ -1014,21 +1014,6 @@ public class RapMock implements IGuiMock {
   }
 
   protected CTabItem findWorkbenchView(final String title) {
-    //XXX RAP
-//    Shell shell = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getShell();XXX RAP
-//    if (shell != null) {
-//      for (CTabFolder f : SwtUtility.findChildComponents(shell, CTabFolder.class)) {
-//        if (f.getItemCount() > 0) {
-//          for (CTabItem item : f.getItems()) {
-//            if (item.isShowing()) {
-//              if (title.equals(cleanButtonLabel(item.getText()))) {
-//                return item;
-//              }
-//            }
-//          }
-//        }
-//      }
-//    }
     return null;
   }
 
@@ -1036,7 +1021,7 @@ public class RapMock implements IGuiMock {
     return waitUntil(new WaitCondition<Control>() {
       @Override
       public Control run() {
-        return syncExec(new MockRunnable<Control>() {
+        return syncExec(new WaitCondition<Control>() {
           @Override
           public Control run() throws Throwable {
             for (Shell shell : getDisplay().getShells()) {
@@ -1060,7 +1045,7 @@ public class RapMock implements IGuiMock {
     return waitUntil(new WaitCondition<Control>() {
       @Override
       public Control run() {
-        return syncExec(new MockRunnable<Control>() {
+        return syncExec(new WaitCondition<Control>() {
           @Override
           public Control run() throws Throwable {
             Control lastSecondaryCandidate = null;
@@ -1087,7 +1072,7 @@ public class RapMock implements IGuiMock {
     return waitUntil(new WaitCondition<Control>() {
       @Override
       public Control run() {
-        return syncExec(new MockRunnable<Control>() {
+        return syncExec(new WaitCondition<Control>() {
           @Override
           public Control run() throws Throwable {
             List<Composite> parents = enumerateParentContainers();
@@ -1113,7 +1098,7 @@ public class RapMock implements IGuiMock {
     return waitUntil(new WaitCondition<Control>() {
       @Override
       public Control run() {
-        return syncExec(new MockRunnable<Control>() {
+        return syncExec(new WaitCondition<Control>() {
           @Override
           public Control run() throws Throwable {
             List<Composite> parents = enumerateParentContainers();
@@ -1136,7 +1121,7 @@ public class RapMock implements IGuiMock {
     return waitUntil(new WaitCondition<MenuItem>() {
       @Override
       public MenuItem run() {
-        return syncExec(new MockRunnable<MenuItem>() {
+        return syncExec(new WaitCondition<MenuItem>() {
           @Override
           public MenuItem run() throws Throwable {
             String label = cleanButtonLabel(name);
@@ -1184,7 +1169,7 @@ public class RapMock implements IGuiMock {
 
   }
 
-  protected <T> T syncExec(final MockRunnable<T> r) {
+  protected <T> T syncExec(final WaitCondition<T> r) {
     if (getDisplay().getThread() != Thread.currentThread()) {
       final AtomicReference<T> ret = new AtomicReference<T>();
       final AtomicReference<Throwable> ex = new AtomicReference<Throwable>();

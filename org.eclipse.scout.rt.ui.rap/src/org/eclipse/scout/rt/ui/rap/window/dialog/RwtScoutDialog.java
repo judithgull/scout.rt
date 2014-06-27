@@ -29,6 +29,7 @@ import org.eclipse.scout.rt.ui.rap.window.IFormBoundsProvider;
 import org.eclipse.scout.rt.ui.rap.window.desktop.IRwtScoutFormFooter;
 import org.eclipse.scout.rt.ui.rap.window.desktop.IRwtScoutFormHeader;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.events.ShellAdapter;
 import org.eclipse.swt.events.ShellEvent;
 import org.eclipse.swt.events.ShellListener;
 import org.eclipse.swt.graphics.Image;
@@ -46,7 +47,7 @@ import org.eclipse.ui.forms.widgets.Form;
  * @since 3.8.0
  */
 public class RwtScoutDialog extends AbstractRwtScoutPart {
-  private static IScoutLogger LOG = ScoutLogManager.getLogger(RwtScoutDialog.class);
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(RwtScoutDialog.class);
   private static String VARIANT_DIALOG_SHELL = "dialog";
 
   private DialogImpl m_uiDialog;
@@ -217,6 +218,20 @@ public class RwtScoutDialog extends AbstractRwtScoutPart {
   }
 
   protected Control createContentsDelegate(Composite parent) {
+    m_uiDialog.getShell().addShellListener(new ShellAdapter() {
+      private static final long serialVersionUID = 1L;
+
+      @Override
+      public void shellActivated(ShellEvent e) {
+        Runnable job = new Runnable() {
+          @Override
+          public void run() {
+            getScoutObject().getUIFacade().fireFormActivatedFromUI();
+          }
+        };
+        getUiEnvironment().invokeScoutLater(job, 0);
+      }
+    });
     m_container = getUiEnvironment().getFormToolkit().createComposite(parent);
     m_container.setLayoutData(new GridData(GridData.FILL_BOTH | GridData.GRAB_HORIZONTAL | GridData.GRAB_VERTICAL));
 
@@ -400,7 +415,7 @@ public class RwtScoutDialog extends AbstractRwtScoutPart {
     public boolean close() {
       // force UI input to be verified on the last focused field, so that changes will be written to the model.
       Control focusControl = m_uiDialog.getShell().getDisplay().getFocusControl();
-      RwtUtility.verifyUiInput(focusControl);
+      RwtUtility.runUiInputVerifier(focusControl);
 
       //override and delegate to scout model
       Runnable job = new Runnable() {

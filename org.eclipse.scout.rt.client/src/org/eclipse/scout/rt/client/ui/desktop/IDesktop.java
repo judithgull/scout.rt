@@ -11,7 +11,10 @@
 package org.eclipse.scout.rt.client.ui.desktop;
 
 import java.beans.PropertyChangeListener;
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.eclipse.scout.commons.beans.IPropertyObserver;
 import org.eclipse.scout.commons.exception.IProcessingStatus;
@@ -63,7 +66,7 @@ public interface IDesktop extends IPropertyObserver {
    */
   String PROP_STATUS = "status";
   /**
-   * {@link IKeyStroke}[]
+   * {@link List<IKeyStroke>}
    */
   String PROP_KEY_STROKES = "keyStrokes";
   /**
@@ -79,7 +82,7 @@ public interface IDesktop extends IPropertyObserver {
 
   <T extends IForm> T findForm(Class<T> formType);
 
-  <T extends IForm> T[] findForms(Class<T> formType);
+  <T extends IForm> List<T> findForms(Class<T> formType);
 
   <T extends IForm> T findLastActiveForm(Class<T> formType);
 
@@ -112,7 +115,7 @@ public interface IDesktop extends IPropertyObserver {
    * @return all forms except the searchform and the current detail form with
    *         the same fully qualified classname and the same primary key.
    */
-  IForm[] getSimilarViewForms(IForm form);
+  List<IForm> getSimilarViewForms(IForm form);
 
   /**
    * @return the {@link IFormField} that owns the focus
@@ -134,12 +137,17 @@ public interface IDesktop extends IPropertyObserver {
   /**
    * DISPLAY_HINT_VIEW
    */
-  IForm[] getViewStack();
+  List<IForm> getViewStack();
 
   /**
    * DISPLAY_HINT_DIALOG
    */
-  IForm[] getDialogStack();
+  List<IForm> getDialogStack();
+
+  /**
+   * Open dialogs or views that need to be saved
+   */
+  List<IForm> getUnsavedForms();
 
   /**
    * add form to desktop and notify attached listeners (incl. gui)
@@ -151,17 +159,17 @@ public interface IDesktop extends IPropertyObserver {
    */
   void removeForm(IForm form);
 
-  IMessageBox[] getMessageBoxStack();
+  List<IMessageBox> getMessageBoxStack();
 
   void addMessageBox(IMessageBox mb);
 
-  IOutline[] getAvailableOutlines();
+  List<IOutline> getAvailableOutlines();
 
-  void setAvailableOutlines(IOutline[] availableOutlines);
+  void setAvailableOutlines(List<? extends IOutline> availableOutlines);
 
-  IKeyStroke[] getKeyStrokes();
+  Set<IKeyStroke> getKeyStrokes();
 
-  void setKeyStrokes(IKeyStroke[] ks);
+  void setKeyStrokes(Collection<? extends IKeyStroke> ks);
 
   void addKeyStrokes(IKeyStroke... keyStrokes);
 
@@ -201,7 +209,14 @@ public interface IDesktop extends IPropertyObserver {
    * If currently active page(s) are affected they reload their data, otherwise
    * the pages is simply marked dirty and reloaded on next activation
    */
-  void refreshPages(Class... pageTypes);
+  void refreshPages(List<Class<? extends IPage>> pages);
+
+  /**
+   * @see IDesktop#refreshPages(List)
+   * @param pageTypes
+   *          Must be classes that implement {@link IPage}.
+   */
+  void refreshPages(Class<?>... pageTypes);
 
   /**
    * add Property Observer
@@ -265,7 +280,7 @@ public interface IDesktop extends IPropertyObserver {
    *         <p>
    *         normally presented in the menubar
    */
-  IMenu[] getMenus();
+  List<IMenu> getMenus();
 
   /**
    * Convenience to find a menu in the desktop, uses {@link ActionFinder}
@@ -282,17 +297,17 @@ public interface IDesktop extends IPropertyObserver {
   /**
    * @return all actions including keyStroke, menu, toolButton and viewButton
    */
-  IAction[] getActions();
+  List<IAction> getActions();
 
   /**
    * @return all {@link IToolButton} actions
    */
-  IToolButton[] getToolButtons();
+  List<IToolButton> getToolButtons();
 
   /**
    * @return all {@link IViewButton} actions
    */
-  IViewButton[] getViewButtons();
+  List<IViewButton> getViewButtons();
 
   /**
    * @return the detail form of the active (selected) page {@link IPage#getDetailForm()} of the active outline
@@ -395,8 +410,22 @@ public interface IDesktop extends IPropertyObserver {
   void addFileChooser(IFileChooser fc);
 
   /**
-   * Creates and opens a browser window to download a file or open an url via user interface (only in web ui)
+   * Opens the link in the browser.
    */
+  void openUrlInBrowser(String url);
+
+  /**
+   * Opens the link in the browser.
+   * 
+   * @param target
+   *          used to specify where the url should be opened. Only considered by the web ui.
+   */
+  void openUrlInBrowser(String url, IUrlTarget target);
+
+  /**
+   * @deprecated use {@link #openUrlInBrowser(String)}. Will be removed in the 5.0 Release.
+   */
+  @Deprecated
   void openBrowserWindow(String path);
 
   /**
@@ -450,4 +479,24 @@ public interface IDesktop extends IPropertyObserver {
    *         closing process.
    */
   boolean doBeforeClosingInternal();
+
+  /**
+   * Transfers the keyboard focus to the next possible location. The next location is defined as the default focus
+   * traversal
+   * as defined by the UI layer.<br>
+   * This operation is not supported in the RAP UI!
+   * 
+   * @since 4.0.0
+   */
+  void traverseFocusNext();
+
+  /**
+   * Transfers the keyboard focus to the previous location. The previous location is defined as the default backwards
+   * focus
+   * traversal as defined by the UI layer.<br>
+   * This operation is not supported in the RAP UI!
+   * 
+   * @since 4.0.0
+   */
+  void traverseFocusPrevious();
 }

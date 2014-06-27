@@ -13,12 +13,17 @@ package org.eclipse.scout.rt.ui.swt.window.dialog;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.lang.reflect.Method;
+import java.util.List;
 
+import org.eclipse.jface.action.IToolBarManager;
 import org.eclipse.jface.dialogs.Dialog;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.exception.ProcessingException;
+import org.eclipse.scout.commons.internal.runtime.CompatibilityUtility;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.ui.action.ActionUtility;
+import org.eclipse.scout.rt.client.ui.action.tool.IToolButton;
 import org.eclipse.scout.rt.client.ui.form.IForm;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.button.IButton;
@@ -26,11 +31,13 @@ import org.eclipse.scout.rt.ui.swt.DefaultValidateRoot;
 import org.eclipse.scout.rt.ui.swt.ISwtEnvironment;
 import org.eclipse.scout.rt.ui.swt.IValidateRoot;
 import org.eclipse.scout.rt.ui.swt.SwtShellValidateRoot;
+import org.eclipse.scout.rt.ui.swt.action.SwtScoutToolbarAction;
 import org.eclipse.scout.rt.ui.swt.form.ISwtScoutForm;
 import org.eclipse.scout.rt.ui.swt.util.SwtUtility;
-import org.eclipse.scout.rt.ui.swt.util.VersionUtility;
 import org.eclipse.scout.rt.ui.swt.window.ISwtScoutPart;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.events.ShellAdapter;
+import org.eclipse.swt.events.ShellEvent;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.layout.GridData;
@@ -45,8 +52,9 @@ import org.eclipse.ui.forms.widgets.Form;
  * 
  * @since 1.0.9 18.07.2008
  */
+@SuppressWarnings("restriction")
 public class SwtScoutDialog extends Dialog implements ISwtScoutPart {
-  private static IScoutLogger LOG = ScoutLogManager.getLogger(SwtScoutDialog.class);
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(SwtScoutDialog.class);
 
   private final ISwtEnvironment m_environment;
   private Composite m_contentPane;
@@ -131,6 +139,7 @@ public class SwtScoutDialog extends Dialog implements ISwtScoutPart {
   }
 
   protected void attachScout(IForm form) {
+    updateToolbarActionsFromScout();
     setTitleFromScout(form.getTitle());
     setImageFromScout(form.getIconId());
     setMaximizeEnabledFromScout(form.isMaximizeEnabled());
@@ -155,6 +164,21 @@ public class SwtScoutDialog extends Dialog implements ISwtScoutPart {
     setCloseEnabledFromScout(closable);
     // listeners
     form.addPropertyChangeListener(m_formPropertyListener);
+  }
+
+  /**
+  *
+  */
+  protected void updateToolbarActionsFromScout() {
+    List<IToolButton> toolbuttons = ActionUtility.visibleNormalizedActions(getForm().getToolButtons());
+    if (!toolbuttons.isEmpty()) {
+      IToolBarManager toolBarManager = getRootForm().getToolBarManager();
+      for (IToolButton b : toolbuttons) {
+        toolBarManager.add(new SwtScoutToolbarAction(b, getEnvironment(), toolBarManager));
+      }
+      toolBarManager.update(true);
+    }
+
   }
 
   protected void detachScout(IForm form) {
@@ -210,7 +234,7 @@ public class SwtScoutDialog extends Dialog implements ISwtScoutPart {
   }
 
   protected void setSaveNeededFromScout(boolean modified) {
-    if (VersionUtility.isEclipseVersionLessThan35()) {
+    if (CompatibilityUtility.isEclipseVersionLessThan35()) {
       return;
     }
 
@@ -269,11 +293,9 @@ public class SwtScoutDialog extends Dialog implements ISwtScoutPart {
   @Override
   public boolean close() {
     m_opened = false;
-    // ensure the traversal is done to write eventually changes to model
+    // ensure the current input is validated
     Control focusControl = getShell().getDisplay().getFocusControl();
-    if (focusControl != null && !focusControl.isDisposed()) {
-      focusControl.traverse(SWT.TRAVERSE_TAB_NEXT);
-    }
+    SwtUtility.runSwtInputVerifier(focusControl);
     Runnable job = new Runnable() {
       @Override
       public void run() {
@@ -286,6 +308,18 @@ public class SwtScoutDialog extends Dialog implements ISwtScoutPart {
 
   @Override
   protected Control createContents(Composite parent) {
+    getShell().addShellListener(new ShellAdapter() {
+      @Override
+      public void shellActivated(ShellEvent e) {
+        Runnable job = new Runnable() {
+          @Override
+          public void run() {
+            m_scoutForm.getUIFacade().fireFormActivatedFromUI();
+          }
+        };
+        m_environment.invokeScoutLater(job, 0);
+      }
+    });
     m_rootForm = getEnvironment().getFormToolkit().createForm(parent);
     m_contentPane = m_rootForm.getBody();
     GridLayout gridLayout = new GridLayout();

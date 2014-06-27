@@ -12,25 +12,29 @@ package org.eclipse.scout.rt.ui.swt.window.desktop.view;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.util.List;
 
 import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.jface.action.IToolBarManager;
 import org.eclipse.scout.commons.OptimisticLock;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ClientSyncJob;
+import org.eclipse.scout.rt.client.ui.action.ActionUtility;
+import org.eclipse.scout.rt.client.ui.action.tool.IToolButton;
 import org.eclipse.scout.rt.client.ui.form.IForm;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.button.IButton;
 import org.eclipse.scout.rt.ui.swt.ISwtEnvironment;
+import org.eclipse.scout.rt.ui.swt.action.SwtScoutToolbarAction;
 import org.eclipse.scout.rt.ui.swt.busy.AnimatedBusyImage;
 import org.eclipse.scout.rt.ui.swt.form.ISwtScoutForm;
 import org.eclipse.scout.rt.ui.swt.util.ScoutFormToolkit;
 import org.eclipse.scout.rt.ui.swt.util.SwtUtility;
 import org.eclipse.scout.rt.ui.swt.util.listener.PartListener;
 import org.eclipse.scout.rt.ui.swt.window.ISwtScoutPart;
-import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
@@ -49,20 +53,18 @@ import org.eclipse.ui.part.ViewPart;
  */
 public abstract class AbstractScoutView extends ViewPart implements ISwtScoutPart, ISaveablePart2 {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractScoutView.class);
-  // public static enum ViewState{OPEN, CLOSING_UI, CLOSING_MODEL, CLOSED}
 
   private P_ViewListener m_viewListener;
-  private OptimisticLock m_closeLock;
-  private OptimisticLock m_closeFromModel = new OptimisticLock();
-  // private ViewState m_viewState;
-  private OptimisticLock m_layoutLock = new OptimisticLock();
+  private final OptimisticLock m_closeLock;
+  private final OptimisticLock m_closeFromModel;
+  private final OptimisticLock m_layoutLock;
 
   private Form m_rootForm;
   private Composite m_rootArea;
 
   private IForm m_scoutForm;
 
-  private PropertyChangeListener m_formPropertyListener;
+  private final PropertyChangeListener m_formPropertyListener;
   private ISwtScoutForm m_uiForm;
 
   private AnimatedBusyImage m_busyImage;
@@ -71,6 +73,8 @@ public abstract class AbstractScoutView extends ViewPart implements ISwtScoutPar
   public AbstractScoutView() {
     m_formPropertyListener = new P_ScoutPropertyChangeListener();
     m_closeLock = new OptimisticLock();
+    m_closeFromModel = new OptimisticLock();
+    m_layoutLock = new OptimisticLock();
   }
 
   @Override
@@ -163,6 +167,7 @@ public abstract class AbstractScoutView extends ViewPart implements ISwtScoutPar
   }
 
   protected void attachScout(IForm form) {
+    updateToolbarActionsFromScout();
     setTitleFromScout(form.getTitle());
     setImageFromScout(form.getIconId());
     setMaximizeEnabledFromScout(form.isMaximizeEnabled());
@@ -187,6 +192,24 @@ public abstract class AbstractScoutView extends ViewPart implements ISwtScoutPar
     setCloseEnabledFromScout(closable);
     // listeners
     form.addPropertyChangeListener(m_formPropertyListener);
+  }
+
+  /**
+   *
+   */
+  protected void updateToolbarActionsFromScout() {
+    List<IToolButton> toolbuttons = ActionUtility.visibleNormalizedActions(getForm().getToolButtons());
+    if (!toolbuttons.isEmpty()) {
+      IToolBarManager toolBarManager = getRootForm().getToolBarManager();
+      if (getForm().getToolbarLocation() == IForm.TOOLBAR_VIEW_PART) {
+        toolBarManager = getViewSite().getActionBars().getToolBarManager();
+      }
+      for (IToolButton b : toolbuttons) {
+        toolBarManager.add(new SwtScoutToolbarAction(b, getSwtEnvironment(), toolBarManager));
+      }
+      toolBarManager.update(true);
+    }
+
   }
 
   protected void detachScout(IForm form) {
@@ -438,10 +461,9 @@ public abstract class AbstractScoutView extends ViewPart implements ISwtScoutPar
 
   @Override
   public boolean isSaveOnCloseNeeded() {
+    // ensure the focus owning field is validated
     Control focusControl = m_rootArea.getDisplay().getFocusControl();
-    if (focusControl != null && !focusControl.isDisposed()) {
-      focusControl.traverse(SWT.TRAVERSE_TAB_NEXT);
-    }
+    SwtUtility.runSwtInputVerifier(focusControl);
     return isDirty();
   }
 

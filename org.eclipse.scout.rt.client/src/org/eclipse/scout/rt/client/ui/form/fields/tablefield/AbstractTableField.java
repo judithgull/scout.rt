@@ -14,18 +14,17 @@ import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.Serializable;
 import java.text.NumberFormat;
-import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.TreeSet;
 
 import org.eclipse.scout.commons.BooleanUtility;
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.ConfigurationUtility;
-import org.eclipse.scout.commons.ListUtility;
 import org.eclipse.scout.commons.NumberUtility;
-import org.eclipse.scout.commons.TypeCastUtility;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.FormData;
 import org.eclipse.scout.commons.annotations.FormData.DefaultSubtypeSdkCommand;
 import org.eclipse.scout.commons.annotations.FormData.SdkCommand;
@@ -37,20 +36,15 @@ import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.commons.xmlparser.SimpleXmlElement;
 import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
-import org.eclipse.scout.rt.client.ui.action.keystroke.KeyStroke;
-import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.MenuUtility;
 import org.eclipse.scout.rt.client.ui.basic.cell.ICell;
 import org.eclipse.scout.rt.client.ui.basic.table.AbstractTable;
 import org.eclipse.scout.rt.client.ui.basic.table.ITable;
-import org.eclipse.scout.rt.client.ui.basic.table.ITable2;
 import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
 import org.eclipse.scout.rt.client.ui.basic.table.TableAdapter;
 import org.eclipse.scout.rt.client.ui.basic.table.TableEvent;
-import org.eclipse.scout.rt.client.ui.basic.table.columns.IBigDecimalColumn;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.IColumn;
-import org.eclipse.scout.rt.client.ui.basic.table.columns.IDoubleColumn;
-import org.eclipse.scout.rt.client.ui.basic.table.columns.IIntegerColumn;
-import org.eclipse.scout.rt.client.ui.basic.table.columns.ILongColumn;
+import org.eclipse.scout.rt.client.ui.basic.table.columns.INumberColumn;
 import org.eclipse.scout.rt.client.ui.form.fields.AbstractFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.IValidateContentDescriptor;
 import org.eclipse.scout.rt.client.ui.form.fields.ValidateFormFieldDescriptor;
@@ -58,7 +52,10 @@ import org.eclipse.scout.rt.shared.ScoutTexts;
 import org.eclipse.scout.rt.shared.data.form.fields.AbstractFormFieldData;
 import org.eclipse.scout.rt.shared.data.form.fields.tablefield.AbstractTableFieldBeanData;
 import org.eclipse.scout.rt.shared.data.form.fields.tablefield.AbstractTableFieldData;
+import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
+import org.eclipse.scout.service.SERVICES;
 
+@ClassId("76887bde-6815-4f7d-9cbd-60409b49488d")
 @FormData(value = AbstractTableFieldData.class, sdkCommand = SdkCommand.USE, defaultSubtypeSdkCommand = DefaultSubtypeSdkCommand.CREATE)
 public abstract class AbstractTableField<T extends ITable> extends AbstractFormField implements ITableField<T> {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractTableField.class);
@@ -125,39 +122,16 @@ public abstract class AbstractTableField<T extends ITable> extends AbstractFormF
         statusText.append(", " + ScoutTexts.get("XSelected", NumberUtility.format(nSel)));
         // show sums of numeric columns
         for (IColumn<?> c : table.getColumnSet().getVisibleColumns()) {
-          NumberFormat fmt = null;
-          Object sum = null;
-          if (c instanceof IBigDecimalColumn) {
-            fmt = ((IBigDecimalColumn) c).getNumberFormat();
-            double d = NumberUtility.sum(TypeCastUtility.castValue(c.getSelectedValues(), double[].class));
-            if (d != 0.0) {
-              sum = d;
+          if (c instanceof INumberColumn) {
+            NumberFormat fmt = null;
+            Object sum = null;
+            fmt = ((INumberColumn) c).getFormat();
+            @SuppressWarnings("unchecked")
+            INumberColumn<? extends Number> numberColumn = (INumberColumn) c;
+            sum = NumberUtility.sum(numberColumn.getSelectedValues());
+            if (fmt != null && sum != null) {
+              statusText.append(", " + c.getHeaderCell().getText() + ": " + fmt.format(sum));
             }
-          }
-          else if (c instanceof IDoubleColumn) {
-            fmt = ((IDoubleColumn) c).getNumberFormat();
-            double d = NumberUtility.sum(TypeCastUtility.castValue(c.getSelectedValues(), double[].class));
-            if (d != 0.0) {
-              sum = d;
-            }
-          }
-          else if (c instanceof ILongColumn) {
-            fmt = ((ILongColumn) c).getNumberFormat();
-            long d = NumberUtility.sum(TypeCastUtility.castValue(c.getSelectedValues(), long[].class));
-            if (d != 0) {
-              sum = d;
-            }
-          }
-          else if (c instanceof IIntegerColumn) {
-            fmt = ((IIntegerColumn) c).getNumberFormat();
-            long d = NumberUtility.sum(TypeCastUtility.castValue(c.getSelectedValues(), long[].class));
-            if (d != 0) {
-              sum = d;
-            }
-          }
-          //
-          if (fmt != null && sum != null) {
-            statusText.append(", " + c.getHeaderCell().getText() + ": " + fmt.format(sum));
           }
         }
       }
@@ -195,7 +169,7 @@ public abstract class AbstractTableField<T extends ITable> extends AbstractFormF
    */
   @ConfigOperation
   @Order(200)
-  protected void execSave(ITableRow[] insertedRows, ITableRow[] updatedRows, ITableRow[] deletedRows) {
+  protected void execSave(List<? extends ITableRow> insertedRows, List<? extends ITableRow> updatedRows, List<? extends ITableRow> deletedRows) {
   }
 
   /**
@@ -248,16 +222,15 @@ public abstract class AbstractTableField<T extends ITable> extends AbstractFormF
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(200)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredTableStatusVisible() {
     return false;
   }
 
-  private Class<? extends ITable> getConfiguredTable() {
+  protected Class<? extends ITable> getConfiguredTable() {
     Class<?>[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
-    Class<? extends ITable>[] f = ConfigurationUtility.filterClasses(dca, ITable.class);
-    if (f.length == 1) {
-      return f[0];
+    List<Class<ITable>> f = ConfigurationUtility.filterClasses(dca, ITable.class);
+    if (f.size() == 1) {
+      return CollectionUtility.firstElement(f);
     }
     else {
       for (Class<? extends ITable> c : f) {
@@ -269,25 +242,16 @@ public abstract class AbstractTableField<T extends ITable> extends AbstractFormF
     }
   }
 
-  @ConfigPropertyValue("1")
   @Override
   protected double getConfiguredGridWeightY() {
     return 1;
   }
 
   @Override
-  @SuppressWarnings("unchecked")
   protected void initConfig() {
     super.initConfig();
     setTableStatusVisible(getConfiguredTableStatusVisible());
-    if (getConfiguredTable() != null) {
-      try {
-        setTableInternal((T) ConfigurationUtility.newInnerInstance(this, getConfiguredTable()));
-      }
-      catch (Exception e) {
-        LOG.warn(null, e);
-      }
-    }
+    setTableInternal(createTable());
     // local enabled listener
     addPropertyChangeListener(PROP_ENABLED, new PropertyChangeListener() {
       @Override
@@ -297,6 +261,19 @@ public abstract class AbstractTableField<T extends ITable> extends AbstractFormF
         }
       }
     });
+  }
+
+  @SuppressWarnings("unchecked")
+  protected T createTable() {
+    if (getConfiguredTable() != null) {
+      try {
+        return (T) ConfigurationUtility.newInnerInstance(this, getConfiguredTable());
+      }
+      catch (Exception e) {
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + getConfiguredTable().getName() + "'.", e));
+      }
+    }
+    return null;
   }
 
   /*
@@ -381,9 +358,9 @@ public abstract class AbstractTableField<T extends ITable> extends AbstractFormF
         AbstractTableFieldData tableFieldData = (AbstractTableFieldData) target;
         m_table.extractTableData(tableFieldData);
       }
-      else if (m_table instanceof ITable2 && target instanceof AbstractTableFieldBeanData) {
+      else if (target instanceof AbstractTableFieldBeanData) {
         AbstractTableFieldBeanData tableBeanData = (AbstractTableFieldBeanData) target;
-        ((ITable2) m_table).exportToTableBeanData(tableBeanData);
+        m_table.exportToTableBeanData(tableBeanData);
         target.setValueSet(true);
       }
     }
@@ -401,9 +378,9 @@ public abstract class AbstractTableField<T extends ITable> extends AbstractFormF
             AbstractTableFieldData tableFieldData = (AbstractTableFieldData) source;
             m_table.updateTable(tableFieldData);
           }
-          else if (m_table instanceof ITable2 && source instanceof AbstractTableFieldBeanData) {
+          else if (source instanceof AbstractTableFieldBeanData) {
             AbstractTableFieldBeanData tableBeanData = (AbstractTableFieldBeanData) source;
-            ((ITable2) m_table).importFromTableBeanData(tableBeanData);
+            m_table.importFromTableBeanData(tableBeanData);
           }
           if (m_table.isCheckable()
               && m_table.getCheckableColumn() != null) {
@@ -453,10 +430,12 @@ public abstract class AbstractTableField<T extends ITable> extends AbstractFormF
   public void storeXML(SimpleXmlElement x) throws ProcessingException {
     super.storeXML(x);
     if (m_table != null) {
-      ITableRow[] selectedRows = m_table.getSelectedRows();
-      int[] selectedRowIndices = new int[selectedRows.length];
-      for (int i = 0; i < selectedRowIndices.length; i++) {
-        selectedRowIndices[i] = selectedRows[i].getRowIndex();
+      List<ITableRow> selectedRows = m_table.getSelectedRows();
+      int[] selectedRowIndices = new int[selectedRows.size()];
+      int i = 0;
+      for (ITableRow selrow : selectedRows) {
+        selectedRowIndices[i] = selrow.getRowIndex();
+        i++;
       }
       try {
         x.setObjectAttribute("selectedRowIndices", selectedRowIndices);
@@ -581,7 +560,7 @@ public abstract class AbstractTableField<T extends ITable> extends AbstractFormF
     if (tableDesc == null) {
       return null;
     }
-    tableDesc.setDisplayText(ScoutTexts.get("TableName") + " " + getLabel() + ": " + ListUtility.format(columnNames));
+    tableDesc.setDisplayText(ScoutTexts.get("TableName") + " " + getLabel() + ": " + CollectionUtility.format(columnNames));
     return tableDesc;
   }
 
@@ -657,26 +636,21 @@ public abstract class AbstractTableField<T extends ITable> extends AbstractFormF
         // 1. batch
         execSave(m_table.getInsertedRows(), m_table.getUpdatedRows(), m_table.getDeletedRows());
         // 2. per row
-        ITableRow[] insertedRows = m_table.getInsertedRows();
-        ITableRow[] updatedRows = m_table.getUpdatedRows();
-        ITableRow[] deletedRows = m_table.getDeletedRows();
         // deleted rows
-        for (int i = 0; i < deletedRows.length; i++) {
-          execSaveDeletedRow(deletedRows[i]);
+        for (ITableRow deletedRow : m_table.getDeletedRows()) {
+          execSaveDeletedRow(deletedRow);
         }
         // inserted rows
-        for (int i = 0; i < insertedRows.length; i++) {
-          ITableRow mr = insertedRows[i];
-          execSaveInsertedRow(mr);
-          mr.setStatusNonchanged();
-          m_table.updateRow(mr);
+        for (ITableRow insertedRow : m_table.getInsertedRows()) {
+          execSaveInsertedRow(insertedRow);
+          insertedRow.setStatusNonchanged();
+          m_table.updateRow(insertedRow);
         }
         // updated rows
-        for (int i = 0; i < updatedRows.length; i++) {
-          ITableRow mr = updatedRows[i];
-          execSaveUpdatedRow(mr);
-          mr.setStatusNonchanged();
-          m_table.updateRow(mr);
+        for (ITableRow updatedRow : m_table.getUpdatedRows()) {
+          execSaveUpdatedRow(updatedRow);
+          updatedRow.setStatusNonchanged();
+          m_table.updateRow(updatedRow);
         }
       }
       finally {
@@ -697,18 +671,11 @@ public abstract class AbstractTableField<T extends ITable> extends AbstractFormF
   }
 
   @Override
-  public IKeyStroke[] getContributedKeyStrokes() {
-    HashMap<String, IKeyStroke> ksMap = new HashMap<String, IKeyStroke>();
+  public List<IKeyStroke> getContributedKeyStrokes() {
     if (getTable() != null) {
-      for (IMenu m : getTable().getMenus()) {
-        String s = m.getKeyStroke();
-        if (s != null && s.trim().length() > 0) {
-          KeyStroke ks = new KeyStroke(s, m);
-          ksMap.put(ks.getKeyStroke().toUpperCase(), ks);
-        }
-      }
+      return MenuUtility.getKeyStrokesFromMenus(getTable().getMenus());
     }
-    return ksMap.values().toArray(new IKeyStroke[ksMap.size()]);
+    return CollectionUtility.emptyArrayList();
   }
 
   private class P_ManagedTableListener extends TableAdapter {

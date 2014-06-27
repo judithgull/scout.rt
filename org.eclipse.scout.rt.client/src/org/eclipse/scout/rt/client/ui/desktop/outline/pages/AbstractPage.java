@@ -10,12 +10,14 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.desktop.outline.pages;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 
+import org.eclipse.scout.commons.ConfigurationUtility;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.IProcessingStatus;
 import org.eclipse.scout.commons.exception.ProcessingException;
@@ -33,7 +35,6 @@ import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
 import org.eclipse.scout.rt.client.ui.desktop.IDesktop;
 import org.eclipse.scout.rt.client.ui.desktop.outline.IOutline;
 import org.eclipse.scout.rt.client.ui.form.IForm;
-import org.eclipse.scout.rt.shared.ContextMap;
 import org.eclipse.scout.rt.shared.services.common.bookmark.Bookmark;
 import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.service.SERVICES;
@@ -42,7 +43,8 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractPage.class);
 
   private IForm m_detailForm;
-  private final ContextMap m_contextMap;
+  @SuppressWarnings("deprecation")
+  private final org.eclipse.scout.rt.shared.ContextMap m_contextMap;
   private boolean m_tableVisible;
   private DataChangeListener m_internalDataChangeListener;
   private final String m_userPreferenceContext;
@@ -84,7 +86,13 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
     this(callInitializer, null, null);
   }
 
-  public AbstractPage(ContextMap contextMap) {
+  /**
+   * @deprecated Will be removed in the 6.0 Release.
+   *             Use {@link #AbstractPage()} in combination with getter and setter (page variable) instead.
+   */
+  @Deprecated
+  @SuppressWarnings("deprecation")
+  public AbstractPage(org.eclipse.scout.rt.shared.ContextMap contextMap) {
     this(true, contextMap, null);
   }
 
@@ -92,11 +100,24 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
     this(callInitializer, null, userPreferenceContext);
   }
 
-  public AbstractPage(boolean callInitializer, ContextMap contextMap) {
+  /**
+   * @deprecated Will be removed in the 6.0 Release.
+   *             Use {@link #AbstractPage(boolean)} in combination with getter and setter (page variable) instead.
+   */
+  @Deprecated
+  @SuppressWarnings("deprecation")
+  public AbstractPage(boolean callInitializer, org.eclipse.scout.rt.shared.ContextMap contextMap) {
     this(callInitializer, contextMap, null);
   }
 
-  public AbstractPage(boolean callInitializer, ContextMap contextMap, String userPreferenceContext) {
+  /**
+   * @deprecated Will be removed with Bug 426088.
+   *             Use {@link #AbstractPage(boolean, String)} in combination with getter and setter (page variable)
+   *             instead.
+   */
+  @Deprecated
+  @SuppressWarnings("deprecation")
+  public AbstractPage(boolean callInitializer, org.eclipse.scout.rt.shared.ContextMap contextMap, String userPreferenceContext) {
     super(false);
     m_contextMap = contextMap;
     m_userPreferenceContext = userPreferenceContext;
@@ -120,7 +141,6 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(35)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredTableVisible() {
     return true;
   }
@@ -135,7 +155,6 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
    */
   @ConfigProperty(ConfigProperty.TEXT)
   @Order(40)
-  @ConfigPropertyValue("null")
   protected String getConfiguredTitle() {
     return null;
   }
@@ -151,7 +170,6 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
    */
   @ConfigProperty(ConfigProperty.ICON_ID)
   @Order(50)
-  @ConfigPropertyValue("null")
   protected String getConfiguredIconId() {
     return null;
   }
@@ -162,11 +180,13 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
    * <p>
    * Subclasses can override this method. Default is {@code null}.
    * 
+   * @deprecated: Use a {@link ClassId} annotation as key for Doc-Text. Will be removed in the 5.0 Release.
    * @return a documentation text, suitable to be included in external documents
    */
-  @ConfigProperty(ConfigProperty.DOC)
+  /**
+   */
+  @Deprecated
   @Order(60)
-  @ConfigPropertyValue("null")
   protected String getConfiguredDoc() {
     return null;
   }
@@ -265,8 +285,8 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
   }
 
   /**
-   * Called after this page has (re)loaded its data. This method is called after {@link #loadChildren()} has been
-   * called.
+   * Called after this page has (re)loaded its data. This method is called after {@link #loadChildren()} has
+   * been called.
    * <p>
    * Subclasses can override this method. The default does nothing.
    * 
@@ -301,7 +321,13 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
   protected void execPageDeactivated() throws ProcessingException {
   }
 
-  protected ContextMap getContextMap() {
+  /**
+   * @deprecated Will be removed with Bug 426088.
+   *             getter and setter (page variable) instead.
+   */
+  @Deprecated
+  @SuppressWarnings("deprecation")
+  protected org.eclipse.scout.rt.shared.ContextMap getContextMap() {
     return m_contextMap;
   }
 
@@ -336,18 +362,6 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
     m_pagePopulateStatus = status;
   }
 
-  /**
-   * @deprecated use {@link #getUserPreferenceContext()} instead. Will be removed in Release 3.10.
-   */
-  @Override
-  @SuppressWarnings("deprecation")
-  @Deprecated
-  @ConfigOperation
-  @Order(95)
-  public String getBookmarkIdentifier() {
-    return getUserPreferenceContext();
-  }
-
   @Override
   @ConfigOperation
   @Order(95)
@@ -380,7 +394,7 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
   }
 
   @Override
-  public IPage[] getChildPages() {
+  public List<IPage> getChildPages() {
     if (ClientSyncJob.isSyncClientJob()) {
       try {
         getTree().resolveVirtualNodes(getChildNodes());
@@ -389,12 +403,11 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
         LOG.error("failed to create the real page from the virtual page", e);
       }
     }
-    ITreeNode[] a = getChildNodes();
-    IPage[] b = new IPage[a.length];
-    for (int i = 0; i < b.length; i++) {
-      b[i] = (IPage) a[i];
+    List<IPage> childPages = new ArrayList<IPage>();
+    for (ITreeNode childNode : getChildNodes()) {
+      childPages.add((IPage) childNode);
     }
-    return b;
+    return childPages;
   }
 
   @Override
@@ -561,12 +574,17 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
         // do NOT unload page, because this will clear the selection
         // //getOutline().unloadNode(this);
         loadChildren();
-        execPageDataLoaded();
       }
       finally {
         tree.setTreeChanging(false);
       }
     }
+  }
+
+  @Override
+  public void loadChildren() throws ProcessingException {
+    super.loadChildren();
+    execPageDataLoaded();
   }
 
   @Override
@@ -577,6 +595,16 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
   @Override
   public void setTableVisible(boolean b) {
     m_tableVisible = b;
+  }
+
+  @Override
+  public String classId() {
+    return ConfigurationUtility.getAnnotatedClassIdWithFallback(getClass());
+  }
+
+  @Override
+  public <T> T getAdapter(Class<T> clazz) {
+    return null;
   }
 
 }

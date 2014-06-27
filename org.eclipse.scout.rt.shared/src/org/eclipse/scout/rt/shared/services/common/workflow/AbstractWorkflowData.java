@@ -4,7 +4,7 @@
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- * 
+ *
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
@@ -13,14 +13,16 @@ package org.eclipse.scout.rt.shared.services.common.workflow;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
 import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.ConfigurationUtility;
+import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
+import org.eclipse.scout.service.SERVICES;
 
 /**
  * Data model container for a server side {@link IWorkflowService}. <br>
@@ -42,7 +44,7 @@ public abstract class AbstractWorkflowData implements Serializable {
   private int m_currentStepIndex;
 
   /*
-   * The following fields are not diretcly used by the workflow framework
+   * The following fields are not directly used by the workflow framework
    */
   private long m_definitionNr;
   private long m_workflowNr;
@@ -58,23 +60,22 @@ public abstract class AbstractWorkflowData implements Serializable {
     initConfig();
   }
 
-  private Class<? extends AbstractWorkflowStepData>[] getConfiguredStepDatas() {
+  private List<Class<AbstractWorkflowStepData>> getConfiguredStepDatas() {
     Class[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
     return ConfigurationUtility.filterClasses(dca, AbstractWorkflowStepData.class);
   }
 
   protected void initConfig() {
-    Class<? extends AbstractWorkflowStepData>[] stepArray = getConfiguredStepDatas();
-    for (int i = 0; i < stepArray.length; i++) {
+    for (Class<? extends AbstractWorkflowStepData> workflowStepDataClazz : getConfiguredStepDatas()) {
       AbstractWorkflowStepData f;
       try {
-        f = ConfigurationUtility.newInnerInstance(this, stepArray[i]);
+        f = ConfigurationUtility.newInnerInstance(this, workflowStepDataClazz);
         m_stepList.add(f);
       }// end try
       catch (Exception e) {
-        LOG.warn(null, e);
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + workflowStepDataClazz.getName() + "'.", e));
       }
-    }// end for
+    }
   }
 
   /*
@@ -185,7 +186,7 @@ public abstract class AbstractWorkflowData implements Serializable {
 
   public void setStepDataList(Collection<AbstractWorkflowStepData> c) {
     if (c != null && c.size() > 0) {
-      m_stepList = CollectionUtility.copyList(c);
+      m_stepList = CollectionUtility.arrayList(c);
     }
     else {
       m_stepList.clear();
@@ -284,10 +285,10 @@ public abstract class AbstractWorkflowData implements Serializable {
     int a = m_currentStepIndex;
     int b = m_stepList.size() - 1;
     if (a <= b && b < m_stepList.size()) {
-      return Collections.unmodifiableList(m_stepList.subList(a, b + 1));
+      return CollectionUtility.arrayList(m_stepList.subList(a, b + 1));
     }
     else {
-      return Collections.emptyList();
+      return CollectionUtility.emptyArrayList();
     }
   }
 
@@ -298,10 +299,10 @@ public abstract class AbstractWorkflowData implements Serializable {
     int a = 0;
     int b = m_currentStepIndex;
     if (a <= b && b < m_stepList.size()) {
-      return Collections.unmodifiableList(m_stepList.subList(a, b + 1));
+      return CollectionUtility.arrayList(m_stepList.subList(a, b + 1));
     }
     else {
-      return Collections.emptyList();
+      return CollectionUtility.emptyArrayList();
     }
   }
 

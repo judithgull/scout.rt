@@ -12,13 +12,16 @@ package org.eclipse.scout.rt.testing.shared;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Proxy;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.eclipse.scout.service.IService;
-import org.eclipse.scout.service.IService2;
+import org.eclipse.scout.service.SERVICES;
 import org.eclipse.scout.service.ServiceUtility;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.Constants;
@@ -71,13 +74,11 @@ public final class TestingUtility {
       if (Proxy.isProxyClass(service.getClass())) {
         //nop
       }
-      else if (service instanceof IService2) {
-        ((IService2) service).initializeService(reg);
-      }
       else if (service instanceof IService) {
-        ((IService) service).initializeService();
+        ((IService) service).initializeService(reg);
       }
     }
+    SERVICES.clearCache();
     return result;
   }
 
@@ -106,6 +107,7 @@ public final class TestingUtility {
     for (ServiceRegistration reg : registrationList) {
       reg.unregister();
     }
+    SERVICES.clearCache();
   }
 
   /**
@@ -130,4 +132,85 @@ public final class TestingUtility {
     }
     return successful;
   }
+
+  /**
+   * convenience overload for {@link #createLocaleSpecificNumberString(minus, integerPart, fractionPart, percent)} with
+   * <code>percent=0</code>
+   * 
+   * @param minus
+   * @param integerPart
+   * @param fractionPart
+   * @return
+   */
+  public static String createLocaleSpecificNumberString(Locale loc, boolean minus, String integerPart, String fractionPart) {
+    return createLocaleSpecificNumberString(loc, minus, integerPart, fractionPart, NumberStringPercentSuffix.NONE);
+  }
+
+  /**
+   * convenience overload for {@link #createLocaleSpecificNumberString(minus, integerPart, fractionPart, percent)} with
+   * <code>fractionPart=null</code> and <code>percent=0</code>
+   * 
+   * @param minus
+   * @param integerPart
+   * @return
+   */
+  public static String createLocaleSpecificNumberString(Locale loc, boolean minus, String integerPart) {
+    return createLocaleSpecificNumberString(loc, minus, integerPart, null, NumberStringPercentSuffix.NONE);
+  }
+
+  public enum NumberStringPercentSuffix {
+    /**
+     * ""
+     */
+    NONE {
+      @Override
+      public String getSuffix(DecimalFormatSymbols symbols) {
+        return "";
+      }
+    },
+    /**
+     * "%"
+     */
+    JUST_SYMBOL {
+      @Override
+      public String getSuffix(DecimalFormatSymbols symbols) {
+        return String.valueOf(symbols.getPercent());
+      }
+    },
+    /**
+     * " %'
+     */
+    BLANK_AND_SYMBOL {
+      @Override
+      public String getSuffix(DecimalFormatSymbols symbols) {
+        return " " + symbols.getPercent();
+      }
+    };
+
+    public abstract String getSuffix(DecimalFormatSymbols symbols);
+  }
+
+  /**
+   * Create a string representing a number using locale specific minus, decimalSeparator and percent symbols
+   * 
+   * @param minus
+   * @param integerPart
+   * @param fractionPart
+   * @param percentSuffix
+   * @return
+   */
+  public static String createLocaleSpecificNumberString(Locale loc, boolean minus, String integerPart, String fractionPart, NumberStringPercentSuffix percentSuffix) {
+    DecimalFormatSymbols symbols = ((DecimalFormat) DecimalFormat.getPercentInstance(loc)).getDecimalFormatSymbols();
+    StringBuilder sb = new StringBuilder();
+    if (minus) {
+      sb.append(symbols.getMinusSign());
+    }
+    sb.append(integerPart);
+    if (fractionPart != null) {
+      sb.append(symbols.getDecimalSeparator()).append(fractionPart);
+    }
+    sb.append(percentSuffix.getSuffix(symbols));
+    return sb.toString();
+  }
+
 }

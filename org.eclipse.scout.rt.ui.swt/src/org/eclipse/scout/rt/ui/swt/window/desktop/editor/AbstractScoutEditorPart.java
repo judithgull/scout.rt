@@ -12,18 +12,23 @@ package org.eclipse.scout.rt.ui.swt.window.desktop.editor;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.util.List;
 
 import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.jface.action.IToolBarManager;
 import org.eclipse.scout.commons.OptimisticLock;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ClientSyncJob;
+import org.eclipse.scout.rt.client.ui.action.ActionUtility;
+import org.eclipse.scout.rt.client.ui.action.tool.IToolButton;
 import org.eclipse.scout.rt.client.ui.form.IForm;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.button.IButton;
 import org.eclipse.scout.rt.ui.swt.ISwtEnvironment;
+import org.eclipse.scout.rt.ui.swt.action.SwtScoutToolbarAction;
 import org.eclipse.scout.rt.ui.swt.busy.AnimatedBusyImage;
 import org.eclipse.scout.rt.ui.swt.form.ISwtScoutForm;
 import org.eclipse.scout.rt.ui.swt.util.ScoutFormToolkit;
@@ -56,11 +61,11 @@ public abstract class AbstractScoutEditorPart extends EditorPart implements ISwt
   private Form m_rootForm;
   private Composite m_rootArea;
   private P_EditorListener m_editorListener;
-  private OptimisticLock m_closeLock;
-  private OptimisticLock m_closeFromModel = new OptimisticLock();
+  private final OptimisticLock m_closeLock;
+  private final OptimisticLock m_closeFromModel;
 
-  private PropertyChangeListener m_formPropertyListener;
-  private OptimisticLock m_layoutLock;
+  private final PropertyChangeListener m_formPropertyListener;
+  private final OptimisticLock m_layoutLock;
   private ISwtScoutForm m_uiForm;
   private Image m_titleImageBackup;
   private AnimatedBusyImage m_busyImage;
@@ -68,6 +73,7 @@ public abstract class AbstractScoutEditorPart extends EditorPart implements ISwt
   public AbstractScoutEditorPart() {
     m_layoutLock = new OptimisticLock();
     m_closeLock = new OptimisticLock();
+    m_closeFromModel = new OptimisticLock();
     m_formPropertyListener = new P_ScoutPropertyChangeListener();
   }
 
@@ -91,6 +97,7 @@ public abstract class AbstractScoutEditorPart extends EditorPart implements ISwt
   }
 
   protected void attachScout() {
+    updateToolbarActionsFromScout();
     IForm form = getForm();
     setTitleFromScout(form.getTitle());
     setImageFromScout(form.getIconId());
@@ -120,6 +127,24 @@ public abstract class AbstractScoutEditorPart extends EditorPart implements ISwt
       m_editorListener = new P_EditorListener();
     }
     getSite().getPage().addPartListener(m_editorListener);
+  }
+
+  /**
+  *
+  */
+  protected void updateToolbarActionsFromScout() {
+    List<IToolButton> toolbuttons = ActionUtility.visibleNormalizedActions(getForm().getToolButtons());
+    if (!toolbuttons.isEmpty()) {
+      IToolBarManager toolBarManager = getRootForm().getToolBarManager();
+      if (getForm().getToolbarLocation() == IForm.TOOLBAR_VIEW_PART) {
+        toolBarManager = getEditorSite().getActionBars().getToolBarManager();
+      }
+      for (IToolButton b : toolbuttons) {
+        toolBarManager.add(new SwtScoutToolbarAction(b, getSwtEnvironment(), toolBarManager));
+      }
+      toolBarManager.update(true);
+    }
+
   }
 
   protected void detachScout() {
@@ -163,18 +188,26 @@ public abstract class AbstractScoutEditorPart extends EditorPart implements ISwt
   }
 
   protected void setImageFromScout(String iconId) {
+    Form swtForm = getSwtForm();
+    if (swtForm.isDisposed()) {
+      return;
+    }
     Image img = getSwtEnvironment().getIcon(iconId);
     setTitleImage(img);
     String sub = getForm().getSubTitle();
     if (sub != null) {
-      getSwtForm().setImage(img);
+      swtForm.setImage(img);
     }
     else {
-      getSwtForm().setImage(null);
+      swtForm.setImage(null);
     }
   }
 
   protected void setTitleFromScout(String title) {
+    Form swtForm = getSwtForm();
+    if (swtForm.isDisposed()) {
+      return;
+    }
     IForm f = getForm();
     //
     String s = f.getBasicTitle();
@@ -182,10 +215,10 @@ public abstract class AbstractScoutEditorPart extends EditorPart implements ISwt
     //
     s = f.getSubTitle();
     if (s != null) {
-      getSwtForm().setText(SwtUtility.escapeMnemonics(StringUtility.removeNewLines(s != null ? s : "")));
+      swtForm.setText(SwtUtility.escapeMnemonics(StringUtility.removeNewLines(s != null ? s : "")));
     }
     else {
-      getSwtForm().setText(null);
+      swtForm.setText(null);
     }
   }
 

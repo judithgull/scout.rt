@@ -27,9 +27,7 @@ import org.eclipse.scout.rt.ui.rap.keystroke.RwtKeyStroke;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
-import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Event;
-import org.eclipse.swt.widgets.Listener;
 
 /**
  * <h3>RwtScoutRadioButtonGroup</h3> ...
@@ -38,7 +36,6 @@ import org.eclipse.swt.widgets.Listener;
  */
 public class RwtScoutRadioButtonGroup extends RwtScoutValueFieldComposite<IRadioButtonGroup<?>> implements IRwtScoutRadioButtonGroup {
 
-  private P_RwtButtonListener m_uiButtonListener = new P_RwtButtonListener();
   private ArrayList<Button> m_uiRadioButtons = new ArrayList<Button>();
 
   @Override
@@ -46,13 +43,12 @@ public class RwtScoutRadioButtonGroup extends RwtScoutValueFieldComposite<IRadio
     Composite container = getUiEnvironment().getFormToolkit().createComposite(parent);
     StatusLabelEx label = getUiEnvironment().getFormToolkit().createStatusLabel(container, getScoutObject());
 
-    Composite buttonArea = new P_RadioButtonComposite(container);
+    Composite buttonArea = getUiEnvironment().getFormToolkit().createComposite(container);
     getUiEnvironment().getFormToolkit().adapt(buttonArea);
     for (IFormField scoutField : getScoutObject().getFields()) {
       IRwtScoutFormField uiField = getUiEnvironment().createFormField(buttonArea, scoutField);
       if (uiField.getUiField() instanceof Button) {
         Button uiButton = (Button) uiField.getUiField();
-        uiButton.addListener(SWT.Selection, m_uiButtonListener);
         getUiEnvironment().addKeyStroke(uiButton, new P_KeyStroke(SWT.ARROW_DOWN), false);
         getUiEnvironment().addKeyStroke(uiButton, new P_KeyStroke(SWT.ARROW_RIGHT), false);
         getUiEnvironment().addKeyStroke(uiButton, new P_KeyStroke(SWT.ARROW_UP), false);
@@ -61,9 +57,6 @@ public class RwtScoutRadioButtonGroup extends RwtScoutValueFieldComposite<IRadio
         getUiEnvironment().addKeyStroke(uiButton, new P_KeyStroke(SWT.END), false);
 
         m_uiRadioButtons.add(uiButton);
-        if (uiButton.getSelection()) {
-          buttonArea.setTabList(new Control[]{uiButton.getParent()});
-        }
       }
     }
     setUiContainer(container);
@@ -89,25 +82,6 @@ public class RwtScoutRadioButtonGroup extends RwtScoutValueFieldComposite<IRadio
     return (Composite) super.getUiField();
   }
 
-  private class P_RwtButtonListener implements Listener {
-    private static final long serialVersionUID = 1L;
-
-    @Override
-    public void handleEvent(Event event) {
-      switch (event.type) {
-        case SWT.Selection:
-          Button button = (Button) event.widget;
-          handleSelectionChanged(button);
-          break;
-      }
-    }
-
-    private void handleSelectionChanged(Button selectedButton) {
-      getUiField().setTabList(new Control[]{selectedButton.getParent()});
-    }
-
-  } // end class P_RwtButtonKeyListener
-
   private class P_KeyStroke extends RwtKeyStroke {
     public P_KeyStroke(int keyCode) {
       super(keyCode);
@@ -115,59 +89,120 @@ public class RwtScoutRadioButtonGroup extends RwtScoutValueFieldComposite<IRadio
 
     @Override
     public void handleUiAction(Event e) {
+      if (e.widget instanceof Button) {
+        handleKeyEvent(e);
+      }
+    }
+
+    public void handleKeyEvent(Event e) {
       int index = m_uiRadioButtons.indexOf(e.widget);
+      if (index < 0) {
+        return;
+      }
       switch (e.keyCode) {
         case SWT.ARROW_DOWN:
         case SWT.ARROW_RIGHT:
-          index++;
+          selectNextPossibleRadioButton(index, e);
           break;
         case SWT.ARROW_UP:
         case SWT.ARROW_LEFT:
-          // ensure not -1
-          index = index + m_uiRadioButtons.size() - 1;
+          selectPreviousPossibleRadioButton(index, e);
           break;
         case SWT.HOME:
-          index = 0;
+          selectFirstPossibleRadioButton(index, e);
           break;
         case SWT.END:
-          index = m_uiRadioButtons.size() - 1;
+          selectLastPossibleRadioButton(index, e);
           break;
       }
-      index = index % m_uiRadioButtons.size();
-      Button newButton = m_uiRadioButtons.get(index);
-      Button oldButton = (Button) e.widget;
+      e.doit = false;
+    }
 
+    /**
+     * Selects the next possible RadioButton based on the current index.
+     * 
+     * @since 3.10.0-M5
+     */
+    protected void selectNextPossibleRadioButton(int currentIndex, Event e) {
+      Button oldButton = m_uiRadioButtons.get(currentIndex);
+
+      for (int i = 1; i < m_uiRadioButtons.size(); i++) {
+        int nextIndex = (currentIndex + i) % m_uiRadioButtons.size();
+        Button newButton = m_uiRadioButtons.get(nextIndex);
+        if (newButton.setFocus()) {
+          selectButton(newButton, oldButton, e);
+          return; //success
+        }
+      }
+    }
+
+    /**
+     * Selects the previous possible RadioButton based on the current index.
+     * 
+     * @since 3.10.0-M5
+     */
+    protected void selectPreviousPossibleRadioButton(int currentIndex, Event e) {
+      Button oldButton = m_uiRadioButtons.get(currentIndex);
+
+      for (int i = 1; i < m_uiRadioButtons.size(); i++) {
+        int nextIndex = (currentIndex - i) % m_uiRadioButtons.size();
+        if (nextIndex < 0) {
+          nextIndex += m_uiRadioButtons.size();
+        }
+
+        Button newButton = m_uiRadioButtons.get(nextIndex);
+        if (newButton.setFocus()) {
+          selectButton(newButton, oldButton, e);
+          return; //success
+        }
+      }
+    }
+
+    /**
+     * Selects the first possible RadioButton
+     * 
+     * @since 3.10.0-M5
+     */
+    protected void selectLastPossibleRadioButton(int currentIndex, Event e) {
+      Button oldButton = m_uiRadioButtons.get(currentIndex);
+
+      for (int i = m_uiRadioButtons.size() - 1; i >= 0; i--) {
+        Button newButton = m_uiRadioButtons.get(i);
+        if (newButton.setFocus()) {
+          selectButton(newButton, oldButton, e);
+          return; //success
+        }
+      }
+    }
+
+    /**
+     * Selects the last possible RadioButton
+     * 
+     * @since 3.10.0-M5
+     */
+    protected void selectFirstPossibleRadioButton(int currentIndex, Event e) {
+      Button oldButton = m_uiRadioButtons.get(currentIndex);
+
+      for (Button newButton : m_uiRadioButtons) {
+        if (newButton.setFocus()) {
+          selectButton(newButton, oldButton, e);
+          return; //success
+        }
+      }
+    }
+
+    /**
+     * Selects the new button and deselects the old one
+     * 
+     * @since 3.10.0-M5
+     */
+    private void selectButton(Button newButton, Button oldButton, Event e) {
       oldButton.setSelection(false);
-      newButton.setFocus();
       newButton.setSelection(true);
-
       if (newButton instanceof ButtonEx) {
         ((ButtonEx) newButton).handleButtonSelectionFromKeyStroke(e);
       }
-
-      e.doit = false;
     }
   }
 
-  private class P_RadioButtonComposite extends Composite {
-    private static final long serialVersionUID = 1L;
-
-    public P_RadioButtonComposite(Composite parent) {
-      super(parent, SWT.NONE);
-    }
-
-    @Override
-    protected void checkSubclass() {
-    }
-
-    @Override
-    public boolean setFocus() {
-      for (Button b : m_uiRadioButtons) {
-        if (b.getSelection()) {
-          return b.getParent().setFocus();
-        }
-      }
-      return super.setFocus();
-    }
-  }
 }

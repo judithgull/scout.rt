@@ -14,6 +14,7 @@ import java.security.Permission;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.scout.commons.ITypeWithSettableClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.beans.IPropertyFilter;
@@ -21,6 +22,7 @@ import org.eclipse.scout.commons.beans.IPropertyObserver;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.xmlparser.SimpleXmlElement;
 import org.eclipse.scout.rt.client.ui.IEventHistory;
+import org.eclipse.scout.rt.client.ui.action.tool.IToolButton;
 import org.eclipse.scout.rt.client.ui.desktop.AbstractDesktop;
 import org.eclipse.scout.rt.client.ui.desktop.DesktopEvent;
 import org.eclipse.scout.rt.client.ui.desktop.IDesktop;
@@ -47,7 +49,7 @@ import org.eclipse.scout.rt.shared.services.common.jdbc.SearchFilter;
  * <b>handler</b> is reponsible for loading from data and storing data. This usually involves calling process services
  * on the server. These will in turn contact a persistence layer such as a database.
  */
-public interface IForm extends IPropertyObserver {
+public interface IForm extends IPropertyObserver, ITypeWithSettableClassId {
 
   String PROP_TITLE = "title";
   String PROP_MINIMIZE_ENABLED = "minimizeEnabled";
@@ -83,6 +85,9 @@ public interface IForm extends IPropertyObserver {
    * SWT: View, Editor, , Wizard Editor
    */
   int DISPLAY_HINT_VIEW = 20;
+
+  int TOOLBAR_FORM_HEADER = 30;
+  int TOOLBAR_VIEW_PART = 31;
 
   String VIEW_ID_N = "N";
   String VIEW_ID_NE = "NE";
@@ -287,7 +292,7 @@ public interface IForm extends IPropertyObserver {
   /**
    * traverse all fields recursive and return them as a list
    */
-  IFormField[] getAllFields();
+  List<IFormField> getAllFields();
 
   List<? extends IFormField> getInvalidFields();
 
@@ -527,16 +532,22 @@ public interface IForm extends IPropertyObserver {
   void setFormStored(boolean b);
 
   /**
-   * @deprecated Use {@link #getProperty(String)} instead. Will be removed in Release 3.10.
+   * Returns a read only list of all tool buttons
+   * 
+   * @return list of all tool buttons
+   * @since Scout 4.0.0-M7
    */
-  @Deprecated
-  Object getCustomProperty(String propName);
+  List<IToolButton> getToolButtons();
 
   /**
-   * @deprecated Use {@link #setProperty(String, Object)} instead. Will be removed in Release 3.10.
+   * Returns the tool button identified with the {@link IToolButton} class
+   * 
+   * @param clazz
+   *          the class of the tool button
+   * @return toolbutton
+   * @since Scout 4.0.0-M7
    */
-  @Deprecated
-  void setCustomProperty(String propName, Object o);
+  <T extends IToolButton> T getToolButtonByClass(Class<T> clazz);
 
   Object getProperty(String name);
 
@@ -595,7 +606,8 @@ public interface IForm extends IPropertyObserver {
   /**
    * Prints the form<br>
    * <p>
-   * The method returns immediately, the print is done int the background.
+   * The method returns immediately, the print is done in the background.<br>
+   * As soon as the print has been finished the {@link FormEvent#TYPE_PRINTED} is fired.
    * <p>
    * For details and parameter details see {@link PrintDevice}
    */
@@ -604,7 +616,8 @@ public interface IForm extends IPropertyObserver {
   /**
    * Prints a form field<br>
    * <p>
-   * The method returns immediately, the print is done int the background.
+   * The method returns immediately, the print is done in the background.<br>
+   * As soon as the print has been finished the {@link FormEvent#TYPE_PRINTED} is fired.
    * <p>
    * For details and parameter details see {@link PrintDevice}
    */
@@ -617,7 +630,7 @@ public interface IForm extends IPropertyObserver {
 
   /**
    * Add a {@link FormListener}. These listeners will be called
-   * when the form is activated, closed, discared, before loading,
+   * when the form is activated, closed, discarded, before loading,
    * after loading, before storing, after storing, when the structure changes, when it is
    * printed, etc.
    */
@@ -640,4 +653,10 @@ public interface IForm extends IPropertyObserver {
   IEventHistory<FormEvent> getEventHistory();
 
   IFormUIFacade getUIFacade();
+
+  /**
+   * @return
+   */
+  int getToolbarLocation();
+
 }

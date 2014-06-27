@@ -11,8 +11,6 @@
 package org.eclipse.scout.rt.server.services.common.jdbc.builder;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,7 +20,7 @@ import java.util.regex.Pattern;
 
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.scout.commons.ClassIdentifier;
-import org.eclipse.scout.commons.ListUtility;
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.StringUtility.ITagProcessor;
 import org.eclipse.scout.commons.exception.ProcessingException;
@@ -116,7 +114,9 @@ import org.eclipse.scout.rt.shared.data.model.IDataModelEntity;
  * That way non-existent matches are added to the result, which matches the expected behaviour.
  * 
  * @author imo
+ * @deprecated. Will be removed in the M-Release.
  */
+@Deprecated
 @SuppressWarnings("deprecation")
 public class FormDataStatementBuilder implements DataModelConstants {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(FormDataStatementBuilder.class);
@@ -383,15 +383,16 @@ public class FormDataStatementBuilder implements DataModelConstants {
   }
 
   /**
-   * @deprecated use setBasicDefinition instead
+   * @deprecated use setBasicDefinition instead. Will be removed in the 5.0 Release.
    */
+
   @Deprecated
   public void setValueDefinition(Class<?> fieldType, String sqlAttribute, int operator) {
     setValueDefinition(new ValuePartDefinition(fieldType, sqlAttribute, operator));
   }
 
   /**
-   * @deprecated use setBasicDefinition instead
+   * @deprecated use setBasicDefinition instead. Will be removed in the 5.0 Release.
    */
   @Deprecated
   public void setValueDefinition(ClassIdentifier fieldTypeIdentifier, String sqlAttribute, int operator) {
@@ -399,7 +400,7 @@ public class FormDataStatementBuilder implements DataModelConstants {
   }
 
   /**
-   * @deprecated use setBasicDefinition instead
+   * @deprecated use setBasicDefinition instead. Will be removed in the 5.0 Release.
    */
   @Deprecated
   public void setValueDefinition(Class<?> fieldType, String sqlAttribute, int operator, boolean plainBind) {
@@ -407,7 +408,7 @@ public class FormDataStatementBuilder implements DataModelConstants {
   }
 
   /**
-   * @deprecated use setBasicDefinition instead
+   * @deprecated use setBasicDefinition instead. Will be removed in the 5.0 Release.
    */
   @Deprecated
   public void setValueDefinition(ClassIdentifier fieldTypeIdentifier, String sqlAttribute, int operator, boolean plainBind) {
@@ -415,7 +416,7 @@ public class FormDataStatementBuilder implements DataModelConstants {
   }
 
   /**
-   * @deprecated use setBasicDefinition instead
+   * @deprecated use setBasicDefinition instead. Will be removed in the 5.0 Release.
    */
   @Deprecated
   public void setValueDefinition(Class<?>[] fieldTypes, String sqlAttribute, int operator) {
@@ -423,7 +424,7 @@ public class FormDataStatementBuilder implements DataModelConstants {
   }
 
   /**
-   * @deprecated use setBasicDefinition instead
+   * @deprecated use setBasicDefinition instead. Will be removed in the 5.0 Release.
    */
   @Deprecated
   public void setValueDefinition(ClassIdentifier[] fieldTypeIdentifiers, String sqlAttribute, int operator) {
@@ -431,7 +432,7 @@ public class FormDataStatementBuilder implements DataModelConstants {
   }
 
   /**
-   * @deprecated use setBasicDefinition instead
+   * @deprecated use setBasicDefinition instead. Will be removed in the 5.0 Release.
    */
   @Deprecated
   public void setValueDefinition(ValuePartDefinition def) {
@@ -715,23 +716,23 @@ public class FormDataStatementBuilder implements DataModelConstants {
   }
 
   /**
-   * @deprecated use {@link #getBasicPartDefinitions()} instead
+   * @deprecated use {@link #getBasicPartDefinitions()} instead. Will be removed in the 5.0 Release.
    */
   @Deprecated
   public List<BasicPartDefinition> getValuePartDefinitions() {
-    return Collections.unmodifiableList(m_basicDefs);
+    return getBasicPartDefinitions();
   }
 
   public List<BasicPartDefinition> getBasicPartDefinitions() {
-    return Collections.unmodifiableList(m_basicDefs);
+    return CollectionUtility.arrayList(m_basicDefs);
   }
 
   public Map<Class<?>, DataModelAttributePartDefinition> getDataModelAttributePartDefinitions() {
-    return Collections.unmodifiableMap(m_dataModelAttMap);
+    return CollectionUtility.copyMap(m_dataModelAttMap);
   }
 
   public Map<Class<?>, DataModelEntityPartDefinition> getDataModelEntityPartDefinitions() {
-    return Collections.unmodifiableMap(m_dataModelEntMap);
+    return CollectionUtility.copyMap(m_dataModelEntMap);
   }
 
   public String getWhereConstraints() {
@@ -795,13 +796,13 @@ public class FormDataStatementBuilder implements DataModelConstants {
     ComposerAttributeNodeData attributeNode = (ComposerAttributeNodeData) node;
     Integer agg = attributeNode.getAggregationType();
     if (agg == null || agg == AGGREGATION_NONE) {
-      if (!isZeroTraversingAttribute(attributeNode.getOperator(), attributeNode.getValues())) {
+      if (!isZeroTraversingAttribute(attributeNode.getOperator(), attributeNode.getValues().toArray())) {
         return AttributeKind.NonAggregationNonZeroTraversing;
       }
       return AttributeKind.NonAggregation;
     }
     //
-    if (!isZeroTraversingAttribute(attributeNode.getOperator(), attributeNode.getValues())) {
+    if (!isZeroTraversingAttribute(attributeNode.getOperator(), attributeNode.getValues().toArray())) {
       return AttributeKind.AggregationNonZeroTraversing;
     }
     return AttributeKind.Aggregation;
@@ -866,7 +867,6 @@ public class FormDataStatementBuilder implements DataModelConstants {
   /**
    * do not use or override this method, it is protected for unit test purposes
    */
-  @SuppressWarnings("unchecked")
   protected EntityContribution buildComposerOrNodes(List<ComposerEitherOrNodeData> nodes, EntityStrategy entityStrategy, AttributeStrategy attributeStrategy) throws ProcessingException {
     EntityContribution contrib = new EntityContribution();
     // check if only one condition
@@ -886,7 +886,7 @@ public class FormDataStatementBuilder implements DataModelConstants {
         // remove possible outer join signs (+) in where / having constraint
         // this is necessary because outer joins are not allowed in OR clause
         // the removal of outer joins does not influence the result set
-        buf.append(ListUtility.format(ListUtility.combine(subContrib.getWhereParts(), subContrib.getHavingParts()), " AND ").replaceAll("\\(\\+\\)", ""));
+        buf.append(CollectionUtility.format(CollectionUtility.combine(subContrib.getWhereParts(), subContrib.getHavingParts()), " AND ").replaceAll("\\(\\+\\)", ""));
         buf.append(")");
         count++;
       }
@@ -909,7 +909,8 @@ public class FormDataStatementBuilder implements DataModelConstants {
   }
 
   /**
-   * @deprecated use {@link #buildComposerEntityNodeContribution(ComposerEntityNodeData, EntityStrategy)} instead
+   * @deprecated use {@link #buildComposerEntityNodeContribution(ComposerEntityNodeData, EntityStrategy)} instead. Will
+   *             be removed in the 5.0 Release.
    */
   @Deprecated
   public String buildComposerEntityNode(ComposerEntityNodeData node, EntityStrategy entityStrategy) throws ProcessingException {
@@ -1172,7 +1173,6 @@ public class FormDataStatementBuilder implements DataModelConstants {
     return s;
   }
 
-  @SuppressWarnings("cast")
   public EntityContribution buildComposerAttributeNode(final ComposerAttributeNodeData node, AttributeStrategy attributeStrategy) throws ProcessingException {
     if (getDataModel() == null) {
       throw new ProcessingException("there is no data model set, call FormDataStatementBuilder.setDataModel to set one");
@@ -1196,7 +1196,7 @@ public class FormDataStatementBuilder implements DataModelConstants {
     }
     List<Object> bindValues = new ArrayList<Object>();
     if (node.getValues() != null) {
-      bindValues.addAll(Arrays.asList(node.getValues()));
+      bindValues.addAll(node.getValues());
     }
     List<String> bindNames = new ArrayList<String>(bindValues.size());
     for (int i = 0; i < bindValues.size(); i++) {
@@ -1296,7 +1296,7 @@ public class FormDataStatementBuilder implements DataModelConstants {
   }
 
   /**
-   * @deprecated moved to {@link EntityContributionUtility}
+   * @deprecated moved to {@link EntityContributionUtility}. Will be removed in the 5.0 Release.
    */
   @Deprecated
   protected String autoBracketSelectPart(String s) {
@@ -1542,7 +1542,7 @@ public class FormDataStatementBuilder implements DataModelConstants {
     if (contrib.isEmpty()) {
       return null;
     }
-    return ListUtility.format(contrib.getWhereParts(), " AND ");
+    return CollectionUtility.format(contrib.getWhereParts(), " AND ");
   }
 
   /**

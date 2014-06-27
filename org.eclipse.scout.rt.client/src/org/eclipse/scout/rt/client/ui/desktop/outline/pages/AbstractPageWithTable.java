@@ -11,18 +11,22 @@
 package org.eclipse.scout.rt.client.ui.desktop.outline.pages;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.eclipse.core.runtime.IStatus;
 import org.eclipse.scout.commons.ConfigurationUtility;
+import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.annotations.PageData;
 import org.eclipse.scout.commons.exception.IProcessingStatus;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.exception.ProcessingStatus;
+import org.eclipse.scout.commons.exception.VetoException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ClientSyncJob;
@@ -43,10 +47,12 @@ import org.eclipse.scout.rt.client.ui.desktop.outline.OutlineMediator;
 import org.eclipse.scout.rt.client.ui.form.FormEvent;
 import org.eclipse.scout.rt.client.ui.form.FormListener;
 import org.eclipse.scout.rt.client.ui.form.IForm;
-import org.eclipse.scout.rt.shared.ContextMap;
 import org.eclipse.scout.rt.shared.ScoutTexts;
+import org.eclipse.scout.rt.shared.TEXTS;
+import org.eclipse.scout.rt.shared.data.page.AbstractTablePageData;
 import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.rt.shared.services.common.jdbc.SearchFilter;
+import org.eclipse.scout.rt.shared.ui.UserAgentUtility;
 import org.eclipse.scout.service.SERVICES;
 
 /**
@@ -61,6 +67,7 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
   private FormListener m_searchFormListener;
   private boolean m_searchRequired;
   private boolean m_searchActive;
+  private boolean m_limitedResult;
   private boolean m_showEmptySpaceMenus;
   private boolean m_showTableRowMenus;
   private final HashMap<ITableRow, IPage> m_tableRowToPageMap = new HashMap<ITableRow, IPage>();
@@ -82,7 +89,13 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
     this(callInitializer, null, null);
   }
 
-  public AbstractPageWithTable(ContextMap contextMap) {
+  /**
+   * @deprecated Will be removed in the 6.0 Release.
+   *             Use {@link #AbstractPageWithTable()} in combination with getter and setter (page variable) instead.
+   */
+  @Deprecated
+  @SuppressWarnings("deprecation")
+  public AbstractPageWithTable(org.eclipse.scout.rt.shared.ContextMap contextMap) {
     this(true, contextMap, null);
   }
 
@@ -90,7 +103,14 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
     this(true, null, userPreferenceContext);
   }
 
-  public AbstractPageWithTable(boolean callInitializer, ContextMap contextMap) {
+  /**
+   * @deprecated Will be removed in the 6.0 Release.
+   *             Use {@link #AbstractPageWithTable(boolean)} in combination with getter and setter (page variable)
+   *             instead.
+   */
+  @Deprecated
+  @SuppressWarnings("deprecation")
+  public AbstractPageWithTable(boolean callInitializer, org.eclipse.scout.rt.shared.ContextMap contextMap) {
     this(callInitializer, contextMap, null);
   }
 
@@ -98,7 +118,14 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
     this(callInitializer, null, userPreferenceContext);
   }
 
-  public AbstractPageWithTable(boolean callInitializer, ContextMap contextMap, String userPreferenceContext) {
+  /**
+   * @deprecated Will be removed in the 6.0 Release.
+   *             Use {@link #AbstractPageWithTable(boolean, String)} in combination with getter and setter (page
+   *             variable) instead.
+   */
+  @Deprecated
+  @SuppressWarnings("deprecation")
+  public AbstractPageWithTable(boolean callInitializer, org.eclipse.scout.rt.shared.ContextMap contextMap, String userPreferenceContext) {
     super(callInitializer, contextMap, userPreferenceContext);
     if (!callInitializer) {
       callMinimalInitializer();
@@ -129,7 +156,6 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
    */
   @ConfigProperty(ConfigProperty.SEARCH_FORM)
   @Order(90)
-  @ConfigPropertyValue("null")
   protected Class<? extends ISearchForm> getConfiguredSearchForm() {
     return null;
   }
@@ -149,7 +175,6 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(100)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredSearchRequired() {
     return false;
   }
@@ -170,7 +195,6 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(110)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredShowEmptySpaceMenus() {
     return true;
   }
@@ -189,7 +213,6 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(120)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredShowTableRowMenus() {
     return true;
   }
@@ -278,6 +301,13 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
     }
     else {
       setPagePopulateStatus(null);
+    }
+    if (isLimitedResult()) {
+      String maxOutlineWarningKey = "MaxOutlineRowWarning";
+      if (UserAgentUtility.isTouchDevice()) {
+        maxOutlineWarningKey = "MaxOutlineRowWarningMobile";
+      }
+      setPagePopulateStatus(new ProcessingStatus(TEXTS.get(maxOutlineWarningKey, "" + getTable().getRowCount()), IStatus.WARNING));
     }
   }
 
@@ -393,7 +423,7 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
         m_table.initTable();
       }
       catch (Exception e) {
-        LOG.warn(null, e);
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + tableClass + "'.", e));
       }
     }
     // legacy-support for searchform-inner classes
@@ -406,7 +436,7 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
           setSearchForm(ConfigurationUtility.newInnerInstance(this, searchFormClass));
         }
         catch (Exception e) {
-          LOG.warn(null, e);
+          SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + searchFormClass.getName() + "'.", e));
         }
       }
     }
@@ -443,7 +473,7 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
       return getConfiguredSearchForm().newInstance();
     }
     catch (Exception e) {
-      LOG.warn("creation of searchForm " + getConfiguredSearchForm() + " failed", e);
+      SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + getConfiguredSearchForm().getName() + "'.", e));
     }
     return null;
   }
@@ -638,6 +668,17 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
     }
   }
 
+  /**
+   * Indicates if the result displayed in the table is the whole result or if there is more data in the server (that
+   * wasn't sent to the client).
+   * Is set if {@link #importPageData(AbstractTablePageData)} was used.
+   * 
+   * @since 3.10.0-M3
+   */
+  protected boolean isLimitedResult() {
+    return m_limitedResult;
+  }
+
   @Override
   public void pageActivatedNotify() {
     ensureInitialized();
@@ -653,29 +694,20 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
   }
 
   /**
-   * @deprecated use {@link #getPagePopulateStatus()}. Will be removed in Release 3.10.
+   * Import the content of the tablePageData in the table of the page.
+   * 
+   * @param tablePageData
+   * @since 3.10.0-M3
    */
-  @Deprecated
-  @Override
-  @SuppressWarnings("deprecation")
-  public IProcessingStatus getTablePopulateStatus() {
-    return getPagePopulateStatus();
-  }
-
-  /**
-   * @deprecated use {@link #setPagePopulateStatus(IProcessingStatus)}. Will be removed in Release 3.10.
-   */
-  @Deprecated
-  @Override
-  @SuppressWarnings("deprecation")
-  public void setTablePopulateStatus(IProcessingStatus status) {
-    setPagePopulateStatus(status);
+  protected void importPageData(AbstractTablePageData tablePageData) throws ProcessingException {
+    getTable().importFromTableBeanData(tablePageData);
+    m_limitedResult = tablePageData.isLimitedResult();
   }
 
   /**
    * load table data
    */
-  private void loadTableDataImpl() throws ProcessingException {
+  protected void loadTableDataImpl() throws ProcessingException {
     if (m_table != null) {
       try {
         m_table.setTableChanging(true);
@@ -697,7 +729,14 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
           setPagePopulateStatus(new ProcessingStatus(ScoutTexts.get("SearchWasCanceled"), ProcessingStatus.CANCEL));
         }
         else {
-          setPagePopulateStatus(new ProcessingStatus(ScoutTexts.get("ErrorWhileLoadingData"), ProcessingStatus.CANCEL));
+          String message = null;
+          if (pe instanceof VetoException) {
+            message = pe.getMessage();
+          }
+          if (StringUtility.isNullOrEmpty(message)) {
+            message = ScoutTexts.get("ErrorWhileLoadingData");
+          }
+          setPagePopulateStatus(new ProcessingStatus(message, ProcessingStatus.CANCEL));
         }
         throw pe;
       }
@@ -728,7 +767,7 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
       if (tree != null) {
         oldSelectedNode = tree.getSelectedNode();
       }
-      Object[] oldSelectedRowKeys = null;
+      List<Object> oldSelectedRowKeys = null;
       if (oldSelectedNode != null) {
         ITreeNode t = oldSelectedNode;
         while (t != null && t.getParentNode() != null) {
@@ -802,6 +841,7 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
     if (desktop != null) {
       desktop.afterTablePageLoaded(this);
     }
+    super.loadChildren();
   }
 
   private void linkTableRowWithPage(ITableRow tableRow, IPage page) {
@@ -817,7 +857,7 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
   }
 
   @Override
-  public IPage[] getUpdatedChildPagesFor(ITableRow[] tableRows) {
+  public List<IPage> getUpdatedChildPagesFor(List<? extends ITableRow> tableRows) {
     return getChildPagesFor(tableRows, true);
   }
 
@@ -825,40 +865,26 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
    * Computes the list of linked child pages for the given table rows. Revalidates the the pages cell
    * if <code>updateChildPageCells</code> is true. Otherwise, the cells are not updated.
    */
-  private IPage[] getChildPagesFor(ITableRow[] tableRows, boolean updateChildPageCells) {
-    IPage[] pages = new IPage[tableRows.length];
-    int missingCount = 0;
+  private List<IPage> getChildPagesFor(List<? extends ITableRow> tableRows, boolean updateChildPageCells) {
+    List<IPage> result = new ArrayList<IPage>();
     try {
-      for (int i = 0; i < tableRows.length; i++) {
-        pages[i] = m_tableRowToPageMap.get(tableRows[i]);
-        if (pages[i] != null) {
+      for (ITableRow row : tableRows) {
+        IPage page = m_tableRowToPageMap.get(row);
+        if (page != null) {
+          result.add(page);
           if (updateChildPageCells) {
             // update tree nodes from table rows
-            ICell tableCell = getTable().getSummaryCell(tableRows[i]);
-            pages[i].setEnabledInternal(tableRows[i].isEnabled());
-            pages[i].getCellForUpdate().updateFrom(tableCell);
+            ICell tableCell = getTable().getSummaryCell(row);
+            page.setEnabledInternal(row.isEnabled());
+            page.getCellForUpdate().updateFrom(tableCell);
           }
-        }
-        else {
-          missingCount++;
         }
       }
     }
     catch (ProcessingException e) {
       SERVICES.getService(IExceptionHandlerService.class).handleException(e);
     }
-    if (missingCount > 0) {
-      IPage[] tmp = new IPage[pages.length - missingCount];
-      int index = 0;
-      for (IPage element : pages) {
-        if (element != null) {
-          tmp[index] = element;
-          index++;
-        }
-      }
-      pages = tmp;
-    }
-    return pages;
+    return result;
   }
 
   @Override
@@ -877,27 +903,15 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
   }
 
   @Override
-  public ITableRow[] getTableRowsFor(ITreeNode[] childPageNodes) {
-    ITableRow[] rows = new ITableRow[childPageNodes.length];
-    int missingCount = 0;
-    for (int i = 0; i < childPageNodes.length; i++) {
-      rows[i] = m_pageToTableRowMap.get(childPageNodes[i]);
-      if (rows[i] == null) {
-        missingCount++;
+  public List<ITableRow> getTableRowsFor(Collection<? extends ITreeNode> childPageNodes) {
+    List<ITableRow> result = new ArrayList<ITableRow>();
+    for (ITreeNode node : childPageNodes) {
+      ITableRow row = m_pageToTableRowMap.get(node);
+      if (row != null) {
+        result.add(row);
       }
     }
-    if (missingCount > 0) {
-      ITableRow[] tmp = new ITableRow[rows.length - missingCount];
-      int index = 0;
-      for (ITableRow element : rows) {
-        if (element != null) {
-          tmp[index] = element;
-          index++;
-        }
-      }
-      rows = tmp;
-    }
-    return rows;
+    return result;
   }
 
   private OutlineMediator getOutlineMediator() {
@@ -928,10 +942,10 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
         case TableEvent.TYPE_ALL_ROWS_DELETED:
         case TableEvent.TYPE_ROWS_DELETED: {
           if (!isLeaf()) {
-            ITableRow[] tableRows = e.getRows();
-            IPage[] childNodes = getChildPagesFor(tableRows, false);
-            for (int i = 0; i < childNodes.length; i++) {
-              unlinkTableRowWithPage(tableRows[i]);
+            List<ITableRow> tableRows = e.getRows();
+            List<IPage> childNodes = getChildPagesFor(e.getRows(), false);
+            for (ITableRow row : tableRows) {
+              unlinkTableRowWithPage(row);
             }
 
             if (outlineMediator != null) {
@@ -943,7 +957,7 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
         case TableEvent.TYPE_ROWS_INSERTED: {
           if (!isLeaf()) {
             ArrayList<IPage> childPageList = new ArrayList<IPage>();
-            ITableRow[] tableRows = e.getRows();
+            List<ITableRow> tableRows = e.getRows();
             for (ITableRow element : tableRows) {
               try {
                 IPage childPage = execCreateVirtualChildPage(element);
@@ -963,8 +977,7 @@ public abstract class AbstractPageWithTable<T extends ITable> extends AbstractPa
             }
 
             if (outlineMediator != null) {
-              IPage[] childPages = childPageList.toArray(new IPage[childPageList.size()]);
-              outlineMediator.mediateTableRowsInserted(tableRows, childPages, AbstractPageWithTable.this);
+              outlineMediator.mediateTableRowsInserted(tableRows, childPageList, AbstractPageWithTable.this);
             }
 
             // check if a page was revoked

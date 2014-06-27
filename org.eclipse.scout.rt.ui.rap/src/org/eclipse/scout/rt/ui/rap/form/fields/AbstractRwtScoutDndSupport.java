@@ -12,13 +12,19 @@ package org.eclipse.scout.rt.ui.rap.form.fields;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
+import org.eclipse.rap.rwt.dnd.ClientFileTransfer;
 import org.eclipse.scout.commons.beans.IPropertyObserver;
 import org.eclipse.scout.commons.dnd.TransferObject;
 import org.eclipse.scout.rt.client.ui.IDNDSupport;
 import org.eclipse.scout.rt.ui.rap.IRwtEnvironment;
+import org.eclipse.scout.rt.ui.rap.dnd.IRwtScoutFileUploadHandler;
+import org.eclipse.scout.rt.ui.rap.dnd.RwtScoutFileUploadEvent;
+import org.eclipse.scout.rt.ui.rap.dnd.RwtScoutFileUploadHandlerFactory;
 import org.eclipse.scout.rt.ui.rap.util.RwtUtility;
 import org.eclipse.swt.dnd.DND;
 import org.eclipse.swt.dnd.DragSource;
@@ -39,7 +45,7 @@ import org.eclipse.swt.widgets.Control;
  * 
  * @since 3.7.0 June 2011
  */
-public abstract class AbstractRwtScoutDndSupport implements IRwtScoutDndSupport {
+public abstract class AbstractRwtScoutDndSupport implements IRwtScoutDndSupport, IRwtScoutDndUploadCallback {
 
   private final Control m_control;
   private final IPropertyObserver m_scoutObject;
@@ -50,6 +56,8 @@ public abstract class AbstractRwtScoutDndSupport implements IRwtScoutDndSupport 
   private PropertyChangeListener m_scoutPropertyListener;
   private Transfer[] m_dragTransferTypes;
   private Transfer[] m_dropTransferTypes;
+  private boolean m_isClientFileTransferSupported;
+  private IRwtScoutFileUploadHandler m_uploadHandler;
 
   public AbstractRwtScoutDndSupport(IPropertyObserver scoutObject, IDNDSupport scoutDndSupportable, Control control, IRwtEnvironment uiEnvironment) {
     m_scoutObject = scoutObject;
@@ -119,7 +127,13 @@ public abstract class AbstractRwtScoutDndSupport implements IRwtScoutDndSupport 
 
   protected abstract void handleUiDropAction(DropTargetEvent event, TransferObject scoutTransferObject);
 
+  protected void handleUiDropTargetChanged(DropTargetEvent event) {
+  }
+
   protected abstract TransferObject handleUiDragRequest();
+
+  protected void handleUiDragFinished() {
+  }
 
   protected void updateDragSupportFromScout() {
     if (m_scoutObject == null || m_control == null || m_control.isDisposed()) {
@@ -131,7 +145,7 @@ public abstract class AbstractRwtScoutDndSupport implements IRwtScoutDndSupport 
     if (dragSource == null) {
       if (transferTypes.length > 0) {
         // create new
-        dragSource = new DragSource(m_control, DND.DROP_COPY);
+        dragSource = createDragSource(m_control);
       }
     }
     if (dragSource != null) {
@@ -165,6 +179,10 @@ public abstract class AbstractRwtScoutDndSupport implements IRwtScoutDndSupport 
     }
   }
 
+  protected DragSource createDragSource(Control control) {
+    return new DragSource(control, DND.DROP_COPY);
+  }
+
   protected void updateDropSupportFromScout() {
     if (m_scoutObject == null || m_control == null || m_control.isDisposed()) {
       return;
@@ -175,7 +193,7 @@ public abstract class AbstractRwtScoutDndSupport implements IRwtScoutDndSupport 
     if (dropTarget == null) {
       if (transferTypes.length > 0) {
         // create new
-        dropTarget = new DropTarget(m_control, DND.DROP_MOVE | DND.DROP_COPY);
+        dropTarget = createDropTarget(m_control);
       }
     }
     if (dropTarget != null) {
@@ -193,6 +211,7 @@ public abstract class AbstractRwtScoutDndSupport implements IRwtScoutDndSupport 
         types.add(t);
       }
       if (types.size() > 0) {
+        m_isClientFileTransferSupported = types.contains(ClientFileTransfer.getInstance());
         dropTarget.setTransfer(types.toArray(new Transfer[types.size()]));
         if (m_dropTargetListener == null) {
           m_dropTargetListener = new P_RwtDropTargetListener();
@@ -200,13 +219,19 @@ public abstract class AbstractRwtScoutDndSupport implements IRwtScoutDndSupport 
         }
       }
       else {
+        m_isClientFileTransferSupported = false;
         if (m_dropTargetListener != null) {
           dropTarget.removeDropListener(m_dropTargetListener);
           m_dropTargetListener = null;
         }
         dropTarget.dispose();
+        m_control.setData(DND_DROP_TARGET, null);
       }
     }
+  }
+
+  protected DropTarget createDropTarget(Control control) {
+    return new DropTarget(control, DND.DROP_MOVE | DND.DROP_COPY);
   }
 
   protected void handleScoutProperty(String name, Object newValue) {
@@ -218,35 +243,99 @@ public abstract class AbstractRwtScoutDndSupport implements IRwtScoutDndSupport 
     }
   }
 
+  protected boolean handleFileUpload(DropTargetEvent event) {
+    if (!m_isClientFileTransferSupported || !ClientFileTransfer.getInstance().isSupportedType(event.currentDataType)) {
+      return false;
+    }
+
+    if (m_uploadHandler == null) {
+      m_uploadHandler = RwtScoutFileUploadHandlerFactory.createFileUploadHandler(this);
+    }
+
+    return m_uploadHandler.startFileUpload(event);
+  }
+
+  protected static int getPercentage(RwtScoutFileUploadEvent uploadEvent) {
+    double bytesRead = uploadEvent.getBytesRead();
+    double contentLength = uploadEvent.getContentLength();
+    double fraction = bytesRead / contentLength;
+    return (int) Math.floor(fraction * 100);
+  }
+
+  @Override
+  public void uploadProgress(final DropTargetEvent dropEvent, final RwtScoutFileUploadEvent uploadEvent) {
+  }
+
+  @Override
+  public void uploadFailed(DropTargetEvent dropEvent, RwtScoutFileUploadEvent uploadEvent) {
+  }
+
+  @Override
+  public void uploadFinished(final DropTargetEvent dropEvent, final RwtScoutFileUploadEvent uploadEvent, final List<File> uploadedFiles) {
+    getUiEnvironment().getDisplay().syncExec(new Runnable() {
+      @Override
+      public void run() {
+        TransferObject scoutTransferable = createScoutTransferableObjectFromFileUpload(dropEvent, uploadedFiles);
+        if (scoutTransferable != null) {
+          handleUiDropAction(dropEvent, scoutTransferable);
+        }
+      }
+    });
+  }
+
+  protected TransferObject createScoutTransferableObjectFromFileUpload(DropTargetEvent event, List<File> uploadedFiles) {
+    return RwtUtility.createScoutTransferableFromClientFile(event, uploadedFiles);
+  }
+
+  protected TransferObject createScoutTransferableObject(DropTargetEvent event) {
+    return RwtUtility.createScoutTransferable(event);
+  }
+
   private class P_RwtDropTargetListener extends DropTargetAdapter {
     private static final long serialVersionUID = 1L;
 
     @Override
-    public void dropAccept(DropTargetEvent event) {
-
-    }
-
-    @Override
     public void drop(DropTargetEvent event) {
-      TransferObject scoutTransferable = RwtUtility.createScoutTransferable(event);
+      if (handleFileUpload(event)) {
+        return;
+      }
+      TransferObject scoutTransferable = createScoutTransferableObject(event);
       if (scoutTransferable != null) {
         handleUiDropAction(event, scoutTransferable);
       }
+    }
+
+    @Override
+    public void dragOver(DropTargetEvent event) {
+      handleUiDropTargetChanged(event);
     }
   } // end class P_RwtDropTargetListener
 
   private class P_RwtDragSourceListener extends DragSourceAdapter {
     private static final long serialVersionUID = 1L;
+    private Object m_data;
+
+    @Override
+    public void dragStart(DragSourceEvent event) {
+      super.dragStart(event);
+      TransferObject scoutTransfer = handleUiDragRequest();
+      if (scoutTransfer != null) {
+        m_data = RwtUtility.createUiTransferable(scoutTransfer);
+      }
+    }
 
     @Override
     public void dragSetData(DragSourceEvent event) {
-      TransferObject scoutTransfer = handleUiDragRequest();
-      if (scoutTransfer != null) {
-        Object data = RwtUtility.createUiTransferable(scoutTransfer);
-        if (data != null) {
-          event.data = data;
-        }
+      if (m_data != null) {
+        event.data = m_data;
       }
+    }
+
+    @Override
+    public void dragFinished(DragSourceEvent event) {
+      super.dragFinished(event);
+      handleUiDragFinished();
+      m_data = null;
     }
   } // end class P_RwtDragSourceListener
 

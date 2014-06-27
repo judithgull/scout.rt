@@ -10,13 +10,14 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.form.fields.datefield;
 
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 
 /**
  * convenience subclass of {@link AbstractDateField} with hasDate=true and hasTime=true
  */
+@ClassId("7475d45c-396f-44c5-bb72-4610d980d3ac")
 public abstract class AbstractDateTimeField extends AbstractDateField {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractDateTimeField.class);
 
@@ -28,7 +29,6 @@ public abstract class AbstractDateTimeField extends AbstractDateField {
     super(callInitializer);
   }
 
-  @ConfigPropertyValue("true")
   @Override
   protected boolean getConfiguredHasTime() {
     return true;

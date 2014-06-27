@@ -29,8 +29,6 @@ public class RwtScoutCheckbox extends RwtScoutValueFieldComposite<IBooleanField>
   private P_RwtButtonListener m_uiButtonListener;
   private boolean m_mandatoryCached;
   private StatusLabelEx m_labelPlaceholder;
-  //ticket 86811: avoid double-action in queue
-  private boolean m_handleActionPending;
 
   @Override
   protected void initializeUi(Composite parent) {
@@ -40,7 +38,7 @@ public class RwtScoutCheckbox extends RwtScoutValueFieldComposite<IBooleanField>
     getUiEnvironment().getFormToolkit().getFormToolkit().adapt(m_labelPlaceholder, false, false);
     m_labelPlaceholder.setLayoutData(LogicalGridDataBuilder.createLabel(getScoutObject().getGridData()));
 
-    Button checkbox = getUiEnvironment().getFormToolkit().createButton(container, "", SWT.CHECK);
+    Button checkbox = getUiEnvironment().getFormToolkit().createButton(container, "", SWT.CHECK | SWT.WRAP);
 
     LogicalGridData checkboxData = LogicalGridDataBuilder.createField(getScoutObject().getGridData());
     checkboxData.fillHorizontal = false;
@@ -158,26 +156,30 @@ public class RwtScoutCheckbox extends RwtScoutValueFieldComposite<IBooleanField>
   }
 
   protected void handleUiAction() {
-    if (getUiField().isEnabled()) {
-      final boolean b = getUiField().getSelection();
-      if (!m_handleActionPending) {
-        m_handleActionPending = true;
-        // notify Scout
-        Runnable t = new Runnable() {
-          @Override
-          public void run() {
-            try {
-              getScoutObject().getUIFacade().setSelectedFromUI(b);
-            }
-            finally {
-              m_handleActionPending = false;
-            }
-          }
-        };
-        getUiEnvironment().invokeScoutLater(t, 0);
-        // end notify
-      }
+    if (!getUiField().isEnabled()) {
+      return;
     }
+    // notify Scout
+    Runnable t = new Runnable() {
+      @Override
+      public void run() {
+        final boolean oldSelection = getScoutObject().isChecked();
+        final boolean newSelection = getScoutObject().getUIFacade().setSelectedFromUI();
+        if (oldSelection == newSelection) {
+          // ensure that the UI has the same value as the Scout model
+          // oldSelection != newSelection case is handled by the value property change listener.
+          Runnable r = new Runnable() {
+            @Override
+            public void run() {
+              getUiField().setSelection(newSelection);
+            }
+          };
+          getUiEnvironment().invokeUiLater(r);
+        }
+      }
+    };
+    getUiEnvironment().invokeScoutLater(t, 0);
+    // end notify
   }
 
   private class P_RwtButtonListener implements Listener {

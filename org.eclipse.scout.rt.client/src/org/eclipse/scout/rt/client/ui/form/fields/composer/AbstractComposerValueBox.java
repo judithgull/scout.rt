@@ -12,11 +12,18 @@ package org.eclipse.scout.rt.client.ui.form.fields.composer;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.TriState;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.FormData;
 import org.eclipse.scout.commons.annotations.FormData.DefaultSubtypeSdkCommand;
@@ -45,12 +52,13 @@ import org.eclipse.scout.rt.shared.data.model.DataModelConstants;
 import org.eclipse.scout.rt.shared.data.model.IDataModelAttribute;
 import org.eclipse.scout.rt.shared.data.model.IDataModelAttributeOp;
 import org.eclipse.scout.rt.shared.services.common.jdbc.SearchFilter;
-import org.eclipse.scout.rt.shared.services.lookup.LookupCall;
+import org.eclipse.scout.rt.shared.services.lookup.ILookupCall;
 
 /**
  * Template box containing all composer values.
  * <p>
  */
+@ClassId("2d8065cf-eeb3-4d64-8753-adb36cf852b8")
 public abstract class AbstractComposerValueBox extends AbstractGroupBox {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractComposerValueBox.class);
 
@@ -156,12 +164,14 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
       f.setLabel(ScoutTexts.get("Value"));
       f.setVisible(false);
       if (f instanceof ISequenceBox) {
-        IFormField[] sequenceBoxChildFields = ((ISequenceBox) f).getFields();
-        if (sequenceBoxChildFields.length > 0) {
-          sequenceBoxChildFields[0].setLabelVisible(false);
-        }
-        if (sequenceBoxChildFields.length > 1 && sequenceBoxChildFields[1].getLabel() == null) {
-          sequenceBoxChildFields[1].setLabel(ScoutTexts.get("and"));
+        List<IFormField> sequenceBoxChildFields = ((ISequenceBox) f).getFields();
+        if (CollectionUtility.hasElements(sequenceBoxChildFields)) {
+          IFormField firstField = CollectionUtility.firstElement(sequenceBoxChildFields);
+          firstField.setLabelVisible(false);
+          if (sequenceBoxChildFields.size() > 1) {
+            IFormField secondField = CollectionUtility.getElement(sequenceBoxChildFields, 1);
+            secondField.setLabel(ScoutTexts.get("and"));
+          }
         }
       }
     }
@@ -174,7 +184,7 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     return m_selectedField;
   }
 
-  public void setSelectionContext(IDataModelAttribute attribute, IDataModelAttributeOp op, Object[] values) {
+  public void setSelectionContext(IDataModelAttribute attribute, IDataModelAttributeOp op, List<?> values) {
     if (op == null) {
       return;
     }
@@ -241,7 +251,7 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    protected void execPrepareLookup(LookupCall call) throws ProcessingException {
+    protected void execPrepareLookup(ILookupCall<Object> call) throws ProcessingException {
       if (m_attribute != null) {
         // if isFilterActiveRows() is true, do not use a filter to load rows
         // the list box is only populated one time and filtering for active/inactive is done afterwards
@@ -260,13 +270,14 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
       this.removePropertyChangeListener(listener);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, Object[] values) {
+    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, List<?> values) {
       setFilterActiveRowsValue(TriState.TRUE);
       setFilterActiveRows(attribute.isActiveFilterEnabled());
-      LookupCall newCall = attribute.getLookupCall();
+      ILookupCall<Object> newCall = attribute.getLookupCall();
       if (getLookupCall() != newCall) {
-        setLookupCall(attribute.getLookupCall());
+        setLookupCall(newCall);
         try {
           loadListBoxData();
         }
@@ -276,8 +287,12 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
         }
       }
       try {
-        if (values != null && values.length == 1 && values[0] instanceof Object[]) {
-          setValue((Object[]) values[0]);
+        Object firstElement = CollectionUtility.firstElement(values);
+        if (firstElement instanceof Collection) {
+          setValue(CollectionUtility.hashSet((Collection) firstElement));
+        }
+        else if (firstElement instanceof Object[]) {
+          setValue(CollectionUtility.hashSet((Object[]) firstElement));
         }
         else {
           setValue(null);
@@ -295,9 +310,9 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public Object[] getValues() {
+    public List<Object> getValues() {
       if (getCheckedKeyCount() > 0) {
-        return new Object[]{getValue()};
+        return CollectionUtility.arrayList((Object) getValue());
       }
       else {
         return null;
@@ -305,8 +320,8 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public String[] getTexts() {
-      return new String[]{getDisplayText()};
+    public List<String> getTexts() {
+      return CollectionUtility.arrayList(getDisplayText());
     }
   }
 
@@ -325,7 +340,7 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    protected void execPrepareLookup(LookupCall call, ITreeNode parent) throws ProcessingException {
+    protected void execPrepareLookup(ILookupCall<Object> call, ITreeNode parent) throws ProcessingException {
       if (m_attribute != null) {
         // if isFilterActiveNodes() is true, do not use a filter to load nodes
         // the tree box is only populated one time and filtering for active/inactive is done afterwards
@@ -345,10 +360,10 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, Object[] values) {
+    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, List<?> values0) {
       setFilterActiveNodesValue(TriState.TRUE);
       setFilterActiveNodes(attribute.isActiveFilterEnabled());
-      LookupCall newCall = attribute.getLookupCall();
+      ILookupCall<Object> newCall = attribute.getLookupCall();
       if (getLookupCall() != newCall) {
         setLookupCall(newCall);
         try {
@@ -361,8 +376,9 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
         }
       }
       try {
-        if (values != null && values.length == 1 && values[0] instanceof Object[]) {
-          setValue((Object[]) values[0]);
+        if (CollectionUtility.hasElements(values0)) {
+          Set<Object> values = new HashSet<Object>(values0);
+          setValue(values);
         }
         else {
           setValue(null);
@@ -380,18 +396,17 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public Object[] getValues() {
-      if (getCheckedKeyCount() > 0) {
-        return new Object[]{getValue()};
-      }
-      else {
+    public List<Object> getValues() {
+      Set<Object> value = getValue();
+      if (value == null) {
         return null;
       }
+      return CollectionUtility.arrayList(value);
     }
 
     @Override
-    public String[] getTexts() {
-      return new String[]{getDisplayText()};
+    public List<String> getTexts() {
+      return CollectionUtility.arrayList(getDisplayText());
     }
   }
 
@@ -409,10 +424,12 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, Object[] values) {
+    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, List values) {
       try {
-        if (values != null && values.length == 1 && values[0] instanceof Date) {
-          setValue((Date) values[0]);
+        @SuppressWarnings("unchecked")
+        Object firstElement = CollectionUtility.firstElement(values);
+        if (firstElement instanceof Date) {
+          setValue((Date) firstElement);
         }
         else {
           setValue(null);
@@ -430,9 +447,9 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public Object[] getValues() {
+    public List<Object> getValues() {
       if (getValue() != null) {
-        return new Object[]{getValue()};
+        return Collections.singletonList((Object) getValue());
       }
       else {
         return null;
@@ -440,8 +457,8 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public String[] getTexts() {
-      return new String[]{getDisplayText()};
+    public List<String> getTexts() {
+      return CollectionUtility.arrayList(getDisplayText());
     }
   }
 
@@ -459,14 +476,18 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, Object[] values) {
+    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, List values) {
+
       try {
-        if (values != null && values.length == 1) {
-          if (values[0] instanceof Double) {
-            setTimeValue((Double) values[0]);
+
+        if (values != null && values.size() == 1) {
+          @SuppressWarnings("unchecked")
+          Object firstElement = CollectionUtility.firstElement(values);
+          if (firstElement instanceof Double) {
+            setTimeValue((Double) firstElement);
           }
-          else if (values[0] instanceof Date) {
-            setValue((Date) values[0]);
+          else if (firstElement instanceof Date) {
+            setValue((Date) firstElement);
           }
           else {
             setValue(null);
@@ -488,18 +509,16 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public Object[] getValues() {
-      if (getValue() != null) {
-        return new Object[]{getValue()};
-      }
-      else {
+    public List<Object> getValues() {
+      if (getValue() == null) {
         return null;
       }
+      return Collections.singletonList((Object) getValue());
     }
 
     @Override
-    public String[] getTexts() {
-      return new String[]{getDisplayText()};
+    public List<String> getTexts() {
+      return CollectionUtility.arrayList(getDisplayText());
     }
   }
 
@@ -523,10 +542,12 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, Object[] values) {
+    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, List values) {
       try {
-        if (values != null && values.length == 1 && values[0] instanceof Date) {
-          setValue((Date) values[0]);
+        @SuppressWarnings("unchecked")
+        Object firstElement = CollectionUtility.firstElement(values);
+        if (firstElement instanceof Date) {
+          setValue((Date) firstElement);
         }
         else {
           setValue(null);
@@ -544,18 +565,16 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public Object[] getValues() {
-      if (getValue() != null) {
-        return new Object[]{getValue()};
-      }
-      else {
+    public List<Object> getValues() {
+      if (getValue() == null) {
         return null;
       }
+      return Collections.singletonList((Object) getValue());
     }
 
     @Override
-    public String[] getTexts() {
-      return new String[]{getDisplayText()};
+    public List<String> getTexts() {
+      return CollectionUtility.arrayList(getDisplayText());
     }
   }
 
@@ -573,7 +592,7 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, Object[] values) {
+    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, List values) {
       switch (dataType) {
         case IDataModelAttribute.TYPE_INTEGER: {
           setGroupingUsed(true);
@@ -585,8 +604,10 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
         }
       }
       try {
-        if (values != null && values.length == 1 && values[0] instanceof Integer) {
-          setValue((Integer) values[0]);
+        @SuppressWarnings("unchecked")
+        Object firstElement = CollectionUtility.firstElement(values);
+        if (firstElement instanceof Integer) {
+          setValue((Integer) firstElement);
         }
         else {
           setValue(null);
@@ -604,18 +625,16 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public Object[] getValues() {
-      if (getValue() != null) {
-        return new Object[]{getValue()};
-      }
-      else {
+    public List<Object> getValues() {
+      if (getValue() == null) {
         return null;
       }
+      return Collections.singletonList((Object) getValue());
     }
 
     @Override
-    public String[] getTexts() {
-      return new String[]{getDisplayText()};
+    public List<String> getTexts() {
+      return CollectionUtility.arrayList(getDisplayText());
     }
   }
 
@@ -633,7 +652,7 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, Object[] values) {
+    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, List values) {
       switch (dataType) {
         case IDataModelAttribute.TYPE_LONG: {
           setGroupingUsed(true);
@@ -645,8 +664,10 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
         }
       }
       try {
-        if (values != null && values.length == 1 && values[0] instanceof Long) {
-          setValue((Long) values[0]);
+        @SuppressWarnings("unchecked")
+        Object firstElement = CollectionUtility.firstElement(values);
+        if (firstElement instanceof Long) {
+          setValue((Long) firstElement);
         }
         else {
           setValue(null);
@@ -664,18 +685,16 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public Object[] getValues() {
-      if (getValue() != null) {
-        return new Object[]{getValue()};
-      }
-      else {
+    public List<Object> getValues() {
+      if (getValue() == null) {
         return null;
       }
+      return Collections.singletonList((Object) getValue());
     }
 
     @Override
-    public String[] getTexts() {
-      return new String[]{getDisplayText()};
+    public List<String> getTexts() {
+      return CollectionUtility.arrayList(getDisplayText());
     }
   }
 
@@ -693,7 +712,7 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, Object[] values) {
+    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, List values) {
       switch (dataType) {
         case IDataModelAttribute.TYPE_DOUBLE: {
           setGroupingUsed(true);
@@ -712,8 +731,10 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
         }
       }
       try {
-        if (values != null && values.length == 1 && values[0] instanceof Double) {
-          setValue((Double) values[0]);
+        @SuppressWarnings("unchecked")
+        Object firstElement = CollectionUtility.firstElement(values);
+        if (firstElement instanceof Double) {
+          setValue((Double) firstElement);
         }
         else {
           setValue(null);
@@ -731,18 +752,16 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public Object[] getValues() {
-      if (getValue() != null) {
-        return new Object[]{getValue()};
-      }
-      else {
+    public List<Object> getValues() {
+      if (getValue() == null) {
         return null;
       }
+      return Collections.singletonList((Object) getValue());
     }
 
     @Override
-    public String[] getTexts() {
-      return new String[]{getDisplayText()};
+    public List<String> getTexts() {
+      return CollectionUtility.arrayList(getDisplayText());
     }
   }
 
@@ -760,10 +779,12 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, Object[] values) {
+    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, List values) {
       try {
-        if (values != null && values.length == 1 && values[0] instanceof String) {
-          setValue((String) values[0]);
+        @SuppressWarnings("unchecked")
+        Object firstElement = CollectionUtility.firstElement(values);
+        if (firstElement instanceof String) {
+          setValue((String) firstElement);
         }
         else {
           setValue(null);
@@ -781,18 +802,16 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public Object[] getValues() {
-      if (getValue() != null) {
-        return new Object[]{getValue()};
-      }
-      else {
+    public List<Object> getValues() {
+      if (getValue() == null) {
         return null;
       }
+      return Collections.singletonList((Object) getValue());
     }
 
     @Override
-    public String[] getTexts() {
-      return new String[]{getDisplayText()};
+    public List<String> getTexts() {
+      return CollectionUtility.arrayList(getDisplayText());
     }
   }
 
@@ -806,7 +825,7 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    protected void execPrepareLookup(LookupCall call) throws ProcessingException {
+    protected void execPrepareLookup(ILookupCall<Object> call) throws ProcessingException {
       if (m_attribute != null) {
         call.setActive(isActiveFilterEnabled() ? getActiveFilter() : TriState.TRUE);
         m_attribute.prepareLookup(call);
@@ -823,20 +842,16 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
       this.removePropertyChangeListener(listener);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, Object[] values) {
+    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, List values) {
       setActiveFilterEnabled(attribute.isActiveFilterEnabled());
-      LookupCall newCall = attribute.getLookupCall();
+      ILookupCall<Object> newCall = attribute.getLookupCall();
       if (getLookupCall() != newCall) {
         setLookupCall(newCall);
       }
       try {
-        if (values != null && values.length == 1) {
-          setValue(values[0]);
-        }
-        else {
-          setValue(null);
-        }
+        setValue(CollectionUtility.<Object> firstElement(values));
       }
       catch (Exception e) {
         // nop
@@ -850,18 +865,16 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public Object[] getValues() {
-      if (getValue() != null) {
-        return new Object[]{getValue()};
-      }
-      else {
+    public List<Object> getValues() {
+      if (getValue() == null) {
         return null;
       }
+      return Collections.singletonList((Object) getValue());
     }
 
     @Override
-    public String[] getTexts() {
-      return new String[]{getDisplayText()};
+    public List<String> getTexts() {
+      return CollectionUtility.arrayList(getDisplayText());
     }
   }
 
@@ -893,16 +906,17 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, Object[] values) {
+    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, List<?> values) {
       try {
         getFieldByClass(BetweenDateField.DateFromField.class).setValue(null);
         getFieldByClass(BetweenDateField.DateToField.class).setValue(null);
-        if (values != null && values.length == 2) {
-          if (values[0] instanceof Date) {
-            getFieldByClass(BetweenDateField.DateFromField.class).setValue((Date) values[0]);
+
+        if (values != null && values.size() == 2) {
+          if (values.get(0) instanceof Date) {
+            getFieldByClass(BetweenDateField.DateFromField.class).setValue((Date) values.get(0));
           }
-          if (values[1] instanceof Date) {
-            getFieldByClass(BetweenDateField.DateToField.class).setValue((Date) values[1]);
+          if (values.get(1) instanceof Date) {
+            getFieldByClass(BetweenDateField.DateToField.class).setValue((Date) values.get(1));
           }
         }
       }
@@ -918,22 +932,20 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public Object[] getValues() {
+    public List<Object> getValues() {
       Object a = getFieldByClass(BetweenDateField.DateFromField.class).getValue();
       Object b = getFieldByClass(BetweenDateField.DateToField.class).getValue();
-      if (a != null || b != null) {
-        return new Object[]{a, b};
-      }
-      else {
+      if (a == null && b == null) {
         return null;
       }
+      return CollectionUtility.arrayList(a, b);
     }
 
     @Override
-    public String[] getTexts() {
+    public List<String> getTexts() {
       String a = getFieldByClass(BetweenDateField.DateFromField.class).getDisplayText();
       String b = getFieldByClass(BetweenDateField.DateToField.class).getDisplayText();
-      return new String[]{a, b};
+      return CollectionUtility.arrayList(a, b);
     }
   }
 
@@ -963,22 +975,22 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, Object[] values) {
+    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, List values) {
       try {
         getFieldByClass(BetweenTimeField.TimeFromField.class).setValue(null);
         getFieldByClass(BetweenTimeField.TimeToField.class).setValue(null);
-        if (values != null && values.length == 2) {
-          if (values[0] instanceof Double) {
-            getFieldByClass(BetweenTimeField.TimeFromField.class).setTimeValue((Double) values[0]);
+        if (values != null && values.size() == 2) {
+          if (values.get(0) instanceof Double) {
+            getFieldByClass(BetweenTimeField.TimeFromField.class).setTimeValue((Double) values.get(0));
           }
-          else if (values[0] instanceof Date) {
-            getFieldByClass(BetweenTimeField.TimeFromField.class).setValue((Date) values[0]);
+          else if (values.get(0) instanceof Date) {
+            getFieldByClass(BetweenTimeField.TimeFromField.class).setValue((Date) values.get(0));
           }
-          if (values[1] instanceof Double) {
-            getFieldByClass(BetweenTimeField.TimeToField.class).setTimeValue((Double) values[1]);
+          if (values.get(1) instanceof Double) {
+            getFieldByClass(BetweenTimeField.TimeToField.class).setTimeValue((Double) values.get(1));
           }
-          else if (values[1] instanceof Date) {
-            getFieldByClass(BetweenTimeField.TimeToField.class).setValue((Date) values[1]);
+          else if (values.get(1) instanceof Date) {
+            getFieldByClass(BetweenTimeField.TimeToField.class).setValue((Date) values.get(1));
           }
         }
       }
@@ -994,22 +1006,20 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public Object[] getValues() {
+    public List<Object> getValues() {
       Object a = getFieldByClass(BetweenTimeField.TimeFromField.class).getValue();
       Object b = getFieldByClass(BetweenTimeField.TimeToField.class).getValue();
-      if (a != null || b != null) {
-        return new Object[]{a, b};
-      }
-      else {
+      if (a == null && b == null) {
         return null;
       }
+      return CollectionUtility.arrayList(a, b);
     }
 
     @Override
-    public String[] getTexts() {
+    public List<String> getTexts() {
       String a = getFieldByClass(BetweenTimeField.TimeFromField.class).getDisplayText();
       String b = getFieldByClass(BetweenTimeField.TimeToField.class).getDisplayText();
-      return new String[]{a, b};
+      return CollectionUtility.arrayList(a, b);
     }
   }
 
@@ -1047,16 +1057,16 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, Object[] values) {
+    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, List values) {
       try {
         getFieldByClass(BetweenDateTimeField.DateTimeFromField.class).setValue(null);
         getFieldByClass(BetweenDateTimeField.DateTimeToField.class).setValue(null);
-        if (values != null && values.length == 2) {
-          if (values[0] instanceof Date) {
-            getFieldByClass(BetweenDateTimeField.DateTimeFromField.class).setValue((Date) values[0]);
+        if (values != null && values.size() == 2) {
+          if (values.get(0) instanceof Date) {
+            getFieldByClass(BetweenDateTimeField.DateTimeFromField.class).setValue((Date) values.get(0));
           }
-          if (values[1] instanceof Date) {
-            getFieldByClass(BetweenDateTimeField.DateTimeToField.class).setValue((Date) values[1]);
+          if (values.get(1) instanceof Date) {
+            getFieldByClass(BetweenDateTimeField.DateTimeToField.class).setValue((Date) values.get(1));
           }
         }
       }
@@ -1072,22 +1082,20 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public Object[] getValues() {
+    public List<Object> getValues() {
       Object a = getFieldByClass(BetweenDateTimeField.DateTimeFromField.class).getValue();
       Object b = getFieldByClass(BetweenDateTimeField.DateTimeToField.class).getValue();
-      if (a != null || b != null) {
-        return new Object[]{a, b};
-      }
-      else {
+      if (a == null && b == null) {
         return null;
       }
+      return CollectionUtility.arrayList(a, b);
     }
 
     @Override
-    public String[] getTexts() {
+    public List<String> getTexts() {
       String a = getFieldByClass(BetweenDateTimeField.DateTimeFromField.class).getDisplayText();
       String b = getFieldByClass(BetweenDateTimeField.DateTimeToField.class).getDisplayText();
-      return new String[]{a, b};
+      return CollectionUtility.arrayList(a, b);
     }
   }
 
@@ -1117,16 +1125,16 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, Object[] values) {
+    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, List values) {
       try {
         getFieldByClass(BetweenIntegerField.IntegerFromField.class).setValue(null);
         getFieldByClass(BetweenIntegerField.IntegerToField.class).setValue(null);
-        if (values != null && values.length == 2) {
-          if (values[0] instanceof Integer) {
-            getFieldByClass(BetweenIntegerField.IntegerFromField.class).setValue((Integer) values[0]);
+        if (values != null && values.size() == 2) {
+          if (values.get(0) instanceof Integer) {
+            getFieldByClass(BetweenIntegerField.IntegerFromField.class).setValue((Integer) values.get(0));
           }
-          if (values[1] instanceof Integer) {
-            getFieldByClass(BetweenIntegerField.IntegerToField.class).setValue((Integer) values[1]);
+          if (values.get(1) instanceof Integer) {
+            getFieldByClass(BetweenIntegerField.IntegerToField.class).setValue((Integer) values.get(1));
           }
         }
       }
@@ -1142,22 +1150,20 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public Object[] getValues() {
+    public List<Object> getValues() {
       Object a = getFieldByClass(BetweenIntegerField.IntegerFromField.class).getValue();
       Object b = getFieldByClass(BetweenIntegerField.IntegerToField.class).getValue();
-      if (a != null || b != null) {
-        return new Object[]{a, b};
-      }
-      else {
+      if (a == null && b == null) {
         return null;
       }
+      return CollectionUtility.arrayList(a, b);
     }
 
     @Override
-    public String[] getTexts() {
+    public List<String> getTexts() {
       String a = getFieldByClass(BetweenIntegerField.IntegerFromField.class).getDisplayText();
       String b = getFieldByClass(BetweenIntegerField.IntegerToField.class).getDisplayText();
-      return new String[]{a, b};
+      return CollectionUtility.arrayList(a, b);
     }
   }
 
@@ -1187,16 +1193,16 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, Object[] values) {
+    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, List values) {
       try {
         getFieldByClass(BetweenLongField.LongFromField.class).setValue(null);
         getFieldByClass(BetweenLongField.LongToField.class).setValue(null);
-        if (values != null && values.length == 2) {
-          if (values[0] instanceof Long) {
-            getFieldByClass(BetweenLongField.LongFromField.class).setValue((Long) values[0]);
+        if (values != null && values.size() == 2) {
+          if (values.get(0) instanceof Long) {
+            getFieldByClass(BetweenLongField.LongFromField.class).setValue((Long) values.get(0));
           }
-          if (values[1] instanceof Long) {
-            getFieldByClass(BetweenLongField.LongToField.class).setValue((Long) values[1]);
+          if (values.get(1) instanceof Long) {
+            getFieldByClass(BetweenLongField.LongToField.class).setValue((Long) values.get(1));
           }
         }
       }
@@ -1212,22 +1218,20 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public Object[] getValues() {
+    public List<Object> getValues() {
       Object a = getFieldByClass(BetweenLongField.LongFromField.class).getValue();
       Object b = getFieldByClass(BetweenLongField.LongToField.class).getValue();
-      if (a != null || b != null) {
-        return new Object[]{a, b};
-      }
-      else {
+      if (a == null && b == null) {
         return null;
       }
+      return CollectionUtility.arrayList(a, b);
     }
 
     @Override
-    public String[] getTexts() {
+    public List<String> getTexts() {
       String a = getFieldByClass(BetweenLongField.LongFromField.class).getDisplayText();
       String b = getFieldByClass(BetweenLongField.LongToField.class).getDisplayText();
-      return new String[]{a, b};
+      return CollectionUtility.arrayList(a, b);
     }
   }
 
@@ -1257,16 +1261,16 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, Object[] values) {
+    public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, List values) {
       try {
         getFieldByClass(BetweenDoubleField.DoubleFromField.class).setValue(null);
         getFieldByClass(BetweenDoubleField.DoubleToField.class).setValue(null);
-        if (values != null && values.length == 2) {
-          if (values[0] instanceof Double) {
-            getFieldByClass(BetweenDoubleField.DoubleFromField.class).setValue((Double) values[0]);
+        if (values != null && values.size() == 2) {
+          if (values.get(0) instanceof Double) {
+            getFieldByClass(BetweenDoubleField.DoubleFromField.class).setValue((Double) values.get(0));
           }
-          if (values[1] instanceof Double) {
-            getFieldByClass(BetweenDoubleField.DoubleToField.class).setValue((Double) values[1]);
+          if (values.get(1) instanceof Double) {
+            getFieldByClass(BetweenDoubleField.DoubleToField.class).setValue((Double) values.get(1));
           }
         }
       }
@@ -1282,22 +1286,20 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
-    public Object[] getValues() {
+    public List<Object> getValues() {
       Object a = getFieldByClass(BetweenDoubleField.DoubleFromField.class).getValue();
       Object b = getFieldByClass(BetweenDoubleField.DoubleToField.class).getValue();
-      if (a != null || b != null) {
-        return new Object[]{a, b};
-      }
-      else {
+      if (a == null && b == null) {
         return null;
       }
+      return CollectionUtility.arrayList(a, b);
     }
 
     @Override
-    public String[] getTexts() {
+    public List<String> getTexts() {
       String a = getFieldByClass(BetweenDoubleField.DoubleFromField.class).getDisplayText();
       String b = getFieldByClass(BetweenDoubleField.DoubleToField.class).getDisplayText();
-      return new String[]{a, b};
+      return CollectionUtility.arrayList(a, b);
     }
   }
 

@@ -11,14 +11,13 @@
 package org.eclipse.scout.rt.client.ui.form.fields.composer.entity;
 
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.shared.data.model.AbstractDataModelEntity;
 
 /**
- * @deprecated use {@link AbstractDataModelEntity}
+ * @deprecated use {@link AbstractDataModelEntity}. Will be removed in the 5.0 Release.
  */
 @Deprecated
 @SuppressWarnings("deprecation")
@@ -37,7 +36,6 @@ public abstract class AbstractComposerEntity extends AbstractDataModelEntity imp
   @Deprecated
   @ConfigProperty(ConfigProperty.STRING)
   @Order(30)
-  @ConfigPropertyValue("null")
   protected String getConfiguredId() {
     return null;
   }
@@ -64,7 +62,7 @@ public abstract class AbstractComposerEntity extends AbstractDataModelEntity imp
   }
 
   /**
-   * @deprecated processing logic belongs to server
+   * @deprecated processing logic belongs to server. Will be removed in the 5.0 Release.
    */
   @Deprecated
   protected String getConfiguredStatement() {
@@ -72,7 +70,7 @@ public abstract class AbstractComposerEntity extends AbstractDataModelEntity imp
   }
 
   /**
-   * @deprecated processing logic belongs to server
+   * @deprecated processing logic belongs to server. Will be removed in the 5.0 Release.
    */
   @Deprecated
   public String getLegacyStatement() {

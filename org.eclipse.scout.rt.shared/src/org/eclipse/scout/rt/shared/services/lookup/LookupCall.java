@@ -11,13 +11,17 @@
 package org.eclipse.scout.rt.shared.services.lookup;
 
 import java.io.Serializable;
+import java.util.List;
 
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
+import org.eclipse.scout.commons.CollectionUtility;
+import org.eclipse.scout.commons.ConfigurationUtility;
+import org.eclipse.scout.commons.ITypeWithClassId;
 import org.eclipse.scout.commons.TriState;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.job.JobEx;
@@ -34,8 +38,7 @@ import org.eclipse.scout.service.SERVICES;
  * <p>
  * When using (a) the configured property getConfiguredService is non-null <br>
  * When using (b) the method execCreateLookupRows() is non-empty. The subclass CodeLookupCall is implementing this
- * method <br>
- * by using data from a code type (enum).
+ * method by using data from a code type (enum).
  * <p>
  * The following three examples illustrate these cases
  * <p>
@@ -55,18 +58,18 @@ import org.eclipse.scout.service.SERVICES;
  * LookupCall: subclass of LocalLookupCall() with implementation of method
  * {@link LocalLookupCall#execCreateLookupRows()}
  */
-public class LookupCall implements Cloneable, Serializable {
+public class LookupCall<KEY_TYPE> implements ILookupCall<KEY_TYPE>, Cloneable, Serializable, ITypeWithClassId {
   private static final long serialVersionUID = 0L;
 
-  private Object m_key;
+  private KEY_TYPE m_key;
   @MaxLength(2000)
   private String m_text;
   private String m_all;
-  private Object m_rec;
+  private KEY_TYPE m_rec;
   private Object m_master;
   private TriState m_active;
   private int m_maxRowCount;
-  private transient ILookupService m_serviceCached;
+  private transient ILookupService<KEY_TYPE> m_serviceCached;
 
   public LookupCall() {
     m_serviceCached = createLookupService();
@@ -81,9 +84,8 @@ public class LookupCall implements Cloneable, Serializable {
    * Configurator is implementing this method
    */
   @ConfigProperty(ConfigProperty.LOOKUP_SERVICE)
-  @ConfigPropertyValue("null")
   @Order(10)
-  protected Class<? extends ILookupService> getConfiguredService() {
+  protected Class<? extends ILookupService<KEY_TYPE>> getConfiguredService() {
     return null;
   }
 
@@ -91,28 +93,34 @@ public class LookupCall implements Cloneable, Serializable {
    * @return true if a master value is required for lookups by {@link #getDataByText()} and {@link #getDataByAll()}
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
-  @ConfigPropertyValue("false")
   @Order(20)
   protected boolean getConfiguredMasterRequired() {
     return false;
   }
 
-  @ConfigProperty(ConfigProperty.DOC)
+  /**
+   * @deprecated: Use a {@link ClassId} annotation as key for Doc-Text. Will be removed in the 5.0 Release.
+   */
+  @Deprecated
   @Order(30)
-  @ConfigPropertyValue("null")
   protected String getConfiguredDoc() {
     return null;
   }
 
-  public ILookupService getLookupService() {
+  @Override
+  public String classId() {
+    return ConfigurationUtility.getAnnotatedClassIdWithFallback(getClass());
+  }
+
+  public ILookupService<KEY_TYPE> getLookupService() {
     if (m_serviceCached == null) {
       m_serviceCached = createLookupService();
     }
     return m_serviceCached;
   }
 
-  private ILookupService createLookupService() {
-    ILookupService s = null;
+  protected ILookupService<KEY_TYPE> createLookupService() {
+    ILookupService<KEY_TYPE> s = null;
     if (getConfiguredService() != null) {
       s = SERVICES.getService(getConfiguredService());
       if (s == null) {
@@ -122,7 +130,8 @@ public class LookupCall implements Cloneable, Serializable {
     return s;
   }
 
-  public Object getKey() {
+  @Override
+  public KEY_TYPE getKey() {
     return m_key;
   }
 
@@ -136,27 +145,33 @@ public class LookupCall implements Cloneable, Serializable {
     }
   }
 
-  public void setKey(Object key) {
+  @Override
+  public void setKey(KEY_TYPE key) {
     m_key = key;
   }
 
+  @Override
   public String getText() {
     return m_text;
   }
 
+  @Override
   public void setText(String s) {
     m_text = s;
   }
 
+  @Override
   public String getAll() {
     return m_all;
   }
 
+  @Override
   public void setAll(String s) {
     m_all = s;
   }
 
-  public Object getRec() {
+  @Override
+  public KEY_TYPE getRec() {
     return m_rec;
   }
 
@@ -170,7 +185,8 @@ public class LookupCall implements Cloneable, Serializable {
     }
   }
 
-  public void setRec(Object parent) {
+  @Override
+  public void setRec(KEY_TYPE parent) {
     m_rec = parent;
   }
 
@@ -179,6 +195,7 @@ public class LookupCall implements Cloneable, Serializable {
    *         should be fetched and {@link TriState#UNDEFINED} if active and inactive rows should be
    *         fetched
    */
+  @Override
   public TriState getActive() {
     return m_active;
   }
@@ -186,6 +203,7 @@ public class LookupCall implements Cloneable, Serializable {
   /**
    * see {@link #getActive()}
    */
+  @Override
   public void setActive(TriState s) {
     if (s == null) {
       s = TriState.UNDEFINED;
@@ -193,6 +211,7 @@ public class LookupCall implements Cloneable, Serializable {
     m_active = s;
   }
 
+  @Override
   public Object getMaster() {
     return m_master;
   }
@@ -207,14 +226,17 @@ public class LookupCall implements Cloneable, Serializable {
     }
   }
 
+  @Override
   public void setMaster(Object master) {
     m_master = master;
   }
 
+  @Override
   public int getMaxRowCount() {
     return m_maxRowCount;
   }
 
+  @Override
   public void setMaxRowCount(int n) {
     m_maxRowCount = n;
   }
@@ -279,14 +301,12 @@ public class LookupCall implements Cloneable, Serializable {
    * <p>
    * When getConfiguredService is set then delegate call to service, otherwise returns an empty array
    */
-  public LookupRow[] getDataByKey() throws ProcessingException {
-    if (getKey() == null) {
-      return LookupRow.EMPTY_ARRAY;
-    }
-    if (getLookupService() != null) {
+  @Override
+  public List<? extends ILookupRow<KEY_TYPE>> getDataByKey() throws ProcessingException {
+    if (getKey() != null && getLookupService() != null) {
       return getLookupService().getDataByKey(this);
     }
-    return LookupRow.EMPTY_ARRAY;
+    return CollectionUtility.emptyArrayList();
   }
 
   /**
@@ -299,14 +319,15 @@ public class LookupCall implements Cloneable, Serializable {
    * 
    * @return the created async job if applicable or null
    */
-  public JobEx getDataByKeyInBackground(final ILookupCallFetcher caller) {
+  @Override
+  public JobEx getDataByKeyInBackground(final ILookupCallFetcher<KEY_TYPE> caller) {
     if (!(LookupCall.this instanceof LocalLookupCall)) {
       JobEx job = createAsyncJob(getClass().getSimpleName() + ".getDataByKeyInBackground",
           new IJobRunnable() {
             @Override
             public IStatus run(IProgressMonitor monitor) {
               try {
-                LookupRow[] rows = getDataByKey();
+                List<? extends ILookupRow<KEY_TYPE>> rows = getDataByKey();
                 if (!JobEx.isCurrentJobCanceled()) {
                   caller.dataFetched(rows, null);
                 }
@@ -339,13 +360,14 @@ public class LookupCall implements Cloneable, Serializable {
    * <p>
    * When getConfiguredService is set then delegate call to service, otherwise return null
    */
-  public LookupRow[] getDataByText() throws ProcessingException {
+  @Override
+  public List<? extends ILookupRow<KEY_TYPE>> getDataByText() throws ProcessingException {
     boolean masterValid = ((!getConfiguredMasterRequired()) || getMaster() != null);
     if (masterValid && getLookupService() != null) {
       return getLookupService().getDataByText(this);
     }
     else {
-      return LookupRow.EMPTY_ARRAY;
+      return CollectionUtility.emptyArrayList();
     }
   }
 
@@ -359,13 +381,14 @@ public class LookupCall implements Cloneable, Serializable {
    * 
    * @return the created async job if applicable or null
    */
-  public JobEx getDataByTextInBackground(final ILookupCallFetcher caller) {
+  @Override
+  public JobEx getDataByTextInBackground(final ILookupCallFetcher<KEY_TYPE> caller) {
     if (!(LookupCall.this instanceof LocalLookupCall)) {
       JobEx job = createAsyncJob(getClass().getSimpleName() + ".getDataByTextInBackground", new IJobRunnable() {
         @Override
         public IStatus run(IProgressMonitor monitor) {
           try {
-            LookupRow[] rows = getDataByText();
+            List<? extends ILookupRow<KEY_TYPE>> rows = getDataByText();
             if (!JobEx.isCurrentJobCanceled()) {
               caller.dataFetched(rows, null);
             }
@@ -398,13 +421,14 @@ public class LookupCall implements Cloneable, Serializable {
    * <p>
    * When getConfiguredService is set then delegate call to service, otherwise return null
    */
-  public LookupRow[] getDataByAll() throws ProcessingException {
+  @Override
+  public List<? extends ILookupRow<KEY_TYPE>> getDataByAll() throws ProcessingException {
     boolean masterValid = ((!getConfiguredMasterRequired()) || getMaster() != null);
     if (masterValid && getLookupService() != null) {
       return getLookupService().getDataByAll(this);
     }
     else {
-      return LookupRow.EMPTY_ARRAY;
+      return CollectionUtility.emptyArrayList();
     }
   }
 
@@ -418,14 +442,15 @@ public class LookupCall implements Cloneable, Serializable {
    * 
    * @return the created async job if applicable or null
    */
-  public JobEx getDataByAllInBackground(final ILookupCallFetcher caller) {
+  @Override
+  public JobEx getDataByAllInBackground(final ILookupCallFetcher<KEY_TYPE> caller) {
     if (!(LookupCall.this instanceof LocalLookupCall)) {
       JobEx job = createAsyncJob(getClass().getSimpleName() + ".getDataByAllInBackground",
           new IJobRunnable() {
             @Override
             public IStatus run(IProgressMonitor monitor) {
               try {
-                LookupRow[] rows = getDataByAll();
+                List<? extends ILookupRow<KEY_TYPE>> rows = getDataByAll();
                 if (!JobEx.isCurrentJobCanceled()) {
                   caller.dataFetched(rows, null);
                 }
@@ -458,12 +483,13 @@ public class LookupCall implements Cloneable, Serializable {
    * <p>
    * When getConfiguredService is set then delegate call to service, otherwise return null
    */
-  public LookupRow[] getDataByRec() throws ProcessingException {
+  @Override
+  public List<? extends ILookupRow<KEY_TYPE>> getDataByRec() throws ProcessingException {
     if (getLookupService() != null) {
       return getLookupService().getDataByRec(this);
     }
     else {
-      return LookupRow.EMPTY_ARRAY;
+      return CollectionUtility.emptyArrayList();
     }
   }
 
@@ -477,14 +503,15 @@ public class LookupCall implements Cloneable, Serializable {
    * 
    * @return the created async job if applicable or null
    */
-  public JobEx getDataByRecInBackground(final ILookupCallFetcher caller) {
+  @Override
+  public JobEx getDataByRecInBackground(final ILookupCallFetcher<KEY_TYPE> caller) {
     if (!(LookupCall.this instanceof LocalLookupCall)) {
       JobEx job = createAsyncJob(getClass().getSimpleName() + ".getDataByRecInBackground",
           new IJobRunnable() {
             @Override
             public IStatus run(IProgressMonitor monitor) {
               try {
-                LookupRow[] rows = getDataByRec();
+                List<? extends ILookupRow<KEY_TYPE>> rows = getDataByRec();
                 if (!JobEx.isCurrentJobCanceled()) {
                   caller.dataFetched(rows, null);
                 }

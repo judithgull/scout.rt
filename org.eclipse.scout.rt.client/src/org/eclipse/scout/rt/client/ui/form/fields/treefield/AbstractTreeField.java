@@ -12,11 +12,14 @@ package org.eclipse.scout.rt.client.ui.form.fields.treefield;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.util.Collection;
+import java.util.List;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.ConfigurationUtility;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
@@ -32,13 +35,12 @@ import org.eclipse.scout.rt.client.ui.form.fields.AbstractFormField;
 import org.eclipse.scout.rt.shared.data.form.fields.AbstractFormFieldData;
 import org.eclipse.scout.rt.shared.data.form.fields.treefield.AbstractTreeFieldData;
 import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
-import org.eclipse.scout.rt.shared.services.lookup.LookupCall;
 import org.eclipse.scout.service.SERVICES;
 
+@ClassId("bfbf00d0-b70a-48d4-8481-4faff294f37f")
 public abstract class AbstractTreeField extends AbstractFormField implements ITreeField {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractTreeField.class);
 
-  private LookupCall m_lookupCall;
   private ITree m_tree;
   private boolean m_treeExternallyManaged;
   private boolean m_autoExpandAll;
@@ -57,14 +59,12 @@ public abstract class AbstractTreeField extends AbstractFormField implements ITr
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(190)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredAutoLoad() {
     return true;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(200)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredAutoExpandAll() {
     return false;
   }
@@ -74,7 +74,7 @@ public abstract class AbstractTreeField extends AbstractFormField implements ITr
    */
   @ConfigOperation
   @Order(190)
-  protected void execSave(ITreeNode[] insertedNodes, ITreeNode[] updatedNodes, ITreeNode[] deletedNodes) {
+  protected void execSave(Collection<? extends ITreeNode> insertedNodes, Collection<? extends ITreeNode> updatedNodes, Collection<? extends ITreeNode> deletedNodes) {
   }
 
   /**
@@ -117,9 +117,9 @@ public abstract class AbstractTreeField extends AbstractFormField implements ITr
 
   private Class<? extends ITree> getConfiguredTree() {
     Class[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
-    Class<? extends ITree>[] f = ConfigurationUtility.filterClasses(dca, ITree.class);
-    if (f.length == 1) {
-      return f[0];
+    List<Class<ITree>> f = ConfigurationUtility.filterClasses(dca, ITree.class);
+    if (f.size() == 1) {
+      return CollectionUtility.firstElement(f);
     }
     else {
       for (Class<? extends ITree> c : f) {
@@ -150,7 +150,7 @@ public abstract class AbstractTreeField extends AbstractFormField implements ITr
         setTreeInternal(ConfigurationUtility.newInnerInstance(this, getConfiguredTree()));
       }
       catch (Exception e) {
-        LOG.warn(null, e);
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + getConfiguredTree().getName() + "'.", e));
       }
     }
     // local enabled listener
@@ -371,27 +371,22 @@ public abstract class AbstractTreeField extends AbstractFormField implements ITr
         // 1. batch
         execSave(m_tree.getInsertedNodes(), m_tree.getUpdatedNodes(), m_tree.getDeletedNodes());
         // 2. per node
-        ITreeNode[] insertedNodes = m_tree.getInsertedNodes();
-        ITreeNode[] updatedNodes = m_tree.getUpdatedNodes();
-        ITreeNode[] deletedNodes = m_tree.getDeletedNodes();
         // deleted nodes
-        for (int i = 0; i < deletedNodes.length; i++) {
-          execSaveDeletedNode(deletedNodes[i]);
+        for (ITreeNode iTreeNode : m_tree.getDeletedNodes()) {
+          execSaveDeletedNode(iTreeNode);
         }
         m_tree.clearDeletedNodes();
         // inserted nodes
-        for (int i = 0; i < insertedNodes.length; i++) {
-          ITreeNode node = insertedNodes[i];
-          execSaveInsertedNode(node);
-          node.setStatusInternal(ITreeNode.STATUS_NON_CHANGED);
-          m_tree.updateNode(node);
+        for (ITreeNode insertedNode : m_tree.getInsertedNodes()) {
+          execSaveInsertedNode(insertedNode);
+          insertedNode.setStatusInternal(ITreeNode.STATUS_NON_CHANGED);
+          m_tree.updateNode(insertedNode);
         }
         // updated rows
-        for (int i = 0; i < updatedNodes.length; i++) {
-          ITreeNode node = insertedNodes[i];
-          execSaveUpdatedNode(node);
-          node.setStatusInternal(ITreeNode.STATUS_NON_CHANGED);
-          m_tree.updateNode(node);
+        for (ITreeNode updatedNode : m_tree.getUpdatedNodes()) {
+          execSaveUpdatedNode(updatedNode);
+          updatedNode.setStatusInternal(ITreeNode.STATUS_NON_CHANGED);
+          m_tree.updateNode(updatedNode);
         }
       }
       finally {

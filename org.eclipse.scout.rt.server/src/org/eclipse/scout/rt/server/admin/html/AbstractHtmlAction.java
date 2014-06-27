@@ -4,17 +4,21 @@
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- * 
+ *
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
 package org.eclipse.scout.rt.server.admin.html;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
-public abstract class AbstractHtmlAction implements Runnable {
-  private HashMap<String, String> m_formParameters = new HashMap<String, String>();
+import org.eclipse.scout.commons.CollectionUtility;
+
+public abstract class AbstractHtmlAction implements Runnable, Serializable {
+  private static final long serialVersionUID = -1352934517273013173L;
+  private Map<String, String> m_formParameters = new HashMap<String, String>();
   private String m_plainText;
   private String m_htmlText;
   private Throwable m_exception;
@@ -30,7 +34,7 @@ public abstract class AbstractHtmlAction implements Runnable {
   }
 
   public void setFormParameters(Map<String, String> m) {
-    m_formParameters = new HashMap<String, String>(m);
+    m_formParameters = CollectionUtility.copyMap(m);
   }
 
   public Map getFormParameters() {

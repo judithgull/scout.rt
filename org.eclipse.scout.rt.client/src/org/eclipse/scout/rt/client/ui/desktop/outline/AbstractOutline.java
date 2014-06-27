@@ -14,19 +14,28 @@ import java.security.Permission;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 
+import org.eclipse.scout.commons.CollectionUtility;
+import org.eclipse.scout.commons.ConfigurationUtility;
 import org.eclipse.scout.commons.OptimisticLock;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.dnd.TransferObject;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.holders.Holder;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.ui.action.ActionUtility;
+import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.MenuSeparator;
+import org.eclipse.scout.rt.client.ui.action.menu.TableMenuType;
+import org.eclipse.scout.rt.client.ui.action.menu.TreeMenuType;
 import org.eclipse.scout.rt.client.ui.basic.table.ITable;
 import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
+import org.eclipse.scout.rt.client.ui.basic.table.internal.TablePageTreeMenuWrapper;
 import org.eclipse.scout.rt.client.ui.basic.tree.AbstractTree;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNodeFilter;
@@ -54,6 +63,9 @@ public abstract class AbstractOutline extends AbstractTree implements IOutline {
   private OptimisticLock m_contextPageOptimisticLock;
   private OutlineMediator m_outlineMediator;
 
+//  // internal usage of menus temporarily added to the tree.
+  private List<IMenu> m_inheritedMenusOfPage;
+
   public AbstractOutline() {
     super();
   }
@@ -75,7 +87,6 @@ public abstract class AbstractOutline extends AbstractTree implements IOutline {
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(80)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredEnabled() {
     return true;
   }
@@ -89,26 +100,8 @@ public abstract class AbstractOutline extends AbstractTree implements IOutline {
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(90)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredVisible() {
     return true;
-  }
-
-  /**
-   * This method is no longer used and has no effect.
-   * <p>
-   * Use {@link Order} annotations to define the sort ordering of the outlines on the desktop instead.
-   * <p>
-   * Subclasses can override this method. Default is 0. Will be removed in Release 3.10.
-   * 
-   * @return the sort order of this outline.
-   */
-  @ConfigProperty(ConfigProperty.INTEGER)
-  @Order(100)
-  @ConfigPropertyValue("0")
-  @Deprecated
-  protected int getConfiguredSortNo() {
-    return 0;
   }
 
   /**
@@ -117,11 +110,11 @@ public abstract class AbstractOutline extends AbstractTree implements IOutline {
    * <p>
    * Subclasses can override this method. Default is {@code null}.
    * 
+   * @deprecated: Use a {@link ClassId} annotation as key for Doc-Text. Will be removed in the 5.0 Release.
    * @return a documentation text, suitable to be included in external documents
    */
-  @ConfigProperty(ConfigProperty.DOC)
+  @Deprecated
   @Order(110)
-  @ConfigPropertyValue("null")
   protected String getConfiguredDoc() {
     return null;
   }
@@ -185,10 +178,24 @@ public abstract class AbstractOutline extends AbstractTree implements IOutline {
   }
 
   @Override
-  public void refreshPages(final Class... pageTypes) {
-    final ArrayList<IPage> candidates = new ArrayList<IPage>();
+  @SuppressWarnings("unchecked")
+  public void refreshPages(Class<?>... pageTypes) {
+    if (pageTypes == null || pageTypes.length < 1) {
+      return;
+    }
+    List<Class<? extends IPage>> list = new ArrayList<Class<? extends IPage>>(pageTypes.length);
+    for (Class<?> c : pageTypes) {
+      if (IPage.class.isAssignableFrom(c)) {
+        list.add((Class<? extends IPage>) c);
+      }
+    }
+    refreshPages(list);
+  }
+
+  @Override
+  public void refreshPages(final List<Class<? extends IPage>> pageTypes) {
+    final List<IPage> candidates = new ArrayList<IPage>();
     ITreeVisitor v = new ITreeVisitor() {
-      @SuppressWarnings("unchecked")
       @Override
       public boolean visit(ITreeNode node) {
         IPage page = (IPage) node;
@@ -249,9 +256,9 @@ public abstract class AbstractOutline extends AbstractTree implements IOutline {
         if (selectedPage == null) {
           try {
             getRootNode().ensureChildrenLoaded();
-            ITreeNode[] children = getRootNode().getFilteredChildNodes();
-            if (children.length > 0) {
-              selectNode(children[0]);
+            List<ITreeNode> children = getRootNode().getFilteredChildNodes();
+            if (CollectionUtility.hasElements(children)) {
+              selectNode(CollectionUtility.firstElement(children));
             }
           }
           catch (ProcessingException e) {
@@ -408,15 +415,65 @@ public abstract class AbstractOutline extends AbstractTree implements IOutline {
     if (activePage != null && m_contextPage != activePage) {
       m_contextPage = activePage;
       activePage.pageActivatedNotify();
+      addMenusOfActivePageToContextMenu(activePage);
     }
+  }
+
+  protected void addMenusOfActivePageToContextMenu(IPage activePage) {
+    List<IMenu> wrappedMenus = new ArrayList<IMenu>();
+
+    if (activePage instanceof IPageWithTable<?>) {
+      // in case of a page with table the empty space actions of the table will be added to the context menu of the tree.
+      IPageWithTable<?> pageWithTable = (IPageWithTable<?>) activePage;
+      if (pageWithTable.isShowEmptySpaceMenus()) {
+        ITable table = pageWithTable.getTable();
+        List<IMenu> emptySpaceMenus = ActionUtility.getActions(table.getMenus(),
+            ActionUtility.createMenuFilterMenuTypes(TableMenuType.EmptySpace));
+        if (emptySpaceMenus.size() > 0) {
+          wrappedMenus.add(new MenuSeparator());
+          for (IMenu menu : emptySpaceMenus) {
+            wrappedMenus.add(new TablePageTreeMenuWrapper(menu, TreeMenuType.SingleSelection));
+          }
+        }
+      }
+    }
+
+    // in case of a page with nodes add the single selection menus of its parent table for the current node/row.
+    IPage parentPage = activePage.getParentPage();
+    if (parentPage instanceof IPageWithTable<?>) {
+      IPageWithTable<?> pageWithTable = (IPageWithTable<?>) parentPage;
+      ITableRow row = pageWithTable.getTableRowFor(activePage);
+      ITable table = pageWithTable.getTable();
+      if (row != null) {
+        table.getUIFacade().setSelectedRowsFromUI(CollectionUtility.arrayList(row));
+        List<IMenu> menus = ActionUtility.getActions(table.getContextMenu().getChildActions(), ActionUtility.createMenuFilterMenuTypes(TableMenuType.SingleSelection));
+        if (menus.size() > 0) {
+          wrappedMenus.add(new MenuSeparator());
+          for (IMenu menu : menus) {
+            wrappedMenus.add(new TablePageTreeMenuWrapper(menu, TreeMenuType.SingleSelection));
+          }
+        }
+      }
+    }
+    m_inheritedMenusOfPage = wrappedMenus;
+    getContextMenu().addChildActions(m_inheritedMenusOfPage);
   }
 
   @Override
   public void clearContextPage() {
     IPage page = m_contextPage;
     if (page != null) {
+      // remove menus of the active page
+      removeMenusOfActivePageToContextMenu();
       m_contextPage = null;
       page.pageDeactivatedNotify();
+    }
+  }
+
+  protected void removeMenusOfActivePageToContextMenu() {
+    if (m_inheritedMenusOfPage != null) {
+      getContextMenu().removeChildActions(m_inheritedMenusOfPage);
+      m_inheritedMenusOfPage = null;
     }
   }
 
@@ -466,15 +523,6 @@ public abstract class AbstractOutline extends AbstractTree implements IOutline {
           handleActivePageChanged((IPage) e.getDeselectedNode(), (IPage) e.getNewSelectedNode());
           break;
         }
-        case TreeEvent.TYPE_NODE_POPUP: {
-          if (e.getNode() instanceof IPageWithTable<?>) {
-            if (getOutlineMediator() != null) {
-              IPageWithTable<? extends ITable> pageWithTable = (IPageWithTable<?>) e.getNode();
-              getOutlineMediator().fetchTableEmptySpaceMenus(e, pageWithTable);
-            }
-          }
-          break;
-        }
       }
 
       ITreeNode commonParentNode = e.getCommonParentNode();
@@ -510,10 +558,6 @@ public abstract class AbstractOutline extends AbstractTree implements IOutline {
       }
 
       switch (e.getType()) {
-        case TreeEvent.TYPE_NODE_POPUP: {
-          outlineMediator.fetchTableRowMenus(e, pageWithTable);
-          break;
-        }
         case TreeEvent.TYPE_NODE_ACTION: {
           outlineMediator.mediateTreeNodeAction(e, pageWithTable);
           break;
@@ -529,6 +573,15 @@ public abstract class AbstractOutline extends AbstractTree implements IOutline {
       }
 
     }
+  }
+
+  /**
+   * If the class is annotated with {@link ClassId}, the annotation value is returned.<br/>
+   * Otherwise the class name.
+   */
+  @Override
+  public String classId() {
+    return ConfigurationUtility.getAnnotatedClassIdWithFallback(getClass(), false);
   }
 
   private class P_TableFilterBasedTreeNodeFilter implements ITreeNodeFilter {

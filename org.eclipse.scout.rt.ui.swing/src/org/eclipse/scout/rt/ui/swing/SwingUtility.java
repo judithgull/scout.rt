@@ -32,13 +32,8 @@ import java.awt.Toolkit;
 import java.awt.Window;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.FocusEvent;
-import java.awt.event.FocusListener;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
-import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
 import java.lang.reflect.Field;
@@ -54,10 +49,8 @@ import javax.swing.InputMap;
 import javax.swing.InputVerifier;
 import javax.swing.JComponent;
 import javax.swing.JDialog;
-import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JToolTip;
 import javax.swing.JViewport;
@@ -67,9 +60,9 @@ import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.plaf.basic.BasicHTML;
-import javax.swing.text.JTextComponent;
 
 import org.eclipse.core.runtime.Platform;
+import org.eclipse.scout.commons.BundleContextUtility;
 import org.eclipse.scout.commons.CompareUtility;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.dnd.FileListTransferObject;
@@ -84,20 +77,26 @@ import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
 import org.eclipse.scout.rt.shared.ScoutTexts;
 import org.eclipse.scout.rt.shared.data.basic.BoundsSpec;
 import org.eclipse.scout.rt.shared.data.basic.FontSpec;
+import org.eclipse.scout.rt.ui.swing.basic.ColorUtility;
 import org.eclipse.scout.rt.ui.swing.dnd.AwtImageTransferable;
 import org.eclipse.scout.rt.ui.swing.dnd.FileListTransferable;
 import org.eclipse.scout.rt.ui.swing.dnd.JVMLocalObjectTransferable;
 import org.eclipse.scout.rt.ui.swing.dnd.TextTransferable;
+import org.eclipse.scout.rt.ui.swing.form.fields.htmlfield.SwingScoutHtmlField;
+import org.eclipse.scout.rt.ui.swing.form.fields.labelfield.SwingScoutLabelField;
 import org.eclipse.scout.rt.ui.swing.simulator.SimulatorAction;
 import org.eclipse.scout.rt.ui.swing.simulator.SwingScoutSimulator;
 
 public final class SwingUtility {
+
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(SwingUtility.class);
 
   public static final boolean IS_JAVA_7_OR_GREATER = CompareUtility.compareTo(System.getProperty("java.version"), "1.7") >= 0;
   public static final boolean IS_JAVA_7_OR_LESS = CompareUtility.compareTo(System.getProperty("java.version"), "1.7") <= 0;
-  public static final boolean DO_RESET_COMPONENT_BOUNDS = StringUtility.parseBoolean(Activator.getDefault().getBundle().getBundleContext().getProperty("scout.ui.layout.resetBoundsOnInvalidate"), true);
-  public static final boolean VERIFY_INPUT_ON_WINDOW_CLOSED = StringUtility.parseBoolean(Activator.getDefault().getBundle().getBundleContext().getProperty("scout.ui.verifyInputOnWindowClosed"), false);
+  public static final boolean DO_RESET_COMPONENT_BOUNDS = BundleContextUtility.parseBooleanProperty("scout.ui.layout.resetBoundsOnInvalidate", true);
+  public static final boolean VERIFY_INPUT_ON_WINDOW_CLOSED = BundleContextUtility.parseBooleanProperty("scout.ui.verifyInputOnWindowClosed", false);
+
+  private static Integer topMarginForField = null;
 
   private SwingUtility() {
   }
@@ -333,17 +332,12 @@ public final class SwingUtility {
     }
   }
 
+  /**
+   * @deprecated Use {@link ColorUtility#createColor(String)} instead. Will be removed in the 5.0 Release.
+   */
+  @Deprecated
   public static Color createColor(String c) {
-    if (c == null) {
-      return null;
-    }
-    try {
-      return new Color(Integer.parseInt(c, 16));
-    }
-    catch (NumberFormatException nfe) {
-      LOG.warn("invalid color code: " + c, nfe);
-      return null;
-    }
+    return ColorUtility.createColor(c);
   }
 
   public static Font createFont(FontSpec scoutFont) {
@@ -449,7 +443,7 @@ public final class SwingUtility {
       return null;
     }
     if (scoutT instanceof FileListTransferObject) {
-      return new FileListTransferable(((FileListTransferObject) scoutT).getFileList());
+      return new FileListTransferable(((FileListTransferObject) scoutT).getFiles());
     }
     else if (scoutT instanceof TextTransferObject) {
       TextTransferObject textTransferObject = (TextTransferObject) scoutT;
@@ -478,6 +472,13 @@ public final class SwingUtility {
     return null;
   }
 
+  /**
+   * @param scoutTransferTypes
+   *          one of {@link IDNDSupport#TYPE_FILE_TRANSFER}, {@link IDNDSupport#TYPE_IMAGE_TRANSFER},
+   *          {@link IDNDSupport#TYPE_JAVA_ELEMENT_TRANSFER}, {@link IDNDSupport#TYPE_TEXT_TRANSFER}
+   * @param flavors
+   * @return
+   */
   public static boolean isSupportedTransfer(int scoutTransferTypes, DataFlavor[] flavors) {
     if (scoutTransferTypes == 0 || flavors == null) {
       return false;
@@ -778,12 +779,6 @@ public final class SwingUtility {
     comp.getInputMap(JComponent.WHEN_FOCUSED).put(KeyStroke.getKeyStroke("ctrl INSERT"), "copy-to-clipboard");
   }
 
-  public static void installCopyPasteMenu(JTextComponent pane) {
-    CopyPasteMenuSupport menu = new CopyPasteMenuSupport(pane);
-    pane.addMouseListener(menu);
-    pane.addFocusListener(menu);
-  }
-
   public static void installDevelopmentShortcuts(JComponent pane) {
     if (Platform.inDevelopmentMode()) {
       SwingScoutSimulator.getInstance().attach();
@@ -1078,6 +1073,20 @@ public final class SwingUtility {
   }
 
   /**
+   * Adjusts the window such that it fits on the screen, if necessary.
+   * 
+   * @param window
+   */
+  public static void adjustBoundsToScreen(Window window) {
+    Rectangle origBounds = window.getBounds();
+    Rectangle newBounds = SwingUtility.validateRectangleOnScreen(origBounds, false, true);
+    if (!newBounds.equals(origBounds)) {
+      window.setLocation(newBounds.getLocation());
+      window.setSize(newBounds.getSize());
+    }
+  }
+
+  /**
    * @return true if the pixel coordinate is just one pixel left of the
    *         scrollpanes right border. This can be used to avoid double-border
    *         line aliasing effeect where single-lines are needed
@@ -1246,6 +1255,26 @@ public final class SwingUtility {
     return useLafFrameAndDialog;
   }
 
+  /**
+   * This method is used to get a top margin for {@link SwingScoutLabelField} and {@link SwingScoutHtmlField} in order
+   * to have correct alignment for customized look and feel (e.g. Rayo)
+   * 
+   * @since 3.10.0-M2
+   */
+  public static int getTopMarginForField() {
+    if (topMarginForField == null) {
+      String topMarginForFieldProperty = System.getProperty("scout.laf.topMarginForField");
+      if (topMarginForFieldProperty != null) {
+        topMarginForField = Integer.parseInt(topMarginForFieldProperty);
+      }
+      else {
+        topMarginForField = Integer.valueOf(0);
+      }
+    }
+
+    return topMarginForField;
+  }
+
   public static void setDefaultImageIcons(Window window) {
     Icon icon = UIManager.getIcon("Window.icon");
     if (icon instanceof ImageIcon) {
@@ -1273,119 +1302,5 @@ public final class SwingUtility {
       c.setBounds(0, 0, 0, 0);
     }
   }
-
-  private static class CopyPasteMenuSupport extends MouseAdapter implements FocusListener {
-    private JTextComponent m_comp;
-
-    public CopyPasteMenuSupport(JTextComponent comp) {
-      m_comp = comp;
-    }
-
-    @Override
-    public void mousePressed(MouseEvent e) {
-      if (isLocationOnText(e.getPoint())) {
-        if (e.isPopupTrigger()) {
-          if (m_comp.isEnabled() && m_comp.isEditable()) {
-            onSwingPopup(e, true);
-          }
-          else {
-            onSwingPopup(e, false);
-          }
-        }
-      }
-    }
-
-    @Override
-    public void mouseReleased(MouseEvent e) {
-      if (isLocationOnText(e.getPoint())) {
-        if (e.isPopupTrigger()) {
-          if (m_comp.isEnabled() && m_comp.isEditable()) {
-            onSwingPopup(e, true);
-          }
-          else {
-            onSwingPopup(e, false);
-          }
-        }
-      }
-    }
-
-    private boolean isLocationOnText(Point p) {
-      Insets insets = m_comp.getMargin();
-      if (insets == null) {
-        return true;
-      }
-      else {
-        return p.x >= insets.left && p.y >= insets.top && p.x <= m_comp.getWidth() - insets.right && p.y <= m_comp.getHeight() - insets.bottom;
-      }
-    }
-
-    private void onSwingPopup(MouseEvent e, boolean pasteEnabled) {
-      JPopupMenu pop = new JPopupMenu();
-
-      if (pasteEnabled) {
-        JMenuItem cutItem = new JMenuItem(SwingUtility.getNlsText("Cut"));
-        cutItem.setEnabled(StringUtility.hasText(m_comp.getSelectedText()));
-        cutItem.addActionListener(new ActionListener() {
-          @Override
-          public void actionPerformed(ActionEvent event) {
-            m_comp.cut();
-          }
-        });
-        pop.add(cutItem);
-      }
-
-      JMenuItem copyItem = new JMenuItem(SwingUtility.getNlsText("Copy"));
-      if (m_comp.isEnabled() && m_comp.isEditable()) {
-        copyItem.setEnabled(StringUtility.hasText(m_comp.getSelectedText()));
-      }
-      copyItem.addActionListener(new ActionListener() {
-        @Override
-        public void actionPerformed(ActionEvent event) {
-          if (m_comp.isEnabled() && m_comp.isEditable()) {
-            m_comp.copy();
-          }
-          else {
-            //Ticket 86'427: Kopieren - Einfügen
-            boolean hasSelection = StringUtility.hasText(m_comp.getSelectedText());
-            if (hasSelection) {
-              m_comp.copy();
-            }
-            else {
-              m_comp.selectAll();
-              m_comp.copy();
-              m_comp.select(0, 0);
-            }
-          }
-        }
-      });
-      pop.add(copyItem);
-
-      if (pasteEnabled) {
-        JMenuItem pasteItem = new JMenuItem(SwingUtility.getNlsText("Paste"));
-        pasteItem.addActionListener(new ActionListener() {
-          @Override
-          public void actionPerformed(ActionEvent event) {
-            m_comp.paste();
-          }
-        });
-        pop.add(pasteItem);
-      }
-
-      m_comp.requestFocus();
-      m_comp.setComponentPopupMenu(pop);
-      pop.show(m_comp, e.getX(), e.getY());
-    }
-
-    @Override
-    public void focusGained(FocusEvent e) {
-      m_comp.setComponentPopupMenu(null);
-    }
-
-    @Override
-    public void focusLost(FocusEvent e) {
-      m_comp.setComponentPopupMenu(null);
-
-    }
-  }// end class
 
 }

@@ -10,19 +10,19 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.ui.rap.mobile.form.fields.tablefield;
 
-import java.util.Arrays;
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.eclipse.scout.rt.client.mobile.ui.action.ActionButtonBarUtility;
+import org.eclipse.scout.rt.client.ui.action.ActionUtility;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.TableMenuType;
 import org.eclipse.scout.rt.client.ui.basic.table.ITable;
 import org.eclipse.scout.rt.client.ui.basic.table.TableAdapter;
 import org.eclipse.scout.rt.client.ui.basic.table.TableEvent;
-import org.eclipse.scout.rt.client.ui.form.fields.smartfield.ISmartFieldProposalForm;
+import org.eclipse.scout.rt.client.ui.form.fields.smartfield.IContentAssistFieldProposalForm;
 import org.eclipse.scout.rt.client.ui.form.fields.tablefield.ITableField;
 import org.eclipse.scout.rt.ui.rap.LogicalGridData;
-import org.eclipse.scout.rt.ui.rap.RwtMenuUtility;
 import org.eclipse.scout.rt.ui.rap.form.fields.LogicalGridDataBuilder;
 import org.eclipse.scout.rt.ui.rap.mobile.action.AbstractRwtScoutActionBar;
 import org.eclipse.swt.SWT;
@@ -66,7 +66,7 @@ public class RwtScoutTableActionBar extends AbstractRwtScoutActionBar<ITableFiel
 
   @Override
   protected String getActionBarContainerVariant() {
-    if (getScoutObject().getForm() instanceof ISmartFieldProposalForm) {
+    if (getScoutObject().getForm() instanceof IContentAssistFieldProposalForm) {
       return VARIANT_SMART_FIELD_ACTION_BAR;
     }
 
@@ -80,20 +80,18 @@ public class RwtScoutTableActionBar extends AbstractRwtScoutActionBar<ITableFiel
       return;
     }
 
-    IMenu[] emptySpaceMenus = RwtMenuUtility.collectEmptySpaceMenus(table, getUiEnvironment());
+    List<IMenu> emptySpaceMenus = ActionUtility.getActions(table.getMenus(), ActionUtility.createMenuFilterVisibleAndMenuTypes(TableMenuType.EmptySpace));
     if (emptySpaceMenus != null) {
-      menuList.addAll(Arrays.asList(emptySpaceMenus));
+      menuList.addAll(emptySpaceMenus);
     }
 
     if (table.getSelectedRowCount() > 0) {
-      IMenu[] rowMenus = RwtMenuUtility.collectRowMenus(table, getUiEnvironment());
+      List<IMenu> rowMenus = ActionUtility.getActions(table.getMenus(), table.getContextMenu().getActiveFilter());
       if (rowMenus != null) {
-        List<IMenu> rowMenuList = new LinkedList<IMenu>(Arrays.asList(rowMenus));
-
-        ActionButtonBarUtility.distributeRowActions(menuList, emptySpaceMenus, rowMenuList);
-
+        List<IMenu> editableRowMenus = new ArrayList<IMenu>(rowMenus);
+        ActionButtonBarUtility.distributeRowActions(menuList, emptySpaceMenus, editableRowMenus);
         //Add remaining row menus
-        menuList.addAll(rowMenuList);
+        menuList.addAll(editableRowMenus);
       }
     }
   }

@@ -10,9 +10,12 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.form.fields.imagebox;
 
+import java.util.List;
+
 import org.eclipse.scout.rt.client.ui.IDNDSupport;
 import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.root.IContextMenu;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.shared.data.basic.AffineTransformSpec;
 import org.eclipse.scout.rt.shared.data.basic.BoundsSpec;
@@ -38,7 +41,14 @@ public interface IImageField extends IFormField, IDNDSupport {
   String PROP_IMAGE_TRANSFORM = "imageTransform";
   String PROP_ANALYSIS_RECTANGLE = "analysisRectangle";
   String PROP_AUTO_FIT = "autoFit";
+
+  /**
+   * @deprecated Will be removed in 5.0 release. This property never had any effect and can safely be removed without
+   *             replacement.
+   */
+  @Deprecated
   String PROP_FOCUS_VISIBLE = "focusVisible";
+
   String PROP_SCROLL_BAR_ENABLED = "scrollBarEnabled";
 
   String getImageId();
@@ -51,10 +61,8 @@ public interface IImageField extends IFormField, IDNDSupport {
 
   byte[] getByteArrayValue();
 
-  IMenu[] getMenus();
-
   @Override
-  IKeyStroke[] getKeyStrokes();
+  List<IKeyStroke> getKeyStrokes();
 
   boolean isAutoFit();
 
@@ -70,8 +78,18 @@ public interface IImageField extends IFormField, IDNDSupport {
 
   void setImageTransform(AffineTransformSpec t);
 
+  /**
+   * @deprecated Will be removed in 5.0 release. This property never had any effect and can safely be removed without
+   *             replacement.
+   */
+  @Deprecated
   boolean isFocusVisible();
 
+  /**
+   * @deprecated Will be removed in 5.0 release. This property never had any effect and can safely be removed without
+   *             replacement.
+   */
+  @Deprecated
   void setFocusVisible(boolean b);
 
   void addImageFieldListener(ImageFieldListener listener);
@@ -119,4 +137,14 @@ public interface IImageField extends IFormField, IDNDSupport {
   boolean isScrollBarEnabled();
 
   void setScrollBarEnabled(boolean b);
+
+  /**
+   * @return
+   */
+  List<IMenu> getMenus();
+
+  /**
+   * @return
+   */
+  IContextMenu getContextMenu();
 }

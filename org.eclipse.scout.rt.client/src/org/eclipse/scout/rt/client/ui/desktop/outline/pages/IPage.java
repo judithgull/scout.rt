@@ -10,6 +10,9 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.desktop.outline.pages;
 
+import java.util.List;
+
+import org.eclipse.scout.commons.ITypeWithClassId;
 import org.eclipse.scout.commons.exception.IProcessingStatus;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
@@ -31,15 +34,9 @@ import org.eclipse.scout.rt.client.ui.form.fields.tablefield.ITableField;
  * {@link IPageWithTable} In the outline, it is possible to drill down the content of the node (except if the page is
  * configured as a leaf)
  */
-public abstract interface IPage extends ITreeNode {
+public interface IPage extends ITreeNode, ITypeWithClassId {
 
   void initPage() throws ProcessingException;
-
-  /**
-   * @deprecated use {@link #getUserPreferenceContext()} instead. Will be removed in Release 3.10.
-   */
-  @Deprecated
-  String getBookmarkIdentifier();
 
   /**
    * This method is used to override the bookmark identifier used for this page
@@ -82,13 +79,13 @@ public abstract interface IPage extends ITreeNode {
 
   /**
    * @return all child pages
-   *         Note that this is <b>not</b> exactly the same as (IPage[])getChildNodes().
+   *         Note that this is <b>not</b> exactly the same as (IPage)getChildNodes().
    *         see {@link VirtualPage} for more details.
    *         <p>
    *         Note: Calling this method effectively creates all child page objects and may be expensive on pages with
    *         many child pages.
    */
-  IPage[] getChildPages();
+  List<IPage> getChildPages();
 
   /**
    * Convenience for (IPage)getParentNode()
@@ -132,4 +129,14 @@ public abstract interface IPage extends ITreeNode {
   void pageActivatedNotify();
 
   void pageDeactivatedNotify();
+
+  /**
+   * Adapter pattern. A page may contribute adapters when asked for a given adapter class. This way, functionality can
+   * be added to {@link IPage} without changing its lean interface
+   * 
+   * @param clazz
+   *          the adapter interface class, usually something like IXxxAdapter
+   * @return the contributed adapter instance or <code>null</code>
+   */
+  <T> T getAdapter(Class<T> clazz);
 }

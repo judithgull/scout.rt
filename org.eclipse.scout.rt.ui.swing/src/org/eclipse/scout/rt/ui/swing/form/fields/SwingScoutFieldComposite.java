@@ -13,8 +13,10 @@ package org.eclipse.scout.rt.ui.swing.form.fields;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Font;
+import java.util.List;
 
 import javax.swing.ActionMap;
+import javax.swing.BorderFactory;
 import javax.swing.InputMap;
 import javax.swing.JComponent;
 import javax.swing.KeyStroke;
@@ -30,6 +32,7 @@ import org.eclipse.scout.rt.shared.data.basic.FontSpec;
 import org.eclipse.scout.rt.ui.swing.LogicalGridData;
 import org.eclipse.scout.rt.ui.swing.SwingUtility;
 import org.eclipse.scout.rt.ui.swing.action.SwingScoutAction;
+import org.eclipse.scout.rt.ui.swing.basic.ColorUtility;
 import org.eclipse.scout.rt.ui.swing.basic.SwingScoutComposite;
 import org.eclipse.scout.rt.ui.swing.ext.JRootPaneEx;
 import org.eclipse.scout.rt.ui.swing.ext.JStatusLabelEx;
@@ -46,7 +49,7 @@ public abstract class SwingScoutFieldComposite<T extends IFormField> extends Swi
   private JComponent m_swingContainer;
   private JStatusLabelEx m_swingStatusLabel;
   // cache
-  private IKeyStroke[] m_installedScoutKs;
+  private List<IKeyStroke> m_installedScoutKs;
 
   public SwingScoutFieldComposite() {
     super();
@@ -95,6 +98,8 @@ public abstract class SwingScoutFieldComposite<T extends IFormField> extends Swi
     if (m_swingStatusLabel != null) {
       LogicalGridData statusLabelGridData = null;
       if (getScoutObject().getLabelPosition() == IFormField.LABEL_POSITION_TOP) {
+        // border to ensure a little gap between the label and the field.
+        m_swingStatusLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 4, 0));
         statusLabelGridData = LogicalGridDataBuilder.createLabelOnTop(((IFormField) getScoutObject()).getGridData());
       }
       else {
@@ -307,7 +312,7 @@ public abstract class SwingScoutFieldComposite<T extends IFormField> extends Swi
     if (fld != null) {
       Color initCol = (Color) getClientProperty(fld, CLIENT_PROP_INITIAL_BACKGROUND);
       boolean initOpaque = ((Boolean) getClientProperty(fld, CLIENT_PROP_INITIAL_OPAQUE)).booleanValue();
-      Color c = SwingUtility.createColor(scoutColor);
+      Color c = ColorUtility.createColor(scoutColor);
       boolean opaque = (c != null ? true : initOpaque);
       if (c == null) {
         c = initCol;
@@ -321,7 +326,7 @@ public abstract class SwingScoutFieldComposite<T extends IFormField> extends Swi
     JComponent fld = getSwingField();
     if (fld != null) {
       Color initCol = (Color) getClientProperty(fld, CLIENT_PROP_INITIAL_FOREGROUND);
-      Color c = SwingUtility.createColor(scoutColor);
+      Color c = ColorUtility.createColor(scoutColor);
       if (c == null) {
         c = initCol;
       }
@@ -346,7 +351,7 @@ public abstract class SwingScoutFieldComposite<T extends IFormField> extends Swi
     if (fld != null) {
       Color initCol = (Color) getClientProperty(fld, CLIENT_PROP_INITIAL_LABEL_BACKGROUND);
       boolean initOpaque = ((Boolean) getClientProperty(fld, CLIENT_PROP_INITIAL_LABEL_OPAQUE)).booleanValue();
-      Color c = SwingUtility.createColor(scoutColor);
+      Color c = ColorUtility.createColor(scoutColor);
       boolean opaque = (c != null ? true : initOpaque);
       if (c == null) {
         c = initCol;
@@ -360,7 +365,7 @@ public abstract class SwingScoutFieldComposite<T extends IFormField> extends Swi
     JComponent fld = getSwingLabel();
     if (fld != null) {
       Color initCol = (Color) getClientProperty(fld, CLIENT_PROP_INITIAL_LABEL_FOREGROUND);
-      Color c = SwingUtility.createColor(scoutColor);
+      Color c = ColorUtility.createColor(scoutColor);
       if (c == null) {
         c = initCol;
       }
@@ -400,8 +405,7 @@ public abstract class SwingScoutFieldComposite<T extends IFormField> extends Swi
     if (component != null) {
       // remove old key strokes
       if (m_installedScoutKs != null) {
-        for (int i = 0; i < m_installedScoutKs.length; i++) {
-          IKeyStroke scoutKs = m_installedScoutKs[i];
+        for (IKeyStroke scoutKs : m_installedScoutKs) {
           KeyStroke swingKs = SwingUtility.createKeystroke(scoutKs);
           //
           InputMap imap = component.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT);
@@ -412,7 +416,7 @@ public abstract class SwingScoutFieldComposite<T extends IFormField> extends Swi
       }
       m_installedScoutKs = null;
       // add new key strokes
-      IKeyStroke[] scoutKeyStrokes = getScoutObject().getKeyStrokes();
+      List<IKeyStroke> scoutKeyStrokes = getScoutObject().getKeyStrokes();
       for (IKeyStroke scoutKs : scoutKeyStrokes) {
         int swingWhen = JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT;
         KeyStroke swingKs = SwingUtility.createKeystroke(scoutKs);
@@ -455,9 +459,6 @@ public abstract class SwingScoutFieldComposite<T extends IFormField> extends Swi
     }
     else if (name.equals(IFormField.PROP_LABEL)) {
       setLabelFromScout((String) newValue);
-    }
-    else if (name.equals(IFormField.PROP_LABEL_VISIBLE)) {
-      setLabelVisibleFromScout();
     }
     else if (name.equals(IFormField.PROP_LABEL_VISIBLE)) {
       setLabelVisibleFromScout();

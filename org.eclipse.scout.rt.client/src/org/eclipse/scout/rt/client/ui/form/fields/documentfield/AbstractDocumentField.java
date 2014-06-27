@@ -2,9 +2,10 @@ package org.eclipse.scout.rt.client.ui.form.fields.documentfield;
 
 import org.eclipse.scout.commons.EventListenerList;
 import org.eclipse.scout.commons.TypeCastUtility;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
+import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
@@ -17,9 +18,10 @@ import org.eclipse.scout.service.SERVICES;
 /**
  * The document field is an editor field that presents a document for editing.
  * <p>
- * Current known implementations inlcude the Microsoft office word document editor in swing. This will be released soon
+ * Current known implementations include the Microsoft office word document editor in swing. This will be released soon
  * as a scout swing fragment under epl.
  */
+@ClassId("4c022ea1-a522-43a5-b603-954d9cb8705c")
 public abstract class AbstractDocumentField extends AbstractValueField<RemoteFile> implements IDocumentField {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractDocumentField.class);
 
@@ -49,14 +51,19 @@ public abstract class AbstractDocumentField extends AbstractValueField<RemoteFil
     return false;
   }
 
+  @Override
+  @Order(210)
   @ConfigProperty(ConfigProperty.BOOLEAN)
-  @ConfigPropertyValue("false")
+  protected boolean getConfiguredAutoAddDefaultMenus() {
+    return false;
+  }
+
+  @ConfigProperty(ConfigProperty.BOOLEAN)
   protected boolean getConfiguredRulersVisible() {
     return false;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredStatusBarVisible() {
     return false;
   }

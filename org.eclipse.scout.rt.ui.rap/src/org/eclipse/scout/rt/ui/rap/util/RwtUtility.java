@@ -13,18 +13,21 @@ package org.eclipse.scout.rt.ui.rap.util;
 import java.awt.event.KeyEvent;
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
 
 import javax.servlet.http.HttpServletRequest;
 
+import org.eclipse.jface.action.LegacyActionTools;
 import org.eclipse.jface.viewers.StructuredSelection;
 import org.eclipse.rap.rwt.RWT;
+import org.eclipse.rap.rwt.dnd.ClientFileTransfer;
 import org.eclipse.scout.commons.CompositeLong;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.dnd.FileListTransferObject;
@@ -36,12 +39,13 @@ import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.IClientSession;
 import org.eclipse.scout.rt.client.ui.IDNDSupport;
+import org.eclipse.scout.rt.client.ui.action.IAction;
 import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
+import org.eclipse.scout.rt.client.ui.action.keystroke.KeyStroke;
 import org.eclipse.scout.rt.shared.ScoutTexts;
 import org.eclipse.scout.rt.ui.rap.IRwtEnvironment;
 import org.eclipse.scout.rt.ui.rap.basic.IRwtScoutComposite;
 import org.eclipse.scout.rt.ui.rap.basic.RwtScoutComposite;
-import org.eclipse.scout.rt.ui.rap.form.fields.RwtScoutValueFieldComposite;
 import org.eclipse.scout.rt.ui.rap.keystroke.IRwtKeyStroke;
 import org.eclipse.scout.rt.ui.rap.keystroke.RwtScoutKeyStroke;
 import org.eclipse.swt.SWT;
@@ -78,8 +82,11 @@ public final class RwtUtility {
   public static final String VARIANT_LISTBOX_DISABLED = "listboxDisabled";
   public static final String VARIANT_EMPTY = "empty";
 
-  private static final HashMap<String, Integer> SCOUT_RWT_KEY_MAP;
-  private static final HashMap<Integer, String> RWT_SCOUT_KEY_MAP;
+  public static final String VARIANT_COMPOSITE_INPUT_FIELD_BORDER = "inputField";
+  public static final String VARIANT_COMPOSITE_INPUT_FIELD_BORDER_READONLY = "inputField-readOnly";
+
+  private static final Map<String, Integer> SCOUT_RWT_KEY_MAP;
+  private static final Map<Integer, String> RWT_SCOUT_KEY_MAP;
 
   public static final String EXTENDED_STYLE = "extendedStyle";
 
@@ -164,8 +171,8 @@ public final class RwtUtility {
   public static TransferObject createScoutTransferable(DropTargetEvent event) {
     if (event == null || event.currentDataType == null) {
       return null;
-
     }
+
     Exception ex = null;
     if (FileTransfer.getInstance().isSupportedType(event.currentDataType)) {
       String[] fileNames = (String[]) event.data;
@@ -214,17 +221,32 @@ public final class RwtUtility {
     return null;
   }
 
+  public static TransferObject createScoutTransferableFromClientFile(DropTargetEvent event, List<File> uploadedFiles) {
+    if (event == null || event.currentDataType == null) {
+      return null;
+    }
+
+    TransferObject scoutTransferObject = null;
+    if (ClientFileTransfer.getInstance().isSupportedType(event.currentDataType)) {
+      scoutTransferObject = new FileListTransferObject(uploadedFiles);
+    }
+    return scoutTransferObject;
+  }
+
   /**
    * @param scoutTransferTypes
    * @return all transfer objects or an empty array NOT NULL
    */
   public static Transfer[] convertScoutTransferTypes(int scoutTransferTypes) {
     ArrayList<Transfer> uiTransferList = new ArrayList<Transfer>();
+    boolean addClientFileTransfer = false;
     if ((IDNDSupport.TYPE_FILE_TRANSFER & scoutTransferTypes) != 0) {
       uiTransferList.add(FileTransfer.getInstance());
+      addClientFileTransfer = true;
     }
     if ((IDNDSupport.TYPE_IMAGE_TRANSFER & scoutTransferTypes) != 0) {
       uiTransferList.add(ImageTransfer.getInstance());
+      addClientFileTransfer = true;
     }
     if ((IDNDSupport.TYPE_JAVA_ELEMENT_TRANSFER & scoutTransferTypes) != 0) {
       uiTransferList.add(JVMLocalObjectTransfer.getInstance());
@@ -232,8 +254,10 @@ public final class RwtUtility {
     if ((IDNDSupport.TYPE_TEXT_TRANSFER & scoutTransferTypes) != 0) {
       uiTransferList.add(TextTransfer.getInstance());
     }
+    if (addClientFileTransfer) {
+      uiTransferList.add(ClientFileTransfer.getInstance());
+    }
     return uiTransferList.toArray(new Transfer[uiTransferList.size()]);
-
   }
 
   public static int getHorizontalAlignment(int scoutAlignment) {
@@ -459,14 +483,15 @@ public final class RwtUtility {
   }
 
   @SuppressWarnings("unchecked")
-  public static <T> T[] getItemsOfSelection(Class<T> t, StructuredSelection selection) {
-    T[] result = (T[]) Array.newInstance(t, selection.size());
-    int i = 0;
-    for (Object o : selection.toArray()) {
-      result[i++] = (T) o;
+  public static <T> List<T> getItemsOfSelection(Class<T> t, StructuredSelection selection) {
+    List<T> result = new ArrayList<T>();
+    if (selection != null) {
+      Iterator selectionIt = selection.iterator();
+      while (selectionIt.hasNext()) {
+        result.add((T) selectionIt.next());
+      }
     }
     return result;
-
   }
 
   /**
@@ -541,7 +566,8 @@ public final class RwtUtility {
   /**
    * Converts {@link IKeyStroke} to a rwt keycode (This is a bitwise OR
    * of zero or more SWT key modifier masks (i.e. SWT.CTRL or SWT.ALT) and a
-   * character code).
+   * character code).<br>
+   * For example if the keyStroke is defined as 'control-alt-f1' the method will return SWT.F1
    * 
    * @param stroke
    * @return
@@ -556,6 +582,13 @@ public final class RwtUtility {
     return rwtKeyCode;
   }
 
+  /**
+   * Converts a scoutKey to an Rwt key. For example 'f11' will be converted to SWT.F11
+   * 
+   * @param scoutKey
+   *          must be lowercase, e.g. f11 instead of F11
+   * @return Rwt key
+   */
   public static int scoutToRwtKey(String scoutKey) {
     Integer i = SCOUT_RWT_KEY_MAP.get(scoutKey);
     if (i == null) {
@@ -668,18 +701,18 @@ public final class RwtUtility {
         return "ARROW_RIGHT";
       case SWT.ARROW_DOWN:
         return "ARROW_DOWN";
-//      case SWT.KEYPAD_MULTIPLY:
-//        return "multiply";
-//      case SWT.KEYPAD_ADD:
-//        return "add";
+      case SWT.KEYPAD_MULTIPLY:
+        return "NUMPAD_MULTIPLY";
+      case SWT.KEYPAD_ADD:
+        return "NUMPAD_ADD";
       case SWT.KEYPAD_CR:
-        return "ENTER";
-//      case SWT.KEYPAD_SUBTRACT:
-//        return "subtract";
-//      case SWT.KEYPAD_DECIMAL:
-//        return "decimal";
-//      case SWT.KEYPAD_DIVIDE:
-//        return "divide";
+        return "RETURN";
+      case SWT.KEYPAD_SUBTRACT:
+        return "NUMPAD_SUBTRACT";
+      case SWT.KEYPAD_DECIMAL:
+        return "NUMPAD_DECIMAL";
+      case SWT.KEYPAD_DIVIDE:
+        return "NUMPAD_DIVIDE";
       case SWT.DEL:
         return "DELETE";
 //      case SWT.NUM_LOCK:
@@ -1488,14 +1521,68 @@ public final class RwtUtility {
     return MNEMONIC_PATTERN.matcher(text).replaceAll("\\&$1");
   }
 
+  /**
+   * @deprecated Use {@link #runUiInputVerifier(Control)} instead. Will be removed in the 5.0 Release.
+   */
+  @Deprecated
   public static void verifyUiInput(Control control) {
+    runUiInputVerifier(control);
+  }
+
+  /**
+   * Run the inputVerifier on the currently focused control. See {@link #runUiInputVerifier(Control)} for more details.
+   * 
+   * @since 3.10.0-M5
+   */
+  public static void runUiInputVerifier() {
+    Control focusControl = Display.getDefault().getFocusControl();
+    runUiInputVerifier(focusControl);
+  }
+
+  /**
+   * Force the control's inputVerifier to run
+   */
+  public static void runUiInputVerifier(Control control) {
     if (control == null || control.isDisposed()) {
       return;
     }
 
     IRwtScoutComposite compositeOnWidget = RwtScoutComposite.getCompositeOnWidget(control);
-    if (compositeOnWidget != null && compositeOnWidget instanceof RwtScoutValueFieldComposite) {
-      ((RwtScoutValueFieldComposite) compositeOnWidget).verifyUiInput();
+    if (compositeOnWidget instanceof RwtScoutComposite) {
+      ((RwtScoutComposite) compositeOnWidget).runUiInputVerifier();
     }
+  }
+
+  /**
+   * Pretty printed version of the key stroke
+   * <p>
+   * Example:
+   * <ul>
+   * <li>control-alternate-f1 --> Ctrl+Alt+F1
+   * </ul>
+   * 
+   * @since 3.10.0-M4
+   */
+  public static String getKeyStrokePrettyPrinted(IAction scoutAction) {
+    if (scoutAction == null) {
+      return "";
+    }
+    return RwtUtility.getKeyStrokePrettyPrinted(scoutAction.getKeyStroke());
+  }
+
+  /**
+   * Pretty printed version of the key stroke.
+   * See {@link RwtUtility#getKeyStrokePrettyPrinted(IAction)}
+   * 
+   * @since 3.10.0-M4
+   */
+  public static String getKeyStrokePrettyPrinted(String s) {
+    if (!StringUtility.hasText(s)) {
+      return "";
+    }
+    KeyStroke ks = new KeyStroke(s);
+    int stateMask = getRwtStateMask(ks);
+    int keyCode = getRwtKeyCode(ks);
+    return LegacyActionTools.convertAccelerator(stateMask | keyCode);
   }
 }

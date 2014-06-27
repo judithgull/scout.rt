@@ -42,9 +42,6 @@ import org.w3c.dom.svg.SVGDocument;
 public abstract class AbstractRwtScoutSvgComposite<T extends IFormField> extends RwtScoutFieldComposite<T> {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractRwtScoutSvgComposite.class);
 
-  /* because the scroll-bar layout of IE is different: add an offset to ensure the full svg element can be shown without scrollbars */
-  protected static final int SVG_ELEMENT_INNER_SPACE = 7;
-
   private static final String DOCUMENT_ENCODING = "UTF-8";
 
   private BrowserExtension m_browserExtension;
@@ -95,18 +92,44 @@ public abstract class AbstractRwtScoutSvgComposite<T extends IFormField> extends
         updateSvgDocument();
       }
     });
-    setBrowserExtension(new BrowserExtension(browser, new IHyperlinkCallback() {
+    attachBrowserExtension(browser);
+
+    // layout
+    getUiContainer().setLayout(new LogicalGridLayout(1, 0));
+  }
+
+  protected void attachBrowserExtension(Browser browser) {
+    detachBrowserExtension();
+    BrowserExtension browserExtension = new BrowserExtension(browser, getUiEnvironment(), new IHyperlinkCallback() {
 
       @Override
       public void execute(String url) {
         hyperlinkActivatedFromUi(url);
       }
 
-    }));
-    getBrowserExtension().attach();
+    });
+    browser.addDisposeListener(new DisposeListener() {
+      private static final long serialVersionUID = 1L;
 
-    // layout
-    getUiContainer().setLayout(new LogicalGridLayout(1, 0));
+      @Override
+      public void widgetDisposed(DisposeEvent e) {
+        detachBrowserExtension();
+      }
+    });
+    adaptBrowserExtension(browserExtension);
+    browserExtension.attach();
+    setBrowserExtension(browserExtension);
+  }
+
+  protected void adaptBrowserExtension(BrowserExtension browserExtension) {
+    browserExtension.setDefaultHyperlinkTarget("_top");
+  }
+
+  protected void detachBrowserExtension() {
+    if (m_browserExtension != null) {
+      m_browserExtension.detach();
+      m_browserExtension = null;
+    }
   }
 
   protected static String getSvgContentFromDocument(SVGDocument doc) throws ProcessingException {
@@ -141,11 +164,11 @@ public abstract class AbstractRwtScoutSvgComposite<T extends IFormField> extends
       doc.getRootElement().setAttribute(SVGConstants.SVG_HEIGHT_ATTRIBUTE, browserBounds.height + "px");
       doc.getRootElement().setAttribute(SVGConstants.SVG_WIDTH_ATTRIBUTE, browserBounds.width + "px");
 
-      // get the svg code as string and rewrite the local links
-      String svgText = getBrowserExtension().adaptLocalHyperlinks(getSvgContentFromDocument(doc));
+      // get the svg code as string and rewrite the links
+      String svgText = getBrowserExtension().adaptHyperlinks(getSvgContentFromDocument(doc));
 
       // bugfix for SVG fields to ensure all context menus are closed when the user clicks into the svg field
-      String contextMenuHideScript = "parent.parent.org.eclipse.rwt.MenuManager.getInstance().update(null, 'mousedown');";
+      String contextMenuHideScript = "parent.parent.rwt.widgets.util.MenuManager.getInstance().update(null, 'mousedown');";
 
       // bugfix so that the svg field inherits the color of the parent container. otherwise it is always defined white.
       String backgroundColorInheritScript = null;
@@ -163,7 +186,7 @@ public abstract class AbstractRwtScoutSvgComposite<T extends IFormField> extends
       }
 
       // set the html content to the browser
-      getUiField().setText("<html><body width=\"100%\" height=\"100%\" onload=\"" + backgroundColorInheritScript + "\" onclick=\"" + contextMenuHideScript + "\">" + svgText + "</body></html>");
+      getUiField().setText("<html><body style=\"overflow: hidden;\" width=\"100%\" height=\"100%\" onload=\"" + backgroundColorInheritScript + "\" onclick=\"" + contextMenuHideScript + "\">" + svgText + "</body></html>");
     }
     catch (Exception e) {
       LOG.error("preparing svg browser content", e);
@@ -173,7 +196,7 @@ public abstract class AbstractRwtScoutSvgComposite<T extends IFormField> extends
 
   protected Rectangle getAbsoluteBrowserBounds() {
     Point pt = getUiField().getDisplay().map(getUiField(), null, new Point(0, 0));
-    return new Rectangle(pt.x, pt.y, getUiField().getBounds().width - SVG_ELEMENT_INNER_SPACE, getUiField().getBounds().height);
+    return new Rectangle(pt.x, pt.y, getUiField().getBounds().width, getUiField().getBounds().height);
   }
 
   @Override

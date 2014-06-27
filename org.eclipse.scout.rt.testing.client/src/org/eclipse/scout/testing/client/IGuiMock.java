@@ -13,6 +13,9 @@ package org.eclipse.scout.testing.client;
 import java.util.List;
 import java.util.Set;
 
+import org.eclipse.scout.rt.client.IClientSession;
+import org.eclipse.scout.rt.testing.shared.WaitCondition;
+
 /**
  * This interface is used to support gui testing with an abstraction layer.
  * <p>
@@ -29,7 +32,6 @@ public interface IGuiMock {
   enum GuiStrategy {
     Swt,
     Swing,
-    Vaadin,
     Rap
   }
 
@@ -39,6 +41,7 @@ public interface IGuiMock {
     Alt,
     Delete,
     Backspace,
+    Space,
     Enter,
     Esc,
     Tab,
@@ -122,6 +125,11 @@ public interface IGuiMock {
     public int height;
     public boolean focus;
     public String text;
+    public boolean visible;
+    public String foregroundColor;
+    public String backgroundColor;
+    public boolean selected;
+    public Object widget;
   }
 
   void initializeMock();
@@ -227,10 +235,22 @@ public interface IGuiMock {
 
   void dragWindowRightBorder(WindowState windowState, int pixelToMoveOnX);
 
+  /**
+   * Press the key specified by the parameter <code>key</code>. Note, the key will not be released until
+   * {@link IGuiMock#releaseKey(Key)} is called.
+   * <p>
+   * The method {@link IGuiMock#typeKey(Key)} is a convenience method that presses and releases the specified key.
+   */
   void pressKey(Key key);
 
+  /**
+   * Releases the specified key
+   */
   void releaseKey(Key key);
 
+  /**
+   * Convenience method that presses and releases the specified key.
+   */
   void typeKey(Key key);
 
   void typeText(final String text);
@@ -250,9 +270,25 @@ public interface IGuiMock {
   void gotoField(FieldType type, int index);
 
   /**
-   * place the mouse over the center of a field that represents a scout model with that (class) name
+   * place the mouse over the center of a field that represents a scout field.
+   * This correspond to {@link #gotoScoutField(String, float, float)} with x=0.5 and y=0.5
+   * 
+   * @param name
+   *          (class) name of the scout field (scout client model)
    */
   void gotoScoutField(String name);
+
+  /**
+   * place the mouse over the field that represents a scout field at the position described by the x and y parameter
+   * 
+   * @param name
+   *          (class) name of the scout field (scout client model)
+   * @param x
+   *          position of the cursor in percent on the horizontal axis (set to 0.5 to be in the center)
+   * @param y
+   *          position of the cursor in percent on the vertical axis (set to 0.5 to be in the center)
+   */
+  void gotoScoutField(String name, double x, double y);
 
   /**
    * place the mouse over the center of a table cell
@@ -327,6 +363,8 @@ public interface IGuiMock {
 
   String getClipboardText();
 
+  void setClipboardText(String val);
+
   Object internal0(Object o);
 
   /**
@@ -338,4 +376,28 @@ public interface IGuiMock {
    * Click right on magnifier of a smartfield
    */
   void clickRightOnSmartFieldMagnifier(FieldState fieldState);
+
+  /**
+   * Invokes the given {@link WaitCondition} in the Scout model thread and waits until it is completed. This may freeze
+   * the UI while the {@link WaitCondition} is executing.
+   * 
+   * @param r
+   *          The {@link WaitCondition} to execute.
+   * @param startTimeout
+   *          A timeout defining the offset between the time the {@link WaitCondition} has been scheduled and the time
+   *          it actually starts. If the startTimeout has passed, the {@link WaitCondition} is no longer processed. A
+   *          value <=0 means no timeout.
+   * @param runTimeout
+   *          Defines how long it should be waited the most for the {@link WaitCondition} to complete after it has been
+   *          scheduled. A value <=0 means no timeout.
+   * @return The result of the {@link WaitCondition#run()} method.
+   * @throws The
+   *           exception thrown by the {@link WaitCondition}.
+   */
+  <T> T invokeScoutAndWait(final WaitCondition<T> r, long startTimeout, long runTimeout) throws Throwable;
+
+  /**
+   * @return Gets the {@link IClientSession} associated with the current {@link IGuiMock}.
+   */
+  IClientSession getClientSession();
 }

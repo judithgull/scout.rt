@@ -30,7 +30,7 @@ public class DefaultShellService extends AbstractService implements IShellServic
   @Override
   public void shellOpen(String path) throws ProcessingException {
     if (UserAgentUtility.isWebClient()) {
-      ClientSyncJob.getCurrentSession().getDesktop().openBrowserWindow(path);
+      ClientSyncJob.getCurrentSession().getDesktop().openUrlInBrowser(path);
     }
     else {
       openWithRuntimeExec(path);
@@ -46,9 +46,10 @@ public class DefaultShellService extends AbstractService implements IShellServic
         //mac is not able to open files with a space, even when in quotes
         String ext = path.substring(path.lastIndexOf('.'));
         File f = new File(new File(path).getParentFile(), "" + System.nanoTime() + ext);
-        new File(path).renameTo(f);
         f.deleteOnExit();
-        path = f.getAbsolutePath();
+        if (new File(path).renameTo(f)) {
+          path = f.getAbsolutePath();
+        }
       }
     }
     return path;

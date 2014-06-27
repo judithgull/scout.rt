@@ -88,7 +88,7 @@ public class MobileDeviceTransformer implements IDeviceTransformer {
   }
 
   protected PageFormManager createPageFormManager(IDesktop desktop) {
-    return new PageFormManager(desktop, IForm.VIEW_ID_CENTER);
+    return new PageFormManager(desktop, getAcceptedViewIds().toArray(new String[getAcceptedViewIds().size()]));
   }
 
   public PageFormManager getPageFormManager() {
@@ -167,6 +167,12 @@ public class MobileDeviceTransformer implements IDeviceTransformer {
   public void transformForm(IForm form) throws ProcessingException {
     if (getDeviceTransformationConfig().isFormExcluded(form)) {
       return;
+    }
+    List<IDeviceTransformationHook> hooks = DeviceTransformationHooks.getFormTransformationHooks(form.getClass());
+    if (hooks != null) {
+      for (IDeviceTransformationHook hook : hooks) {
+        hook.beforeFormTransformation(form);
+      }
     }
 
     m_gridDataDirty = false;
@@ -271,6 +277,13 @@ public class MobileDeviceTransformer implements IDeviceTransformer {
   }
 
   protected void transformFormField(IFormField field) {
+    List<IDeviceTransformationHook> hooks = DeviceTransformationHooks.getFormFieldTransformationHooks(field.getClass());
+    if (hooks != null) {
+      for (IDeviceTransformationHook hook : hooks) {
+        hook.beforeFormFieldTransformation(field);
+      }
+    }
+
     if (getDeviceTransformationConfig().isTransformationEnabled(MobileDeviceTransformation.MOVE_FIELD_LABEL_TO_TOP, field)) {
       moveLabelToTop(field);
     }
@@ -383,7 +396,7 @@ public class MobileDeviceTransformer implements IDeviceTransformer {
   public boolean acceptMobileTabBoxTransformation(ITabBox tabBox) {
     IGroupBox mainBox = tabBox.getForm().getRootGroupBox();
     if (tabBox.getParentField() == mainBox) {
-      return !(mainBox.getControlFields()[0] == tabBox);
+      return !(mainBox.getControlFields().get(0) == tabBox);
     }
 
     return false;

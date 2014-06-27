@@ -16,7 +16,6 @@ import java.util.List;
 import org.eclipse.scout.commons.ConfigurationUtility;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.exception.VetoException;
@@ -29,6 +28,8 @@ import org.eclipse.scout.rt.client.ui.basic.table.ITable;
 import org.eclipse.scout.rt.client.ui.desktop.outline.IOutline;
 import org.eclipse.scout.rt.client.ui.desktop.outline.pages.IPageWithTable;
 import org.eclipse.scout.rt.client.ui.form.IForm;
+import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
+import org.eclipse.scout.service.SERVICES;
 
 /**
  * base implementation of {@link IDesktopExtension}
@@ -108,34 +109,29 @@ public abstract class AbstractDesktopExtension implements IDesktopExtension {
 
   @Override
   public void contributeOutlines(Collection<IOutline> outlines) {
-    Class<? extends IOutline>[] array = getConfiguredOutlines();
-    if (array == null) {
+    List<Class<? extends IOutline>> contributedOutlines = getConfiguredOutlines();
+    if (contributedOutlines == null) {
       return;
     }
-    for (Class<? extends IOutline> element : array) {
+    for (Class<? extends IOutline> element : contributedOutlines) {
       try {
         IOutline o = element.newInstance();
         outlines.add(o);
       }
       catch (Throwable t) {
-        LOG.error(null, t);
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + element.getName() + "'.", t));
       }
     }
   }
 
   @Override
   public void contributeActions(Collection<IAction> actions) {
-    Class<? extends IAction>[] array = getConfiguredActions();
-    if (array == null) {
-      return;
-    }
-    for (Class<? extends IAction> element : array) {
+    for (Class<? extends IAction> actionClazz : getConfiguredActions()) {
       try {
-        IAction a = ConfigurationUtility.newInnerInstance(this, element);
-        actions.add(a);
+        actions.add(ConfigurationUtility.newInnerInstance(this, actionClazz));
       }
       catch (Exception e) {
-        LOG.error(null, e);
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + actionClazz.getName() + "'.", e));
       }
     }
   }
@@ -387,14 +383,13 @@ public abstract class AbstractDesktopExtension implements IDesktopExtension {
    */
   @ConfigProperty(ConfigProperty.OUTLINES)
   @Order(20)
-  @ConfigPropertyValue("null")
-  protected Class<? extends IOutline>[] getConfiguredOutlines() {
+  protected List<Class<? extends IOutline>> getConfiguredOutlines() {
     return null;
   }
 
-  private Class<? extends IAction>[] getConfiguredActions() {
+  private List<Class<? extends IAction>> getConfiguredActions() {
     Class<?>[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
-    Class<IAction>[] fca = ConfigurationUtility.filterClasses(dca, IAction.class);
+    List<Class<IAction>> fca = ConfigurationUtility.filterClasses(dca, IAction.class);
     return ConfigurationUtility.removeReplacedClasses(fca);
   }
 

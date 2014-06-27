@@ -10,11 +10,12 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.basic.table;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
@@ -52,7 +53,6 @@ public abstract class AbstractCheckableTable extends AbstractTable implements IC
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(200)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredMultiCheckable() {
     return true;
   }
@@ -143,8 +143,8 @@ public abstract class AbstractCheckableTable extends AbstractTable implements IC
   }
 
   @Override
-  public ITableRow[] getCheckedRows() {
-    List<ITableRow> rows = new LinkedList<ITableRow>();
+  public Collection<ITableRow> getCheckedRows() {
+    List<ITableRow> rows = new ArrayList<ITableRow>();
     boolean checked = false;
     for (int i = 0; i < getRowCount(); i++) {
       checked = (getCheckboxColumn().getValue(i) != null && getCheckboxColumn().getValue(i));
@@ -153,21 +153,16 @@ public abstract class AbstractCheckableTable extends AbstractTable implements IC
       }
     }
 
-    return rows.toArray(new ITableRow[]{});
+    return rows;
   }
 
   @Override
   public ITableRow getCheckedRow() {
-    if (getCheckedRowCount() > 0) {
-      return getCheckedRows()[0];
-    }
-    else {
-      return null;
-    }
+    return CollectionUtility.firstElement(getCheckedRows());
   }
 
   public int getCheckedRowCount() {
-    return getCheckedRows().length;
+    return getCheckedRows().size();
   }
 
   @Override

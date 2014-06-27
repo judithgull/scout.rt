@@ -10,9 +10,10 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.form.fields.button;
 
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.rt.shared.ScoutTexts;
 
+@ClassId("a832c827-50ca-4a59-b8f3-31e620f329ec")
 public abstract class AbstractOkButton extends AbstractButton implements IButton {
 
   public AbstractOkButton() {
@@ -27,19 +28,16 @@ public abstract class AbstractOkButton extends AbstractButton implements IButton
    * Configuration
    */
   @Override
-  @ConfigPropertyValue("SYSTEM_TYPE_OK")
   protected int getConfiguredSystemType() {
     return SYSTEM_TYPE_OK;
   }
 
   @Override
-  @ConfigPropertyValue("\"OkButton\"")
   protected String getConfiguredLabel() {
     return ScoutTexts.get("OkButton");
   }
 
   @Override
-  @ConfigPropertyValue("\"OkButtonTooltip\"")
   protected String getConfiguredTooltipText() {
     return ScoutTexts.get("OkButtonTooltip");
   }

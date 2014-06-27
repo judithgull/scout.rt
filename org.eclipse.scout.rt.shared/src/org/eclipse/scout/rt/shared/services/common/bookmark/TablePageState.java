@@ -12,9 +12,9 @@ package org.eclipse.scout.rt.shared.services.common.bookmark;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.CompositeObject;
 
 public class TablePageState extends AbstractPageState implements Serializable, Cloneable {
@@ -63,12 +63,7 @@ public class TablePageState extends AbstractPageState implements Serializable, C
   }
 
   public List<CompositeObject> getSelectedChildrenPrimaryKeys() {
-    if (m_selectedChildrenPrimaryKeys == null) {
-      return Collections.emptyList();
-    }
-    else {
-      return Collections.unmodifiableList(m_selectedChildrenPrimaryKeys);
-    }
+    return CollectionUtility.arrayList(m_selectedChildrenPrimaryKeys);
   }
 
   public void setSelectedChildrenPrimaryKeys(List<CompositeObject> list) {
@@ -124,32 +119,8 @@ public class TablePageState extends AbstractPageState implements Serializable, C
     m_searchFilterState = state;
   }
 
-  /**
-   * @deprecated use {@link #getAvailableColumns()} and filter by visible property. Will be removed in Release 3.10.
-   */
-  @SuppressWarnings("unchecked")
-  @Deprecated
-  public List<TableColumnState> getVisibleColumns() {
-    return Collections.unmodifiableList(m_visibleColumns != null ? m_visibleColumns : Collections.EMPTY_LIST);
-  }
-
-  /**
-   * @deprecated use {@link #setAvailableColumns()} and set all available columns (with sort index, dispayable, visible
-   *             and width property), not just the visible ones. Will be removed in Release 3.10.
-   */
-  @Deprecated
-  public void setVisibleColumns(List<TableColumnState> cols) {
-    if (cols == null) {
-      m_visibleColumns = null;
-    }
-    else {
-      m_visibleColumns = new ArrayList<TableColumnState>(cols);
-    }
-  }
-
-  @SuppressWarnings("unchecked")
   public List<TableColumnState> getAvailableColumns() {
-    return Collections.unmodifiableList(m_availableColumns != null ? m_availableColumns : Collections.EMPTY_LIST);
+    return CollectionUtility.arrayList(m_availableColumns);
   }
 
   public void setAvailableColumns(List<TableColumnState> cols) {

@@ -29,10 +29,6 @@ import java.awt.event.MouseListener;
 import java.beans.PropertyChangeEvent;
 
 import javax.swing.JComponent;
-import javax.swing.event.CaretEvent;
-import javax.swing.event.CaretListener;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
 import javax.swing.text.AbstractDocument;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
@@ -41,20 +37,19 @@ import javax.swing.text.Document;
 import javax.swing.text.DocumentFilter;
 import javax.swing.text.JTextComponent;
 
-import org.eclipse.scout.commons.CompareUtility;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.dnd.TransferObject;
 import org.eclipse.scout.commons.holders.Holder;
-import org.eclipse.scout.commons.job.JobEx;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.form.fields.stringfield.IStringField;
 import org.eclipse.scout.rt.ui.swing.SwingUtility;
+import org.eclipse.scout.rt.ui.swing.basic.ColorUtility;
 import org.eclipse.scout.rt.ui.swing.basic.document.BasicDocumentFilter;
 import org.eclipse.scout.rt.ui.swing.ext.MouseClickedBugFix;
-import org.eclipse.scout.rt.ui.swing.form.fields.SwingScoutValueFieldComposite;
+import org.eclipse.scout.rt.ui.swing.form.fields.SwingScoutBasicFieldComposite;
 
-public abstract class SwingScoutTextFieldComposite<T extends IStringField> extends SwingScoutValueFieldComposite<T> {
+public abstract class SwingScoutTextFieldComposite<T extends IStringField> extends SwingScoutBasicFieldComposite<T> {
   private static final long serialVersionUID = 1L;
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(SwingScoutTextFieldComposite.class);
 
@@ -64,7 +59,6 @@ public abstract class SwingScoutTextFieldComposite<T extends IStringField> exten
   private boolean m_upperCase;
   private boolean m_lowerCase;
   private MouseListener m_linkTrigger;
-  private boolean m_validateOnAnyKey;
   private boolean m_decorationLink;
   private boolean m_multilineText;
 
@@ -88,8 +82,7 @@ public abstract class SwingScoutTextFieldComposite<T extends IStringField> exten
       if (doc instanceof AbstractDocument) {
         ((AbstractDocument) doc).setDocumentFilter(new P_SwingDocumentFilter());
       }
-      doc.addDocumentListener(new P_SwingDocumentListener());
-      textField.addCaretListener(new P_SwingCaretListener());
+      addInputListenersForBasicField(textField, doc);
     }
   }
 
@@ -97,17 +90,15 @@ public abstract class SwingScoutTextFieldComposite<T extends IStringField> exten
     return (JTextComponent) getSwingField();
   }
 
-  /*
-   * scout properties
+  /**
+   * attach Scout Model: set scout properties
    */
-
   @Override
   protected void attachScout() {
     IStringField f = getScoutObject();
     setDecorationLinkFromScout(f.isDecorationLink());
     setFormatFromScout(f.getFormat());
     setMaxLengthFromScout(f.getMaxLength());
-    setValidateOnAnyKeyFromScout(f.isValidateOnAnyKey());
     setMultilineTextFromScout(f.isMultilineText());
 
     // supercall must come after reading model properties to have P_SwingDocumentFilter initialized.
@@ -118,6 +109,11 @@ public abstract class SwingScoutTextFieldComposite<T extends IStringField> exten
     setSelectionFromScout();
     updateDragTransferTypesFromScout();
     updateDropTransferTypesFromScout();
+  }
+
+  @Override
+  protected boolean isSelectAllOnFocusInScout() {
+    return getScoutObject().isSelectAllOnFocus();
   }
 
   protected void setDecorationLinkFromScout(boolean b) {
@@ -187,42 +183,6 @@ public abstract class SwingScoutTextFieldComposite<T extends IStringField> exten
   }
 
   @Override
-  protected void setDisplayTextFromScout(String s) {
-    //loop detection
-    if (m_validateOnAnyKey && getSwingField().isFocusOwner()) {
-      return;
-    }
-    JTextComponent swingField = getSwingTextComponent();
-    String oldText = swingField.getText();
-    if (s == null) {
-      s = "";
-    }
-    if (oldText == null) {
-      oldText = "";
-    }
-    if (oldText.equals(s)) {
-      return;
-    }
-    //
-    int startIndex = -1;
-    int endIndex = -1;
-    Caret caret = swingField.getCaret();
-    if (caret != null) {
-      startIndex = caret.getMark();
-      endIndex = caret.getDot();
-    }
-    swingField.setText(s);
-    // restore selection and caret
-    int textLength = swingField.getText().length();
-    if (caret != null) {
-      startIndex = Math.min(Math.max(startIndex, -1), textLength);
-      endIndex = Math.min(Math.max(endIndex, 0), textLength);
-      swingField.setCaretPosition(startIndex);
-      swingField.moveCaretPosition(endIndex);
-    }
-  }
-
-  @Override
   protected void cacheSwingClientProperties() {
     super.cacheSwingClientProperties();
     JTextComponent fld = getSwingTextComponent();
@@ -242,7 +202,7 @@ public abstract class SwingScoutTextFieldComposite<T extends IStringField> exten
     super.setForegroundFromScout(scoutColor);
     JTextComponent fld = getSwingTextComponent();
     if (fld != null) {
-      Color c = SwingUtility.createColor(scoutColor);
+      Color c = ColorUtility.createColor(scoutColor);
       if (c == null) {
         c = (Color) getClientProperty(fld, CLIENT_PROP_INITIAL_DISABLED_TEXT_COLOR);
       }
@@ -251,10 +211,6 @@ public abstract class SwingScoutTextFieldComposite<T extends IStringField> exten
       }
       fld.setDisabledTextColor(c);
     }
-  }
-
-  protected void setValidateOnAnyKeyFromScout(boolean b) {
-    m_validateOnAnyKey = b;
   }
 
   protected void setSelectionFromScout() {
@@ -277,6 +233,7 @@ public abstract class SwingScoutTextFieldComposite<T extends IStringField> exten
     }
   }
 
+  @Override
   protected void setSelectionFromSwing() {
     if (getUpdateSwingFromScoutLock().isAcquired()) {
       return;
@@ -354,9 +311,6 @@ public abstract class SwingScoutTextFieldComposite<T extends IStringField> exten
     else if (name.equals(IStringField.PROP_INSERT_TEXT)) {
       setDoInsertFromScout((String) newValue);
     }
-    else if (name.equals(IStringField.PROP_VALIDATE_ON_ANY_KEY)) {
-      setValidateOnAnyKeyFromScout(((Boolean) newValue).booleanValue());
-    }
     else if (name.equals(IStringField.PROP_SELECTION_START)) {
       setSelectionFromScout();
     }
@@ -380,48 +334,6 @@ public abstract class SwingScoutTextFieldComposite<T extends IStringField> exten
 
     getSwingEnvironment().invokeScoutLater(t, 0);
     // end notify
-  }
-
-  @Override
-  protected boolean handleSwingInputVerifier() {
-    final String text = getSwingTextComponent().getText();
-    // only handle if text has changed
-    if (CompareUtility.equals(text, getScoutObject().getDisplayText()) && getScoutObject().getErrorStatus() == null) {
-      return true;
-    }
-    final Holder<Boolean> result = new Holder<Boolean>(Boolean.class, false);
-    // notify Scout
-    Runnable t = new Runnable() {
-      @Override
-      public void run() {
-        boolean b = getScoutObject().getUIFacade().setTextFromUI(text);
-        result.setValue(b);
-      }
-    };
-    JobEx job = getSwingEnvironment().invokeScoutLater(t, 0);
-    try {
-      job.join(2345);
-    }
-    catch (InterruptedException e) {
-      //nop
-    }
-    // end notify
-    getSwingEnvironment().dispatchImmediateSwingJobs();
-    //if not validate any key, also update selections
-    if (!m_validateOnAnyKey) {
-      setSelectionFromSwing();
-    }
-    return true; // continue always
-  }
-
-  @Override
-  protected void handleSwingFocusGained() {
-    super.handleSwingFocusGained();
-    if (getScoutObject().isSelectAllOnFocus()) {
-      JTextComponent swingField = getSwingTextComponent();
-      swingField.setCaretPosition(swingField.getDocument().getLength());
-      swingField.moveCaretPosition(0);
-    }
   }
 
   protected Transferable handleSwingDragRequest() {
@@ -530,63 +442,6 @@ public abstract class SwingScoutTextFieldComposite<T extends IStringField> exten
       }
     }
   }
-
-  private class P_SwingCaretListener implements CaretListener {
-    @Override
-    public void caretUpdate(CaretEvent e) {
-      //only if validate any key, update selections immediately, otherwise it is done in handleSwingInputVerifier
-      if (m_validateOnAnyKey) {
-        setSelectionFromSwing();
-      }
-    }
-  }// end private class
-
-  private class P_SwingDocumentListener implements DocumentListener {
-    @Override
-    public void changedUpdate(DocumentEvent e) {
-      setInputDirty(true);
-      if (m_validateOnAnyKey) {
-        if (getUpdateSwingFromScoutLock().isReleased()) {
-          sendVerifyToScoutAndIgnoreResponses();
-        }
-      }
-    }
-
-    @Override
-    public void insertUpdate(DocumentEvent e) {
-      setInputDirty(true);
-      if (m_validateOnAnyKey) {
-        if (getUpdateSwingFromScoutLock().isReleased()) {
-          sendVerifyToScoutAndIgnoreResponses();
-        }
-      }
-    }
-
-    @Override
-    public void removeUpdate(DocumentEvent e) {
-      setInputDirty(true);
-      if (m_validateOnAnyKey) {
-        if (getUpdateSwingFromScoutLock().isReleased()) {
-          sendVerifyToScoutAndIgnoreResponses();
-        }
-      }
-    }
-
-    /*
-     * Do not call handleSwingInputVerifier(), this can lead to endless loops.
-     */
-    private void sendVerifyToScoutAndIgnoreResponses() {
-      final String text = getSwingTextComponent().getText();
-      // notify Scout
-      Runnable t = new Runnable() {
-        @Override
-        public void run() {
-          getScoutObject().getUIFacade().setTextFromUI(text);
-        }
-      };
-      getSwingEnvironment().invokeScoutLater(t, 0);
-    }
-  }// end private class
 
   private class P_DropTargetListener implements DropTargetListener {
     @Override

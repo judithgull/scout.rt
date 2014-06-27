@@ -13,7 +13,7 @@ package org.eclipse.scout.rt.client.ui.basic.tree;
 import java.net.URL;
 import java.security.Permission;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collection;
 import java.util.EventListener;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -22,11 +22,11 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Set;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.ConfigurationUtility;
 import org.eclipse.scout.commons.EventListenerList;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.beans.AbstractPropertyObserver;
 import org.eclipse.scout.commons.dnd.TransferObject;
@@ -36,10 +36,15 @@ import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.IEventHistory;
 import org.eclipse.scout.rt.client.ui.action.ActionFinder;
+import org.eclipse.scout.rt.client.ui.action.ActionUtility;
+import org.eclipse.scout.rt.client.ui.action.IAction;
+import org.eclipse.scout.rt.client.ui.action.IActionFilter;
+import org.eclipse.scout.rt.client.ui.action.IActionVisitor;
 import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
 import org.eclipse.scout.rt.client.ui.action.keystroke.KeyStroke;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
-import org.eclipse.scout.rt.client.ui.action.menu.MenuSeparator;
+import org.eclipse.scout.rt.client.ui.action.menu.root.ITreeContextMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.root.internal.TreeContextMenu;
 import org.eclipse.scout.rt.client.ui.basic.cell.Cell;
 import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
 import org.eclipse.scout.rt.client.ui.profiler.DesktopProfiler;
@@ -54,7 +59,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
 
   private final EventListenerList m_listenerList = new EventListenerList();
   private ITreeUIFacade m_uiFacade;
-  private IMenu[] m_menus;
+  private List<IMenu> m_menus;
   private boolean m_initialized;
 
   // enabled is defined as: enabledGranted && enabledProperty && enabledSlave
@@ -66,16 +71,19 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   private boolean m_autoDiscardOnDelete;
   private boolean m_autoTitle;
   private final HashMap<Object, ITreeNode> m_deletedNodes;
-  private ArrayList<TreeEvent> m_treeEventBuffer = new ArrayList<TreeEvent>();
-  private HashSet<ITreeNode> m_nodeDecorationBuffer = new HashSet<ITreeNode>();
-  private HashSet<ITreeNode> m_selectedNodes = new HashSet<ITreeNode>();
-  private final ArrayList<ITreeNodeFilter> m_nodeFilters;
+  private List<TreeEvent> m_treeEventBuffer = new ArrayList<TreeEvent>();
+  private Set<ITreeNode> m_nodeDecorationBuffer = new HashSet<ITreeNode>();
+  private Set<ITreeNode> m_selectedNodes = new HashSet<ITreeNode>();
+  private final List<ITreeNodeFilter> m_nodeFilters;
   private final int m_uiProcessorCount = 0;
-  private IKeyStroke[] m_baseKeyStrokes;
+  private List<IKeyStroke> m_baseKeyStrokes;
   private IEventHistory<TreeEvent> m_eventHistory;
   // only do one action at a time
   private boolean m_actionRunning;
   private boolean m_saveAndRestoreScrollbars;
+  private ITreeNode m_lastSeenDropNode;
+
+  private List<IMenu> m_currentNodeMenus;
 
   public AbstractTree() {
     this(true);
@@ -105,70 +113,60 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
    */
   @ConfigProperty(ConfigProperty.TEXT)
   @Order(10)
-  @ConfigPropertyValue("null")
   protected String getConfiguredTitle() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.ICON_ID)
   @Order(20)
-  @ConfigPropertyValue("null")
   protected String getConfiguredIconId() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(30)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredAutoTitle() {
     return false;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(40)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredMultiSelect() {
     return false;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(42)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredMultiCheck() {
     return true;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(45)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredCheckable() {
     return false;
   }
 
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(46)
-  @ConfigPropertyValue("-1")
   protected int getConfiguredNodeHeightHint() {
     return -1;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(50)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredDragEnabled() {
     return false;
   }
 
   @ConfigProperty(ConfigProperty.DRAG_AND_DROP_TYPE)
   @Order(51)
-  @ConfigPropertyValue("0")
   protected int getConfiguredDragType() {
     return 0;
   }
 
   @ConfigProperty(ConfigProperty.DRAG_AND_DROP_TYPE)
   @Order(52)
-  @ConfigPropertyValue("0")
   protected int getConfiguredDropType() {
     return 0;
   }
@@ -180,21 +178,18 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(60)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredAutoDiscardOnDelete() {
     return true;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(70)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredRootNodeVisible() {
     return false;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(71)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredRootHandlesVisible() {
     return true;
   }
@@ -210,7 +205,6 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(80)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredScrollToSelection() {
     return false;
   }
@@ -228,20 +222,20 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(90)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredSaveAndRestoreScrollbars() {
     return false;
   }
 
-  private Class<? extends IKeyStroke>[] getConfiguredKeyStrokes() {
+  private List<Class<? extends IKeyStroke>> getConfiguredKeyStrokes() {
     Class<?>[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
-    Class<IKeyStroke>[] fca = ConfigurationUtility.filterClasses(dca, IKeyStroke.class);
+    List<Class<IKeyStroke>> fca = ConfigurationUtility.filterClasses(dca, IKeyStroke.class);
     return ConfigurationUtility.removeReplacedClasses(fca);
   }
 
-  private Class<? extends IMenu>[] getConfiguredMenus() {
+  protected List<Class<? extends IMenu>> getDeclaredMenus() {
     Class<?>[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
-    Class<IMenu>[] foca = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(dca, IMenu.class);
+    List<Class<IMenu>> filtered = ConfigurationUtility.filterClasses(dca, IMenu.class);
+    List<Class<? extends IMenu>> foca = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(filtered, IMenu.class);
     return ConfigurationUtility.removeReplacedClasses(foca);
   }
 
@@ -290,7 +284,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
    */
   @ConfigOperation
   @Order(30)
-  protected TransferObject execDrag(ITreeNode[] nodes) throws ProcessingException {
+  protected TransferObject execDrag(Collection<ITreeNode> nodes) throws ProcessingException {
     return null;
   }
 
@@ -300,6 +294,17 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   @ConfigOperation
   @Order(40)
   protected void execDrop(ITreeNode node, TransferObject t) throws ProcessingException {
+  }
+
+  /**
+   * This method gets called when the drop node is changed, e.g. the dragged object
+   * is moved over a new drop target.
+   * 
+   * @since 4.0-M7
+   */
+  @ConfigOperation
+  @Order(45)
+  protected void execDropTargetChanged(ITreeNode node) throws ProcessingException {
   }
 
   /**
@@ -358,6 +363,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
     });
     // add Convenience observer for drag & drop callbacks and event history
     addTreeListener(new TreeAdapter() {
+
       @Override
       public void treeChanged(TreeEvent e) {
         //event history
@@ -368,6 +374,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
         //dnd
         switch (e.getType()) {
           case TreeEvent.TYPE_NODES_DRAG_REQUEST: {
+            m_lastSeenDropNode = null;
             if (e.getDragObject() == null) {
               try {
                 TransferObject transferObject = execDrag(e.getNode());
@@ -383,6 +390,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
             break;
           }
           case TreeEvent.TYPE_NODE_DROP_ACTION: {
+            m_lastSeenDropNode = null;
             if (e.getDropObject() != null) {
               try {
                 execDrop(e.getNode(), e.getDropObject());
@@ -397,20 +405,32 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
             rebuildKeyStrokesInternal();
             break;
           }
+          case TreeEvent.TYPE_NODE_DROP_TARGET_CHANGED: {
+            try {
+              if (m_lastSeenDropNode == null || m_lastSeenDropNode != e.getNode()) {
+                m_lastSeenDropNode = e.getNode();
+                execDropTargetChanged(e.getNode());
+              }
+            }
+            catch (Throwable t) {
+              LOG.error("DropTargetChanged", t);
+            }
+            break;
+          }
+          case TreeEvent.TYPE_DRAG_FINISHED: {
+            m_lastSeenDropNode = null;
+          }
         }
       }
     });
     // key shortcuts
-    ArrayList<IKeyStroke> ksList = new ArrayList<IKeyStroke>();
-    Class<? extends IKeyStroke>[] shortcutArray = getConfiguredKeyStrokes();
-    for (int i = 0; i < shortcutArray.length; i++) {
-      IKeyStroke ks;
+    List<IKeyStroke> ksList = new ArrayList<IKeyStroke>();
+    for (Class<? extends IKeyStroke> keystrokeClazz : getConfiguredKeyStrokes()) {
       try {
-        ks = ConfigurationUtility.newInnerInstance(this, shortcutArray[i]);
-        ksList.add(ks);
+        ksList.add(ConfigurationUtility.newInnerInstance(this, keystrokeClazz));
       }
       catch (Throwable t) {
-        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("keyStroke: " + shortcutArray[i].getName(), t));
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + keystrokeClazz.getName() + "'.", t));
       }
     }
     //ticket 87370: add ENTER key stroke when execNodeAction has an override
@@ -422,18 +442,17 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
         }
       });
     }
-    m_baseKeyStrokes = ksList.toArray(new IKeyStroke[ksList.size()]);
+    m_baseKeyStrokes = ksList;
     setKeyStrokesInternal(m_baseKeyStrokes);
     // menus
-    ArrayList<IMenu> menuList = new ArrayList<IMenu>();
-    Class<? extends IMenu>[] ma = getConfiguredMenus();
-    for (int i = 0; i < ma.length; i++) {
+    List<IMenu> menuList = new ArrayList<IMenu>();
+    for (Class<? extends IMenu> menuClazz : getDeclaredMenus()) {
       try {
-        IMenu menu = ConfigurationUtility.newInnerInstance(this, ma[i]);
+        IMenu menu = ConfigurationUtility.newInnerInstance(this, menuClazz);
         menuList.add(menu);
       }
       catch (Exception e) {
-        LOG.error("Exception occured while creating a new instance of " + ma[i].getName(), e);
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + menuClazz.getName() + "'.", e));
       }
     }
     try {
@@ -442,7 +461,9 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
     catch (Exception e) {
       LOG.error("Error occured while dynamically contributing menus.", e);
     }
-    m_menus = menuList.toArray(new IMenu[0]);
+    TreeContextMenu contextMenu = new TreeContextMenu(this, menuList);
+    setContextMenuInternal(contextMenu);
+
   }
 
   /*
@@ -451,6 +472,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   @Override
   public final void initTree() throws ProcessingException {
     initTreeInternal();
+    ActionUtility.initActions(getMenus());
     execInitTree();
   }
 
@@ -482,13 +504,17 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   }
 
   @Override
-  public IMenu[] getMenus() {
-    return m_menus;
+  public ITreeContextMenu getContextMenu() {
+    return (ITreeContextMenu) propertySupport.getProperty(PROP_CONTEXT_MENU);
+  }
+
+  protected void setContextMenuInternal(ITreeContextMenu contextMenu) {
+    propertySupport.setProperty(PROP_CONTEXT_MENU, contextMenu);
   }
 
   @Override
-  public void setMenus(IMenu[] a) {
-    m_menus = a;
+  public List<IMenu> getMenus() {
+    return getContextMenu().getChildActions();
   }
 
   @Override
@@ -503,8 +529,8 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   }
 
   @Override
-  public ITreeNodeFilter[] getNodeFilters() {
-    return m_nodeFilters.toArray(new ITreeNodeFilter[m_nodeFilters.size()]);
+  public List<ITreeNodeFilter> getNodeFilters() {
+    return CollectionUtility.arrayList(m_nodeFilters);
   }
 
   @Override
@@ -551,6 +577,10 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
           break;
         }
       }
+    }
+    if (!inode.isFilterAccepted() && isSelectedNode(inode)) {
+      // invisible nodes cannot be selected
+      deselectNode(inode);
     }
     // make parent path accepted
     if ((!parentAccepted) && inode.isFilterAccepted()) {
@@ -744,35 +774,48 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   }
 
   private void rebuildKeyStrokesInternal() {
-    //Get the menus for the selected nodes
-    IMenu[] menus;
-    try {
-      ITreeNode[] nodes = resolveVirtualNodes(getSelectedNodes());
-      menus = fetchMenusForNodesInternal(nodes);
-    }
-    catch (ProcessingException e) {
-      SERVICES.getService(IExceptionHandlerService.class).handleException(e);
-      menus = new IMenu[0];
-    }
+
+    final List<IMenu> menus = new ArrayList<IMenu>();
+    final IActionFilter activeFilter = getContextMenu().getActiveFilter();
+    getContextMenu().acceptVisitor(new IActionVisitor() {
+      @Override
+      public int visit(IAction action) {
+        if (action instanceof IMenu) {
+          IMenu menu = (IMenu) action;
+          if (menu.isEnabled() && !menu.isSeparator() && !menu.hasChildActions()) {
+            if (activeFilter.accept(menu)) {
+              menus.add(menu);
+            }
+          }
+        }
+        return CONTINUE;
+      }
+    });
 
     //Compute the Keystrokes: base + keyStroke for the current Menus.
-    ArrayList<IKeyStroke> ksList = new ArrayList<IKeyStroke>(Arrays.asList(m_baseKeyStrokes));
+    List<IKeyStroke> ksList = new ArrayList<IKeyStroke>(m_baseKeyStrokes);
     for (IMenu menu : menus) {
       if (menu.getKeyStroke() != null) {
-        IKeyStroke ks = new KeyStroke(menu.getKeyStroke(), menu);
-        ksList.add(ks);
+        try {
+          IKeyStroke ks = new KeyStroke(menu.getKeyStroke(), menu);
+          ks.initAction();
+          ksList.add(ks);
+        }
+        catch (ProcessingException e) {
+          LOG.error("could not initialize key stroke '" + menu.getKeyStroke() + "'", e);
+        }
       }
     }
 
     //Set KeyStrokes:
-    setKeyStrokesInternal(ksList.toArray(new IKeyStroke[ksList.size()]));
+    setKeyStrokesInternal(ksList);
   }
 
   @Override
   public ITreeNode findNode(Object primaryKey) {
-    ITreeNode[] a = findNodes(new Object[]{primaryKey});
-    if (a != null && a.length > 0) {
-      return a[0];
+    Collection<ITreeNode> a = findNodes(CollectionUtility.hashSet(primaryKey));
+    if (a != null && a.size() > 0) {
+      return CollectionUtility.firstElement(a);
     }
     else {
       return null;
@@ -780,11 +823,12 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   }
 
   @Override
-  public ITreeNode[] findNodes(Object[] primaryKeys) {
-    if (primaryKeys == null || primaryKeys.length <= 0) {
-      return new ITreeNode[0];
+  public List<ITreeNode> findNodes(final Collection<?> primaryKeys) {
+    if (primaryKeys == null || primaryKeys.size() <= 0) {
+      return CollectionUtility.emptyArrayList();
     }
-    final HashSet<Object> keySet = new HashSet<Object>(Arrays.asList(primaryKeys));
+
+    final Set<Object> keySet = new HashSet<Object>(primaryKeys);
     P_AbstractCollectingTreeVisitor v = new P_AbstractCollectingTreeVisitor() {
       @Override
       public boolean visit(ITreeNode node) {
@@ -863,7 +907,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
         m_treeChanging--;
         if (m_treeChanging == 0) {
           try {
-            processChangeBuffer();
+            processTreeBuffers();
           }
           finally {
             propertySupport.setPropertiesChanging(false);
@@ -930,7 +974,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
       node.setEnabledPermissionInternal(p);
       boolean newValue = node.isEnabled();
       if (oldValue != newValue) {
-        fireNodesUpdated(node.getParentNode(), new ITreeNode[]{node});
+        fireNodesUpdated(node.getParentNode(), CollectionUtility.hashSet(node));
       }
     }
   }
@@ -963,7 +1007,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
       node.setEnabledInternal(b);
       boolean newValue = node.isEnabled();
       if (oldValue != newValue) {
-        fireNodesUpdated(node.getParentNode(), new ITreeNode[]{node});
+        fireNodesUpdated(node.getParentNode(), CollectionUtility.arrayList(node));
       }
     }
   }
@@ -976,7 +1020,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
       node.setEnabledGrantedInternal(b);
       boolean newValue = node.isEnabled();
       if (oldValue != newValue) {
-        fireNodesUpdated(node.getParentNode(), new ITreeNode[]{node});
+        fireNodesUpdated(node.getParentNode(), CollectionUtility.arrayList(node));
       }
     }
   }
@@ -1059,7 +1103,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
     if (node != null) {
       if (node.isLeaf() != b) {
         node.setLeafInternal(b);
-        fireNodesUpdated(node.getParentNode(), new ITreeNode[]{node});
+        fireNodesUpdated(node.getParentNode(), CollectionUtility.arrayList(node));
       }
     }
   }
@@ -1079,7 +1123,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
     node = resolveNode(node);
     if (node != null) {
       if (node.isChecked() != b) {
-        ArrayList<ITreeNode> changedNodes = new ArrayList<ITreeNode>();
+        List<ITreeNode> changedNodes = new ArrayList<ITreeNode>();
         node.setCheckedInternal(b);
         changedNodes.add(node);
 
@@ -1094,7 +1138,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
           }
           commonParent = TreeUtility.findLowestCommonAncestorNode(changedNodes);
         }
-        fireNodesUpdated(commonParent, changedNodes.toArray(new ITreeNode[changedNodes.size()]));
+        fireNodesUpdated(commonParent, changedNodes);
       }
     }
   }
@@ -1115,7 +1159,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
     if (node != null) {
       if (node.getStatus() != status) {
         node.setStatusInternal(status);
-        fireNodesUpdated(node.getParentNode(), new ITreeNode[]{node});
+        fireNodesUpdated(node.getParentNode(), CollectionUtility.arrayList(node));
       }
     }
   }
@@ -1158,9 +1202,9 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
       LOG.warn("detected loop on tree node " + parent);
     }
     else {
-      ITreeNode[] children = parent.getChildNodes();
-      for (int i = 0; i < children.length; i++) {
-        expandAllRec(children[i], level + 1);
+      List<ITreeNode> children = parent.getChildNodes();
+      for (ITreeNode child : children) {
+        expandAllRec(child, level + 1);
       }
     }
   }
@@ -1189,31 +1233,27 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
     else {
       if (parent.isExpanded()) {
         list.add(parent);
-        ITreeNode[] children = parent.getChildNodes();
-        for (int i = 0; i < children.length; i++) {
-          fetchAllCollapsingNodesRec(children[i], level + 1, list);
+        List<ITreeNode> children = parent.getChildNodes();
+        for (ITreeNode child : children) {
+          fetchAllCollapsingNodesRec(child, level + 1, list);
         }
       }
     }
   }
 
   @Override
-  public IKeyStroke[] getKeyStrokes() {
-    IKeyStroke[] keyStrokes = (IKeyStroke[]) propertySupport.getProperty(PROP_KEY_STROKES);
-    if (keyStrokes == null) {
-      keyStrokes = new IKeyStroke[0];
-    }
-    return keyStrokes;
+  public List<IKeyStroke> getKeyStrokes() {
+    return CollectionUtility.arrayList(propertySupport.<IKeyStroke> getPropertyList(PROP_KEY_STROKES));
   }
 
   @Override
-  public void setKeyStrokes(IKeyStroke[] keyStrokes) {
-    m_baseKeyStrokes = keyStrokes;
+  public void setKeyStrokes(List<? extends IKeyStroke> keyStrokes) {
+    m_baseKeyStrokes = CollectionUtility.arrayListWithoutNullElements(keyStrokes);
     rebuildKeyStrokesInternal();
   }
 
-  private void setKeyStrokesInternal(IKeyStroke[] keyStrokes) {
-    propertySupport.setProperty(PROP_KEY_STROKES, keyStrokes);
+  private void setKeyStrokesInternal(List<? extends IKeyStroke> keyStrokes) {
+    propertySupport.setPropertyList(PROP_KEY_STROKES, keyStrokes);
   }
 
   /*
@@ -1222,25 +1262,25 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   @Override
   public void addChildNode(ITreeNode parent, ITreeNode child) {
     if (child != null) {
-      addChildNodes(parent, new ITreeNode[]{child});
+      addChildNodes(parent, CollectionUtility.arrayList(child));
     }
   }
 
   @Override
   public void addChildNode(int startIndex, ITreeNode parent, ITreeNode child) {
     if (child != null) {
-      addChildNodes(startIndex, parent, new ITreeNode[]{child});
+      addChildNodes(startIndex, parent, CollectionUtility.arrayList(child));
     }
   }
 
   @Override
-  public void addChildNodes(ITreeNode parent, ITreeNode[] children) {
+  public void addChildNodes(ITreeNode parent, List<? extends ITreeNode> children) {
     addChildNodes(parent.getChildNodeCount(), parent, children);
   }
 
   @Override
-  public void addChildNodes(int startIndex, ITreeNode parent, ITreeNode[] children) {
-    if (children == null || children.length == 0) {
+  public void addChildNodes(int startIndex, ITreeNode parent, List<? extends ITreeNode> children) {
+    if (!CollectionUtility.hasElements(children)) {
       return;
     }
     try {
@@ -1248,26 +1288,16 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
       //
       parent = resolveNode(parent);
       ((AbstractTreeNode) parent).addChildNodesInternal(startIndex, children, true);
-      // check if all children were added, or if somem were revoked using
+      // check if all children were added, or if some were revoked using
       // visible=false in init (addNotify) phase.
-      int revokeCount = 0;
+      List<ITreeNode> newChildren = new ArrayList<ITreeNode>();
       for (ITreeNode child : children) {
-        if (child.getParentNode() == null) {
-          revokeCount++;
+        if (child.getParentNode() != null) {
+          newChildren.add(child);
         }
-      }
-      if (revokeCount > 0) {
-        ITreeNode[] newChildren = new ITreeNode[children.length - revokeCount];
-        int index = 0;
-        for (ITreeNode child : children) {
-          if (child.getParentNode() != null) {
-            newChildren[index++] = child;
-          }
-        }
-        children = newChildren;
       }
       // decorate
-      decorateAffectedNodeCells(parent, children);
+      decorateAffectedNodeCells(parent, newChildren);
       // filter
       int level = 0;
       ITreeNode tmp = parent;
@@ -1275,10 +1305,10 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
         tmp = tmp.getParentNode();
         level++;
       }
-      for (ITreeNode child : children) {
+      for (ITreeNode child : newChildren) {
         applyNodeFiltersRecInternal(child, parent.isFilterAccepted(), level);
       }
-      fireNodesInserted(parent, children);
+      fireNodesInserted(parent, newChildren);
     }
     finally {
       setTreeChanging(false);
@@ -1287,18 +1317,20 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
 
   @Override
   public void updateNode(ITreeNode node) {
-    updateChildNodes(node.getParentNode(), new ITreeNode[]{node});
+    if (node != null) {
+      updateChildNodes(node.getParentNode(), CollectionUtility.hashSet(node));
+    }
   }
 
   @Override
-  public void updateChildNodes(ITreeNode parent, ITreeNode[] children) {
+  public void updateChildNodes(ITreeNode parent, Collection<? extends ITreeNode> children) {
     try {
       setTreeChanging(true);
       //
       parent = resolveNode(parent);
-      children = resolveNodes(children);
-      decorateAffectedNodeCells(parent, children);
-      fireNodesUpdated(parent, children);
+      Collection<ITreeNode> resolvedChildren = resolveNodes(children);
+      decorateAffectedNodeCells(parent, resolvedChildren);
+      fireNodesUpdated(parent, resolvedChildren);
     }
     finally {
       setTreeChanging(false);
@@ -1306,13 +1338,13 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   }
 
   @Override
-  public void updateChildNodeOrder(ITreeNode parent, ITreeNode[] newChildren) {
+  public void updateChildNodeOrder(ITreeNode parent, List<? extends ITreeNode> newChildren) {
     try {
       setTreeChanging(true);
       //
       parent = resolveNode(parent);
-      ITreeNode[] newChildrenResolved = resolveNodes(newChildren);
-      if (newChildren.length > 0 && newChildrenResolved.length == newChildren.length) {
+      List<ITreeNode> newChildrenResolved = resolveNodes(newChildren);
+      if (newChildren.size() > 0 && newChildrenResolved.size() == newChildren.size()) {
         ((AbstractTreeNode) parent).setChildNodeOrderInternal(newChildrenResolved);
         decorateAffectedNodeCells(parent, newChildrenResolved);
         fireChildNodeOrderChanged(parent, newChildrenResolved);
@@ -1332,12 +1364,12 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
 
   @Override
   public void removeChildNode(ITreeNode parent, ITreeNode child) {
-    removeChildNodes(parent, new ITreeNode[]{child});
+    removeChildNodes(parent, CollectionUtility.hashSet(child));
   }
 
   @Override
-  public void removeChildNodes(ITreeNode parent, ITreeNode[] children) {
-    if (children == null || children.length == 0) {
+  public void removeChildNodes(ITreeNode parent, Collection<? extends ITreeNode> children) {
+    if (!CollectionUtility.hasElements(children)) {
       return;
     }
     try {
@@ -1352,13 +1384,13 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
       ((AbstractTreeNode) parent).removeChildNodesInternal(children, true);
       decorateAffectedNodeCells(parent, parent.getChildNodes());
       if (!isAutoDiscardOnDelete()) {
-        for (int i = 0; i < children.length; i++) {
-          if (children[i].getStatus() == ITreeNode.STATUS_INSERTED) {
+        for (ITreeNode child : children) {
+          if (child.getStatus() == ITreeNode.STATUS_INSERTED) {
             // it was new and now it is gone, no further action required
           }
           else {
-            children[i].setStatusInternal(ITableRow.STATUS_DELETED);
-            m_deletedNodes.put(children[i].getPrimaryKey(), children[i]);
+            child.setStatusInternal(ITableRow.STATUS_DELETED);
+            m_deletedNodes.put(child.getPrimaryKey(), child);
           }
         }
       }
@@ -1395,21 +1427,20 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   }
 
   @Override
-  public ITreeNode[] resolveVirtualNodes(ITreeNode[] nodes) throws ProcessingException {
-    if (nodes == null) {
-      return new ITreeNode[0];
+  public Set<ITreeNode> resolveVirtualNodes(Collection<? extends ITreeNode> nodes) throws ProcessingException {
+    if (!CollectionUtility.hasElements(nodes)) {
+      return CollectionUtility.hashSet();
     }
     try {
       setTreeChanging(true);
-      //
-      ArrayList<ITreeNode> resolvedNodes = new ArrayList<ITreeNode>(nodes.length);
-      for (int i = 0; i < nodes.length; i++) {
-        ITreeNode resolvedNode = resolveVirtualNode(nodes[i]);
+      Set<ITreeNode> resolvedNodes = new HashSet<ITreeNode>(nodes.size());
+      for (ITreeNode node : nodes) {
+        ITreeNode resolvedNode = resolveVirtualNode(node);
         if (resolvedNode != null) {
           resolvedNodes.add(resolvedNode);
         }
       }
-      return resolvedNodes.toArray(new ITreeNode[resolvedNodes.size()]);
+      return resolvedNodes;
     }
     finally {
       setTreeChanging(false);
@@ -1464,11 +1495,11 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
     if (!b) {
       return b;
     }
-    ITreeNode[] a = node.getChildNodes();
-    for (int i = 0; i < a.length; i++) {
+    List<ITreeNode> a = node.getChildNodes();
+    for (ITreeNode childNode : a) {
       // it might be that the visit of a node detached the node from the tree
-      if (a[i].getTree() != null) {
-        b = visitNodeRec(a[i], v);
+      if (childNode.getTree() != null) {
+        b = visitNodeRec(childNode, v);
         if (!b) {
           return b;
         }
@@ -1491,17 +1522,18 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
         }
       }
       if (node.isExpanded()) {
-        ITreeNode[] a = node.getFilteredChildNodes();
-        for (int i = 0; i < a.length; i++) {
+        List<ITreeNode> a = node.getFilteredChildNodes();
+        for (ITreeNode filteredChildNode : a) {
           // it might be that the visit of a node detached the node from the
           // tree
-          if (a[i].getTree() != null) {
-            boolean b = visitVisibleNodeRec(a[i], v, true);
+          if (filteredChildNode.getTree() != null) {
+            boolean b = visitVisibleNodeRec(filteredChildNode, v, true);
             if (!b) {
               return b;
             }
           }
         }
+
       }
     }
     return true;
@@ -1513,8 +1545,8 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   }
 
   @Override
-  public ITreeNode[] getDeletedNodes() {
-    return m_deletedNodes.values().toArray(new ITreeNode[0]);
+  public Set<ITreeNode> getDeletedNodes() {
+    return CollectionUtility.hashSet(m_deletedNodes.values());
   }
 
   @Override
@@ -1533,7 +1565,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   }
 
   @Override
-  public ITreeNode[] getInsertedNodes() {
+  public Set<ITreeNode> getInsertedNodes() {
     P_AbstractCollectingTreeVisitor v = new P_AbstractCollectingTreeVisitor() {
       @Override
       public boolean visit(ITreeNode node) {
@@ -1544,7 +1576,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
       }
     };
     visitNode(getRootNode(), v);
-    return v.getNodes();
+    return CollectionUtility.hashSet(v.getNodes());
   }
 
   @Override
@@ -1563,7 +1595,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   }
 
   @Override
-  public ITreeNode[] getUpdatedNodes() {
+  public Set<ITreeNode> getUpdatedNodes() {
     P_AbstractCollectingTreeVisitor v = new P_AbstractCollectingTreeVisitor() {
       @Override
       public boolean visit(ITreeNode node) {
@@ -1574,7 +1606,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
       }
     };
     visitNode(getRootNode(), v);
-    return v.getNodes();
+    return CollectionUtility.hashSet(v.getNodes());
   }
 
   @Override
@@ -1593,8 +1625,8 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   }
 
   @Override
-  public ITreeNode[] getSelectedNodes() {
-    return m_selectedNodes.toArray(new ITreeNode[0]);
+  public Set<ITreeNode> getSelectedNodes() {
+    return CollectionUtility.hashSet(m_selectedNodes);
   }
 
   @Override
@@ -1616,15 +1648,15 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   @Override
   public void selectNode(ITreeNode node, boolean append) {
     if (node != null) {
-      selectNodes(new ITreeNode[]{node}, append);
+      selectNodes(CollectionUtility.hashSet(node), append);
     }
     else {
-      selectNodes(new ITreeNode[0], append);
+      selectNodes(null, append);
     }
   }
 
   @Override
-  public void selectNodes(ITreeNode[] nodes, boolean append) {
+  public void selectNodes(Collection<? extends ITreeNode> nodes, boolean append) {
     nodes = resolveNodes(nodes);
     try {
       nodes = resolveVirtualNodes(nodes);
@@ -1633,15 +1665,15 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
       LOG.warn("could not resolve virtual nodes.", e);
     }
     if (nodes == null) {
-      nodes = new ITreeNode[0];
+      nodes = CollectionUtility.hashSet();
     }
     HashSet<ITreeNode> newSelection = new HashSet<ITreeNode>();
     if (append) {
       newSelection.addAll(m_selectedNodes);
-      newSelection.addAll(Arrays.asList(nodes));
+      newSelection.addAll(nodes);
     }
     else {
-      newSelection.addAll(Arrays.asList(nodes));
+      newSelection.addAll(nodes);
     }
     // check selection count with multiselect
     if (newSelection.size() > 1 && !isMultiSelect()) {
@@ -1649,11 +1681,11 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
       newSelection.clear();
       newSelection.add(first);
     }
-    if (m_selectedNodes.equals(newSelection) && m_selectedNodes.containsAll(Arrays.asList(nodes))) {
+    if (m_selectedNodes.equals(newSelection) && m_selectedNodes.containsAll(nodes)) {
       // ok
     }
     else {
-      HashSet<ITreeNode> oldSelection = m_selectedNodes;
+      Set<ITreeNode> oldSelection = m_selectedNodes;
       fireBeforeNodesSelected(oldSelection, newSelection);
       m_selectedNodes = newSelection;
       fireNodesSelected(oldSelection, m_selectedNodes);
@@ -1814,19 +1846,19 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   @Override
   public void deselectNode(ITreeNode node) {
     if (node != null) {
-      deselectNodes(new ITreeNode[]{node});
+      deselectNodes(CollectionUtility.hashSet(node));
     }
     else {
-      deselectNodes(new ITreeNode[0]);
+      deselectNodes(null);
     }
   }
 
   @Override
-  public void deselectNodes(ITreeNode[] nodes) {
+  public void deselectNodes(Collection<? extends ITreeNode> nodes) {
     nodes = resolveNodes(nodes);
-    if (nodes != null && nodes.length > 0) {
-      HashSet<ITreeNode> oldSelection = new HashSet<ITreeNode>(m_selectedNodes);
-      HashSet<ITreeNode> newSelection = new HashSet<ITreeNode>();
+    if (CollectionUtility.hasElements(nodes)) {
+      Set<ITreeNode> oldSelection = new HashSet<ITreeNode>(m_selectedNodes);
+      Set<ITreeNode> newSelection = new HashSet<ITreeNode>();
       if (m_selectedNodes != null) {
         for (ITreeNode selChild : m_selectedNodes) {
           boolean accept = true;
@@ -1850,8 +1882,8 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   }
 
   @Override
-  public ITreeNode[] getCheckedNodes() {
-    final ArrayList<ITreeNode> list = new ArrayList<ITreeNode>();
+  public Set<ITreeNode> getCheckedNodes() {
+    final List<ITreeNode> list = new ArrayList<ITreeNode>();
     visitTree(new ITreeVisitor() {
       @Override
       public boolean visit(ITreeNode node) {
@@ -1861,7 +1893,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
         return true;
       }
     });
-    return list.toArray(new ITreeNode[list.size()]);
+    return CollectionUtility.hashSet(list);
   }
 
   @Override
@@ -1895,28 +1927,23 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
     }
   }
 
-  private ITreeNode[] resolveNodes(ITreeNode[] nodes) {
-    if (nodes == null) {
-      return new ITreeNode[0];
+  /**
+   * keeps order of input
+   * 
+   * @param nodes
+   * @return
+   */
+  private List<ITreeNode> resolveNodes(Collection<? extends ITreeNode> nodes) {
+    if (!CollectionUtility.hasElements(nodes)) {
+      return CollectionUtility.emptyArrayList();
     }
-    int mismatchCount = 0;
-    for (int i = 0; i < nodes.length; i++) {
-      if (resolveNode(nodes[i]) == null) {
-        mismatchCount++;
+    List<ITreeNode> resolvedNodes = new ArrayList<ITreeNode>(nodes.size());
+    for (ITreeNode node : nodes) {
+      if (resolveNode(node) != null) {
+        resolvedNodes.add(node);
       }
     }
-    if (mismatchCount > 0) {
-      ITreeNode[] resolvedNodes = new ITreeNode[nodes.length - mismatchCount];
-      int index = 0;
-      for (int i = 0; i < nodes.length; i++) {
-        if (resolveNode(nodes[i]) != null) {
-          resolvedNodes[index] = nodes[i];
-          index++;
-        }
-      }
-      nodes = resolvedNodes;
-    }
-    return nodes;
+    return resolvedNodes;
   }
 
   /*
@@ -1946,43 +1973,47 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
     return m_eventHistory;
   }
 
-  private void fireNodesInserted(ITreeNode parent, ITreeNode[] children) {
-    if (children.length > 0) {
+  private void fireNodesInserted(ITreeNode parent, List<ITreeNode> children) {
+    if (CollectionUtility.hasElements(children)) {
       fireTreeEventInternal(new TreeEvent(this, TreeEvent.TYPE_NODES_INSERTED, parent, children));
     }
   }
 
-  private void fireNodesUpdated(ITreeNode parent, ITreeNode[] children) {
-    if (children.length > 0) {
+  private void fireNodesUpdated(ITreeNode parent, Collection<ITreeNode> children) {
+    if (CollectionUtility.hasElements(children)) {
       fireTreeEventInternal(new TreeEvent(this, TreeEvent.TYPE_NODES_UPDATED, parent, children));
     }
+  }
+
+  @Override
+  public void fireNodeChanged(ITreeNode node) {
+    fireTreeEventInternal(new TreeEvent(this, TreeEvent.TYPE_NODE_CHANGED, node));
   }
 
   private void fireNodeFilterChanged() {
     fireTreeEventInternal(new TreeEvent(this, TreeEvent.TYPE_NODE_FILTER_CHANGED, getRootNode()));
   }
 
-  private void fireNodesDeleted(ITreeNode parent, ITreeNode[] children) {
-    if (children.length > 0) {
+  private void fireNodesDeleted(ITreeNode parent, Collection<? extends ITreeNode> children) {
+    if (CollectionUtility.hasElements(children)) {
       fireTreeEventInternal(new TreeEvent(this, TreeEvent.TYPE_NODES_DELETED, parent, children));
     }
   }
 
-  private void fireChildNodeOrderChanged(ITreeNode parent, ITreeNode[] children) {
-    if (children.length > 0) {
+  private void fireChildNodeOrderChanged(ITreeNode parent, List<? extends ITreeNode> children) {
+    if (CollectionUtility.hasElements(children)) {
       fireTreeEventInternal(new TreeEvent(this, TreeEvent.TYPE_CHILD_NODE_ORDER_CHANGED, parent, children));
     }
   }
 
   private void fireBeforeNodesSelected(Set<ITreeNode> oldSelection, Set<ITreeNode> newSelection) {
-    ITreeNode[] nodes = newSelection.toArray(new ITreeNode[newSelection.size()]);
-    TreeEvent e = new TreeEvent(this, TreeEvent.TYPE_BEFORE_NODES_SELECTED, nodes);
+    TreeEvent e = new TreeEvent(this, TreeEvent.TYPE_BEFORE_NODES_SELECTED, newSelection);
     HashSet<ITreeNode> deselectedNodes = new HashSet<ITreeNode>(oldSelection);
     deselectedNodes.removeAll(newSelection);
-    e.setDeselectedNodes(deselectedNodes.toArray(new ITreeNode[deselectedNodes.size()]));
-    HashSet<ITreeNode> newSelectedNodes = new HashSet<ITreeNode>(newSelection);
+    e.setDeselectedNodes(deselectedNodes);
+    Set<ITreeNode> newSelectedNodes = new HashSet<ITreeNode>(newSelection);
     newSelectedNodes.removeAll(oldSelection);
-    e.setNewSelectedNodes(newSelectedNodes.toArray(new ITreeNode[newSelectedNodes.size()]));
+    e.setNewSelectedNodes(newSelectedNodes);
     fireTreeEventInternal(e);
   }
 
@@ -1991,15 +2022,16 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
     if (isAutoTitle()) {
       rebuildTitleInternal();
     }
-    ITreeNode[] nodes = newSelection.toArray(new ITreeNode[newSelection.size()]);
     // fire
-    TreeEvent e = new TreeEvent(this, TreeEvent.TYPE_NODES_SELECTED, nodes);
-    HashSet<ITreeNode> deselectedNodes = new HashSet<ITreeNode>(oldSelection);
+    TreeEvent e = new TreeEvent(this, TreeEvent.TYPE_NODES_SELECTED, newSelection);
+    Set<ITreeNode> deselectedNodes = new HashSet<ITreeNode>(oldSelection);
     deselectedNodes.removeAll(newSelection);
-    e.setDeselectedNodes(deselectedNodes.toArray(new ITreeNode[deselectedNodes.size()]));
-    HashSet<ITreeNode> newSelectedNodes = new HashSet<ITreeNode>(newSelection);
+    e.setDeselectedNodes(deselectedNodes);
+    Set<ITreeNode> newSelectedNodes = new HashSet<ITreeNode>(newSelection);
     newSelectedNodes.removeAll(oldSelection);
-    e.setNewSelectedNodes(newSelectedNodes.toArray(new ITreeNode[newSelectedNodes.size()]));
+    e.setNewSelectedNodes(newSelectedNodes);
+    // update node menus
+    updateNodeMenus(newSelection);
     //single observer
     try {
       execNodesSelected(e);
@@ -2014,6 +2046,24 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
     fireTreeEventInternal(e);
   }
 
+  /**
+   * @param newSelectedNodes
+   */
+  protected void updateNodeMenus(Set<ITreeNode> newSelectedNodes) {
+    // remove old
+    if (m_currentNodeMenus != null) {
+      getContextMenu().removeChildActions(m_currentNodeMenus);
+      m_currentNodeMenus = null;
+    }
+    List<IMenu> nodeMenus = new ArrayList<IMenu>();
+    // take only first node to avoid having multiple same menus due to all nodes.
+    if (CollectionUtility.hasElements(newSelectedNodes)) {
+      nodeMenus.addAll(CollectionUtility.firstElement(newSelectedNodes).getMenus());
+      m_currentNodeMenus = nodeMenus;
+      getContextMenu().addChildActions(nodeMenus);
+    }
+  }
+
   private void fireNodeExpanded(ITreeNode node, boolean b) {
     if (node != null) {
       if (b) {
@@ -2023,32 +2073,6 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
         fireTreeEventInternal(new TreeEvent(this, TreeEvent.TYPE_NODE_COLLAPSED, node));
       }
     }
-  }
-
-  @Override
-  public IMenu[] fetchMenusForNodesInternal(ITreeNode[] nodes) {
-    TreeEvent e = new TreeEvent(this, TreeEvent.TYPE_NODE_POPUP, nodes);
-    // single observer for tree-owned menus
-    addLocalPopupMenus(e);
-    fireTreeEventInternal(e);
-    //separate node menus and empty space actions
-    ArrayList<IMenu> nodeMenus = new ArrayList<IMenu>();
-    ArrayList<IMenu> emptySpaceMenus = new ArrayList<IMenu>();
-    for (IMenu menu : e.getPopupMenus()) {
-      if (menu.isVisible()) {
-        if (menu.isEmptySpaceAction()) {
-          emptySpaceMenus.add(menu);
-        }
-        else {
-          nodeMenus.add(menu);
-        }
-      }
-    }
-    if (nodeMenus.size() > 0 && emptySpaceMenus.size() > 0) {
-      nodeMenus.add(0, new MenuSeparator());
-    }
-    nodeMenus.addAll(0, emptySpaceMenus);
-    return nodeMenus.toArray(new IMenu[nodeMenus.size()]);
   }
 
   private void fireNodeClick(ITreeNode node) {
@@ -2101,43 +2125,8 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
     fireTreeEventInternal(e);
   }
 
-  private void addLocalPopupMenus(TreeEvent e) {
-    int selectionCount = e.getNodes().length;
-    ArrayList<IMenu> list = new ArrayList<IMenu>();
-    for (IMenu m : this.getMenus()) {
-      if ((!m.isInheritAccessibility()) || (isEnabled())) {
-        m.prepareAction();
-        if (m.isVisible()) {
-          list.add(m);
-        }
-      }
-    }
-    if (e.getNode() != null) {
-      for (IMenu m : e.getNode().getMenus()) {
-        if ((!m.isInheritAccessibility()) || (e.getNode().isEnabled() && isEnabled())) {
-          m.prepareAction();
-          if (m.isVisible()) {
-            list.add(m);
-          }
-        }
-      }
-    }
-    //check single/multi select
-    for (IMenu menu : list) {
-      if (selectionCount > 1 && menu.isMultiSelectionAction()) {
-        e.addPopupMenu(menu);
-      }
-      else if (selectionCount == 1 && menu.isSingleSelectionAction()) {
-        e.addPopupMenu(menu);
-      }
-      else if (selectionCount == 0 && menu.isEmptySpaceAction()) {
-        e.addPopupMenu(menu);
-      }
-    }
-  }
-
-  private TransferObject fireNodesDragRequest(ITreeNode[] nodes) {
-    if (nodes != null && nodes.length > 0) {
+  private TransferObject fireNodesDragRequest(Collection<ITreeNode> nodes) {
+    if (CollectionUtility.hasElements(nodes)) {
       TreeEvent e = new TreeEvent(this, TreeEvent.TYPE_NODES_DRAG_REQUEST, nodes);
       fireTreeEventInternal(e);
       return e.getDragObject();
@@ -2150,6 +2139,27 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   private void fireNodeDropAction(ITreeNode node, TransferObject dropData) {
     TreeEvent e = new TreeEvent(this, TreeEvent.TYPE_NODE_DROP_ACTION, node);
     e.setDropObject(dropData);
+    fireTreeEventInternal(e);
+  }
+
+  /**
+   * This method gets called when the drop node is changed, e.g. the dragged object
+   * is moved over a new drop target.
+   * 
+   * @since 4.0-M7
+   */
+  public void fireNodeDropTargetChanged(ITreeNode node) {
+    TreeEvent e = new TreeEvent(this, TreeEvent.TYPE_NODE_DROP_TARGET_CHANGED, node);
+    fireTreeEventInternal(e);
+  }
+
+  /**
+   * This method gets called after the drag action has been finished.
+   * 
+   * @since 4.0-M7
+   */
+  public void fireDragFinished() {
+    TreeEvent e = new TreeEvent(this, TreeEvent.TYPE_DRAG_FINISHED);
     fireTreeEventInternal(e);
   }
 
@@ -2185,14 +2195,13 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   }
 
   // batch handler
-  private void fireTreeEventBatchInternal(TreeEvent[] batch) {
-    if (batch.length == 0) {
-      return;
-    }
-    EventListener[] listeners = m_listenerList.getListeners(TreeListener.class);
-    if (listeners != null && listeners.length > 0) {
-      for (int i = 0; i < listeners.length; i++) {
-        ((TreeListener) listeners[i]).treeChangedBatch(batch);
+  private void fireTreeEventBatchInternal(List<? extends TreeEvent> batch) {
+    if (CollectionUtility.hasElements(batch)) {
+      EventListener[] listeners = m_listenerList.getListeners(TreeListener.class);
+      if (listeners != null && listeners.length > 0) {
+        for (int i = 0; i < listeners.length; i++) {
+          ((TreeListener) listeners[i]).treeChangedBatch(batch);
+        }
       }
     }
   }
@@ -2200,7 +2209,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   /**
    * add cells on the path to root and on children to decoration buffer
    */
-  private void decorateAffectedNodeCells(ITreeNode parent, ITreeNode[] children) {
+  private void decorateAffectedNodeCells(ITreeNode parent, Collection<ITreeNode> children) {
     decorateAffectedNodeCellsOnPathToRoot(parent);
     for (ITreeNode child : children) {
       decorateAffectedNodeCellsOnSubtree(child);
@@ -2222,28 +2231,38 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
     }
   }
 
-  private int m_processChangeBufferLoopDetection;
+  private int m_processTreeBufferLoopDetection;
 
   /**
    * affects columns with lookup calls or code types<br>
    * cells that have changed values fetch new texts/decorations from the lookup
    * service in one single batch call lookup (performance optimization)
    */
-  private void processChangeBuffer() {
+  private void processTreeBuffers() {
     //loop detection
     try {
-      m_processChangeBufferLoopDetection++;
-      if (m_processChangeBufferLoopDetection > 100) {
+      m_processTreeBufferLoopDetection++;
+      if (m_processTreeBufferLoopDetection > 100) {
         LOG.error("LOOP DETECTION in " + getClass() + ". see stack trace for more details.", new Exception("LOOP DETECTION"));
         return;
       }
-      //
-      /*
-       * update row decorations
-       */
-      if (m_nodeDecorationBuffer.size() > 0) {
-        HashSet<ITreeNode> set = m_nodeDecorationBuffer;
-        m_nodeDecorationBuffer = new HashSet<ITreeNode>();
+      processDecorationBuffer();
+      processEventBuffer();
+    }
+    finally {
+      m_processTreeBufferLoopDetection--;
+    }
+  }
+
+  /**
+   * update row decorations
+   */
+  private void processDecorationBuffer() {
+    if (m_nodeDecorationBuffer.size() > 0) {
+      Set<ITreeNode> set = m_nodeDecorationBuffer;
+      m_nodeDecorationBuffer = new HashSet<ITreeNode>();
+      try {
+        setTreeChanging(true);
         for (Iterator<ITreeNode> it = set.iterator(); it.hasNext();) {
           ITreeNode node = it.next();
           if (node.getTree() != null) {
@@ -2256,38 +2275,41 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
           }
         }
       }
-      /*
-       * fire events tree changes are finished now, fire all buffered events
-       * and call lookups
-       */
-      if (m_treeEventBuffer.size() > 0) {
-        ArrayList<TreeEvent> list = m_treeEventBuffer;
-        m_treeEventBuffer = new ArrayList<TreeEvent>();
-        // coalesce selection events
-        boolean foundSelectionEvent = false;
-        for (ListIterator<TreeEvent> it = list.listIterator(list.size()); it.hasPrevious();) {
-          if (it.previous().getType() == TreeEvent.TYPE_NODES_SELECTED) {
-            if (!foundSelectionEvent) {
-              foundSelectionEvent = true;
-            }
-            else {
-              it.remove();
-            }
-          }
-        }
-        // fire the batch and set tree to changing, otherwise a listener might trigger another events that then are processed before all other listeners received that batch
-        try {
-          setTreeChanging(true);
-          //
-          fireTreeEventBatchInternal(list.toArray(new TreeEvent[list.size()]));
-        }
-        finally {
-          setTreeChanging(false);
-        }
+      finally {
+        setTreeChanging(false);
       }
     }
-    finally {
-      m_processChangeBufferLoopDetection--;
+  }
+
+  /**
+   * fire events tree changes are finished now, fire all buffered events
+   * and call lookups
+   */
+  private void processEventBuffer() {
+    if (m_treeEventBuffer.size() > 0) {
+      List<TreeEvent> list = m_treeEventBuffer;
+      m_treeEventBuffer = new ArrayList<TreeEvent>();
+      // coalesce selection events
+      boolean foundSelectionEvent = false;
+      for (ListIterator<TreeEvent> it = list.listIterator(list.size()); it.hasPrevious();) {
+        if (it.previous().getType() == TreeEvent.TYPE_NODES_SELECTED) {
+          if (!foundSelectionEvent) {
+            foundSelectionEvent = true;
+          }
+          else {
+            it.remove();
+          }
+        }
+      }
+      // fire the batch and set tree to changing, otherwise a listener might trigger another events that then are processed before all other listeners received that batch
+      try {
+        setTreeChanging(true);
+        //
+        fireTreeEventBatchInternal(list);
+      }
+      finally {
+        setTreeChanging(false);
+      }
     }
   }
 
@@ -2346,7 +2368,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
     exportTreeNodeDataRec(getRootNode().getChildNodes(), target, null);
   }
 
-  private void exportTreeNodeDataRec(ITreeNode[] nodes, AbstractTreeFieldData treeData, TreeNodeData parentNodeData) throws ProcessingException {
+  private void exportTreeNodeDataRec(List<ITreeNode> nodes, AbstractTreeFieldData treeData, TreeNodeData parentNodeData) throws ProcessingException {
     ArrayList<TreeNodeData> nodeDataList = new ArrayList<TreeNodeData>();
     for (ITreeNode node : nodes) {
       TreeNodeData nodeData = exportTreeNodeData(node, treeData);
@@ -2421,14 +2443,14 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   }
 
   private abstract class P_AbstractCollectingTreeVisitor implements ITreeVisitor {
-    private final ArrayList<ITreeNode> m_list = new ArrayList<ITreeNode>();
+    private final List<ITreeNode> m_list = new ArrayList<ITreeNode>();
 
     protected void addNodeToList(ITreeNode node) {
       m_list.add(node);
     }
 
-    public ITreeNode[] getNodes() {
-      return m_list.toArray(new ITreeNode[0]);
+    public List<ITreeNode> getNodes() {
+      return CollectionUtility.arrayList(m_list);
     }
   }// end private class
 
@@ -2530,82 +2552,40 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
     }
 
     @Override
-    public void setNodesSelectedFromUI(ITreeNode[] nodes) {
+    public void setNodesSelectedFromUI(List<ITreeNode> nodes) {
       try {
         pushUIProcessor();
         try {
           setTreeChanging(true);
-          //
-          HashSet<ITreeNode> requestedNodes = new HashSet<ITreeNode>(Arrays.asList(resolveVirtualNodes(resolveNodes(nodes))));
-          for (ITreeNode node : requestedNodes) {
+
+          Set<ITreeNode> validNodes = resolveVirtualNodes(resolveNodes(nodes));
+
+          // remove filtered (invisible) nodes from selection
+          Iterator<ITreeNode> iterator = validNodes.iterator();
+          while (iterator.hasNext()) {
+            if (!iterator.next().isFilterAccepted()) {
+              iterator.remove();
+            }
+          }
+
+          // load children for selection
+          for (ITreeNode node : validNodes) {
             if (node.isChildrenLoaded()) {
               if (node.isChildrenDirty() || node.isChildrenVolatile()) {
                 node.loadChildren();
               }
             }
           }
-          ArrayList<ITreeNode> validNodes = new ArrayList<ITreeNode>();
-          if (isMultiSelect()) {
-            // When multiselection is enabled
-            // check filtered nodes
-            // add existing selected nodes that are masked by filter
-            for (ITreeNode node : getSelectedNodes()) {
-              if (!node.isFilterAccepted()) {
-                validNodes.add(node);
-              }
-            }
-            // remove all filtered from requested
-            requestedNodes.removeAll(validNodes);
-            // add remainder
-            for (ITreeNode node : requestedNodes) {
-              validNodes.add(node);
-            }
-          }
-          else {
-            for (ITreeNode node : requestedNodes) {
-              if (node.isFilterAccepted()) {
-                validNodes.add(node);
-              }
-            }
-          }
-          selectNodes(validNodes.toArray(new ITreeNode[validNodes.size()]), false);
+
+          selectNodes(validNodes, false);
         }
         finally {
           setTreeChanging(false);
         }
       }
       catch (ProcessingException se) {
-        se.addContextMessage(Arrays.asList(nodes).toString());
+        se.addContextMessage(nodes.toString());
         SERVICES.getService(IExceptionHandlerService.class).handleException(se);
-      }
-      finally {
-        popUIProcessor();
-      }
-    }
-
-    @Override
-    public IMenu[] fireNodePopupFromUI() {
-      try {
-        pushUIProcessor();
-        //
-        ITreeNode[] nodes = resolveVirtualNodes(getSelectedNodes());
-        return fetchMenusForNodesInternal(nodes);
-      }
-      catch (ProcessingException e) {
-        SERVICES.getService(IExceptionHandlerService.class).handleException(e);
-        return new IMenu[0];
-      }
-      finally {
-        popUIProcessor();
-      }
-    }
-
-    @Override
-    public IMenu[] fireEmptySpacePopupFromUI() {
-      try {
-        pushUIProcessor();
-        //
-        return fetchMenusForNodesInternal(new ITreeNode[0]);
       }
       finally {
         popUIProcessor();
@@ -2616,7 +2596,6 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
     public void fireNodeClickFromUI(ITreeNode node) {
       try {
         pushUIProcessor();
-        //
         node = resolveNode(node);
         node = resolveVirtualNode(node);
         if (node != null) {
@@ -2650,6 +2629,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
       }
     }
 
+    @SuppressWarnings("deprecation")
     @Override
     public boolean getNodesDragEnabledFromUI() {
       return isDragEnabled();
@@ -2660,12 +2640,42 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
       try {
         pushUIProcessor();
         //
-        ITreeNode[] nodes = resolveVirtualNodes(getSelectedNodes());
+        Collection<ITreeNode> nodes = resolveVirtualNodes(getSelectedNodes());
         return fireNodesDragRequest(nodes);
       }
       catch (ProcessingException e) {
         SERVICES.getService(IExceptionHandlerService.class).handleException(e);
         return null;
+      }
+      finally {
+        popUIProcessor();
+      }
+    }
+
+    @Override
+    public void fireDragFinishedFromUI() {
+      try {
+        pushUIProcessor();
+        fireDragFinished();
+      }
+      finally {
+        popUIProcessor();
+      }
+    }
+
+    @Override
+    public void fireNodeDropTargetChangedFromUI(ITreeNode node) {
+      try {
+        pushUIProcessor();
+        //
+        node = resolveNode(node);
+        node = resolveVirtualNode(node);
+        if (node != null) {
+          fireNodeDropTargetChanged(node);
+        }
+      }
+      catch (ProcessingException e) {
+        SERVICES.getService(IExceptionHandlerService.class).handleException(e);
       }
       finally {
         popUIProcessor();
@@ -2711,4 +2721,5 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
     }
 
   }// end private class
+
 }

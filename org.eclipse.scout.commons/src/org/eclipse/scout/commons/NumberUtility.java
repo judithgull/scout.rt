@@ -14,10 +14,15 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.text.NumberFormat;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Locale;
 import java.util.Random;
 
+import org.eclipse.scout.commons.logger.IScoutLogger;
+import org.eclipse.scout.commons.logger.ScoutLogManager;
+
 public final class NumberUtility {
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(NumberUtility.class);
   private static final Random RANDOMIZER = new Random();
 
   private NumberUtility() {
@@ -48,6 +53,27 @@ public final class NumberUtility {
       return null;
     }
     return n.longValue();
+  }
+
+  /**
+   * Converts a Number into a BigDecimal using it's String representation. If the <code>number</code>'s String
+   * representation cannot be converted to a BigDecimal this method returns <code>null</code> (E.g. for Double and
+   * Floats special values: NaN, POSITIVE_INFINITY and NEGATIVE_INFINITY).
+   * 
+   * @param number
+   */
+  public static BigDecimal numberToBigDecimal(Number number) {
+    if (number == null) {
+      return null;
+    }
+    BigDecimal retVal = null;
+    try {
+      retVal = new BigDecimal(number.toString());
+    }
+    catch (NumberFormatException e) {
+      LOG.warn("converting to BigDecimal failed for Number: " + number.toString());
+    }
+    return retVal;
   }
 
   public static BigDecimal toBigDecimal(Double d) {
@@ -112,6 +138,44 @@ public final class NumberUtility {
     double sum = 0;
     for (double d : a) {
       sum += d;
+    }
+    return sum;
+  }
+
+  /**
+   * null lenient
+   * 
+   * @param numbers
+   * @return the sum of all numbers passt in the given list. Null elements are not considered.
+   */
+  public static BigDecimal sum(Collection<? extends Number> numbers) {
+    BigDecimal sum = BigDecimal.ZERO;
+    if (CollectionUtility.hasElements(numbers)) {
+      for (Number number : numbers) {
+        if (number != null) {
+          BigDecimal augend = numberToBigDecimal(number);
+          sum = sum.add(augend == null ? BigDecimal.ZERO : augend);
+        }
+      }
+    }
+    return sum;
+  }
+
+  /**
+   * Calculates the sum over an array of numbers. Array elements that have no valid BigDecimal representation (e.g.
+   * Double.NaN) are treated as BigDecimal.ZERO.
+   */
+  public static BigDecimal sum(Number... a) {
+    if (a == null) {
+      return BigDecimal.ZERO;
+    }
+    if (a.length == 0) {
+      return BigDecimal.ZERO;
+    }
+    BigDecimal sum = BigDecimal.ZERO;
+    for (Number d : a) {
+      BigDecimal augend = numberToBigDecimal(d);
+      sum = sum.add(augend == null ? BigDecimal.ZERO : augend);
     }
     return sum;
   }

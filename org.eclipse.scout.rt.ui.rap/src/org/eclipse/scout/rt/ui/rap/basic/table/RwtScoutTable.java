@@ -13,7 +13,10 @@ package org.eclipse.scout.rt.ui.rap.basic.table;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicReference;
@@ -28,6 +31,7 @@ import org.eclipse.jface.viewers.StructuredSelection;
 import org.eclipse.jface.viewers.TableViewer;
 import org.eclipse.jface.viewers.TableViewerColumn;
 import org.eclipse.rap.rwt.RWT;
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.CompareUtility;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.beans.IPropertyObserver;
@@ -39,8 +43,11 @@ import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ClientSyncJob;
 import org.eclipse.scout.rt.client.ui.IDNDSupport;
 import org.eclipse.scout.rt.client.ui.IEventHistory;
+import org.eclipse.scout.rt.client.ui.action.ActionUtility;
+import org.eclipse.scout.rt.client.ui.action.IActionFilter;
 import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
-import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.TableMenuType;
+import org.eclipse.scout.rt.client.ui.action.menu.root.IContextMenu;
 import org.eclipse.scout.rt.client.ui.basic.table.IHeaderCell;
 import org.eclipse.scout.rt.client.ui.basic.table.ITable;
 import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
@@ -48,6 +55,7 @@ import org.eclipse.scout.rt.client.ui.basic.table.RowIndexComparator;
 import org.eclipse.scout.rt.client.ui.basic.table.TableEvent;
 import org.eclipse.scout.rt.client.ui.basic.table.TableListener;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.IColumn;
+import org.eclipse.scout.rt.client.ui.basic.table.columns.IStringColumn;
 import org.eclipse.scout.rt.client.ui.basic.table.customizer.ICustomColumn;
 import org.eclipse.scout.rt.ui.rap.RwtMenuUtility;
 import org.eclipse.scout.rt.ui.rap.basic.RwtScoutComposite;
@@ -65,6 +73,8 @@ import org.eclipse.scout.rt.ui.rap.util.RwtUtility;
 import org.eclipse.scout.rt.ui.rap.util.UiRedrawHandler;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.dnd.DropTargetEvent;
+import org.eclipse.swt.events.MenuDetectEvent;
+import org.eclipse.swt.events.MenuDetectListener;
 import org.eclipse.swt.events.MenuEvent;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
@@ -77,6 +87,7 @@ import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Menu;
+import org.eclipse.swt.widgets.Table;
 import org.eclipse.swt.widgets.TableColumn;
 import org.eclipse.swt.widgets.TableItem;
 
@@ -91,7 +102,7 @@ import org.eclipse.swt.widgets.TableItem;
  * @since 3.8.0
  */
 @SuppressWarnings("restriction")
-public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScoutTableForPatch {
+public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScoutTable {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(RwtScoutTable.class);
 
   private P_ScoutTableListener m_scoutTableListener;
@@ -149,6 +160,8 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
     //cell editing support
     m_uiCellEditorComposite = new RwtScoutTableCellEditor(this);
 
+    table.addMenuDetectListener(new P_RwtHeaderMenuDetectListener());
+
     //columns
     initializeUiColumns();
 
@@ -191,12 +204,10 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
     return m_columnModel;
   }
 
-  @Override
   public TableColumnManager getUiColumnManager() {
     return m_uiColumnManager;
   }
 
-  @Override
   public void initializeUiColumns() {
     m_redrawHandler.pushControlChanging();
     try {
@@ -212,13 +223,13 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
       dummyCol.setResizable(false);
       dummyCol.setMoveable(false);
       boolean sortEnabled = false;
-      IColumn<?>[] scoutColumnsOrdered;
+      List<IColumn<?>> scoutColumnsOrdered;
       if (getScoutObject() != null) {
         scoutColumnsOrdered = getScoutObject().getColumnSet().getVisibleColumns();
         sortEnabled = getScoutObject().isSortEnabled();
       }
       else {
-        scoutColumnsOrdered = new IColumn[0];
+        scoutColumnsOrdered = CollectionUtility.emptyArrayList();
       }
       if (m_uiColumnManager == null) {
         m_uiColumnManager = new TableColumnManager();
@@ -244,6 +255,9 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
         TableViewerColumn rwtViewerCol = new TableViewerColumn(getUiTableViewer(), rwtCol);
         rwtViewerCol.setLabelProvider(getUiColumnModel());
         rwtCol.setData(KEY_SCOUT_COLUMN, scoutColumn);
+        if (scoutColumn instanceof IStringColumn) {
+          rwtCol.setData(WRAPPED_COLUMN, ((IStringColumn) scoutColumn).isTextWrap());
+        }
         rwtCol.setMoveable(true);
         rwtCol.setToolTipText(cell.getTooltipText());
         updateHeaderText(rwtCol, scoutColumn);
@@ -339,31 +353,24 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
     return m_uiViewer;
   }
 
-  @Override
   public void setUiTableViewer(TableViewer uiViewer) {
     m_uiViewer = uiViewer;
   }
 
-  @Override
   public ITableRow getUiSelectedRow() {
-    ITableRow[] rows = getUiSelectedRows();
-    if (rows.length > 0) {
-      return rows[0];
-    }
-    return null;
+    return CollectionUtility.firstElement(getUiSelectedRows());
   }
 
-  @Override
-  public ITableRow[] getUiSelectedRows() {
+  public List<ITableRow> getUiSelectedRows() {
     StructuredSelection uiSelection = (StructuredSelection) getUiTableViewer().getSelection();
     TreeSet<ITableRow> sortedRows = new TreeSet<ITableRow>(new RowIndexComparator());
     if (uiSelection != null && !uiSelection.isEmpty()) {
-      for (Object o : uiSelection.toArray()) {
-        ITableRow row = (ITableRow) o;
-        sortedRows.add(row);
+      Iterator uiSelectionIt = uiSelection.iterator();
+      while (uiSelectionIt.hasNext()) {
+        sortedRows.add((ITableRow) uiSelectionIt.next());
       }
     }
-    return sortedRows.toArray(new ITableRow[sortedRows.size()]);
+    return new ArrayList<ITableRow>(sortedRows);
   }
 
   protected void setKeyStrokeFormScout() {
@@ -374,9 +381,8 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
       }
     }
     // add new
-    ArrayList<IRwtKeyStroke> newRwtKeyStrokes = new ArrayList<IRwtKeyStroke>();
-    IKeyStroke[] scoutKeyStrokes = getScoutObject().getKeyStrokes();
-    for (IKeyStroke scoutKeyStroke : scoutKeyStrokes) {
+    List<IRwtKeyStroke> newRwtKeyStrokes = new ArrayList<IRwtKeyStroke>();
+    for (IKeyStroke scoutKeyStroke : getScoutObject().getKeyStrokes()) {
       if (scoutKeyStroke.isEnabled()) {
         IRwtKeyStroke[] rwtStrokes = RwtUtility.getKeyStrokes(scoutKeyStroke, getUiEnvironment());
         for (IRwtKeyStroke rwtStroke : rwtStrokes) {
@@ -483,8 +489,8 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
   /**
    * scout table observer
    */
-  protected boolean isHandleScoutTableEvent(TableEvent[] a) {
-    for (TableEvent element : a) {
+  protected boolean isHandleScoutTableEvent(List<? extends TableEvent> events) {
+    for (TableEvent element : events) {
       switch (element.getType()) {
         case TableEvent.TYPE_REQUEST_FOCUS:
         case TableEvent.TYPE_REQUEST_FOCUS_IN_CELL:
@@ -584,14 +590,6 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
         }
         setSelectionFromScout(e.getTable().getSelectedRows());
         break;
-      case TableEvent.TYPE_ROWS_INSERTED:
-      case TableEvent.TYPE_ROWS_UPDATED:
-      case TableEvent.TYPE_ROWS_DELETED:
-      case TableEvent.TYPE_ALL_ROWS_DELETED:
-      case TableEvent.TYPE_ROW_ORDER_CHANGED: {
-        setSelectionFromScout(e.getTable().getSelectedRows());
-        break;
-      }
     }
   }
 
@@ -638,7 +636,7 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
 
   @Override
   public void setEnabledFromScout(boolean enabledFromScout) {
-    getUiField().setEnabled(!enabledFromScout);
+    getUiField().setEnabled(true);
     // <Workaround>
     // Because RAP seems to ignore the default ":disabled" state,
     // we apply a custom variant to all header cells. Otherwise
@@ -649,18 +647,18 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
     // </Workaround>
   }
 
-  protected void setSelectionFromScout(ITableRow[] selectedRows) {
+  protected void setSelectionFromScout(List<ITableRow> selectedRows) {
     if (getUiField().isDisposed()) {
       return;
     }
-    ITableRow[] uiSelection = getUiSelectedRows();
+    List<ITableRow> uiSelection = getUiSelectedRows();
     if (CompareUtility.equals(uiSelection, selectedRows)) {
       // no change
       return;
     }
     else {
       if (selectedRows == null) {
-        selectedRows = new ITableRow[0];
+        selectedRows = Collections.emptyList();
       }
       getUiTableViewer().setSelection(new StructuredSelection(selectedRows), true);
       updateScrollToSelectionFromScout();
@@ -718,6 +716,28 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
     return visualCellIndex;
   }
 
+  /**
+   * @param p
+   *          is the location of the Table control (i.e. not scrollbar adjusted)
+   * @since 4.1
+   */
+  private TableColumn getUiColumnAt(Point p) {
+    Table table = getUiTableViewer().getTable();
+    int x = p.x + getUiField().getHorizontalBar().getSelection();
+    int[] order = table.getColumnOrder();
+    for (int index : order) {
+      // loop over columns according current display-order
+      TableColumn c = table.getColumn(index);
+      if (c != null) {
+        if (x >= 0 && x <= c.getWidth()) {
+          return c;
+        }
+        x = x - c.getWidth();
+      }
+    }
+    return null;
+  }
+
   protected void setSelectionFromUi(final StructuredSelection selection) {
     if (getUpdateUiFromScoutLock().isAcquired()) {
       return;
@@ -759,6 +779,7 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
           minUiSortColumn = col;
           minScoutSortColumn = cell;
         }
+        updateHeaderText(col);
       }
     }
 
@@ -962,7 +983,7 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
     for (int i = 0; i < truncatedColOrder.length; i++) {
       truncatedColOrder[i] = uiColumnOrder[i + 1] - 1;
     }
-    final IColumn<?>[] newOrder = m_uiColumnManager.getOrderedColumns(truncatedColOrder);
+    final List<IColumn<?>> newOrder = m_uiColumnManager.getOrderedColumns(truncatedColOrder);
     if (m_uiColumnManager.applyNewOrder(newOrder)) {
       m_uiColumnOrder = uiColumnOrder;
       // notify Scout
@@ -1001,9 +1022,9 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
       if (e.stateMask == 0) {
         switch (e.keyCode) {
           case ' ':
-            ITableRow[] selectedRows = RwtUtility.getItemsOfSelection(ITableRow.class, (StructuredSelection) getUiTableViewer().getSelection());
-            if (selectedRows != null && selectedRows.length > 0) {
-              handleUiRowClick(selectedRows[0]);
+            List<ITableRow> selectedRows = RwtUtility.getItemsOfSelection(ITableRow.class, (StructuredSelection) getUiTableViewer().getSelection());
+            if (CollectionUtility.hasElements(selectedRows)) {
+              handleUiRowClick(CollectionUtility.firstElement(selectedRows));
             }
             e.doit = false;
             break;
@@ -1015,7 +1036,7 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
   private class P_ScoutTableListener implements TableListener {
     @Override
     public void tableChanged(final TableEvent e) {
-      if (isHandleScoutTableEvent(new TableEvent[]{e})) {
+      if (isHandleScoutTableEvent(CollectionUtility.arrayList(e))) {
         if (isIgnoredScoutEvent(TableEvent.class, "" + e.getType())) {
           return;
         }
@@ -1037,42 +1058,41 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
     }
 
     @Override
-    public void tableChangedBatch(final TableEvent[] a) {
-      if (isHandleScoutTableEvent(a)) {
-        final ArrayList<TableEvent> filteredList = new ArrayList<TableEvent>();
-        for (int i = 0; i < a.length; i++) {
-          if (!isIgnoredScoutEvent(TableEvent.class, "" + a[i].getType())) {
-            filteredList.add(a[i]);
+    public void tableChangedBatch(final List<? extends TableEvent> events) {
+      if (isHandleScoutTableEvent(events)) {
+        final List<TableEvent> filteredList = new ArrayList<TableEvent>();
+        for (TableEvent event : events) {
+          if (!isIgnoredScoutEvent(TableEvent.class, "" + event.getType())) {
+            filteredList.add(event);
           }
         }
-        if (filteredList.size() == 0) {
-          return;
-        }
-        Runnable t = new Runnable() {
-          @Override
-          public void run() {
-            if (isUiDisposed()) {
-              return;
-            }
-            m_redrawHandler.pushControlChanging();
-            try {
+        if (CollectionUtility.hasElements(filteredList)) {
+          Runnable t = new Runnable() {
+            @Override
+            public void run() {
+              if (isUiDisposed()) {
+                return;
+              }
+              m_redrawHandler.pushControlChanging();
               try {
-                getUpdateUiFromScoutLock().acquire();
-                //
-                for (TableEvent element : filteredList) {
-                  handleScoutTableEventInUi(element);
+                try {
+                  getUpdateUiFromScoutLock().acquire();
+                  //
+                  for (TableEvent element : filteredList) {
+                    handleScoutTableEventInUi(element);
+                  }
+                }
+                finally {
+                  getUpdateUiFromScoutLock().release();
                 }
               }
               finally {
-                getUpdateUiFromScoutLock().release();
+                m_redrawHandler.popControlChanging();
               }
             }
-            finally {
-              m_redrawHandler.popControlChanging();
-            }
-          }
-        };
-        getUiEnvironment().invokeUiLater(t);
+          };
+          getUiEnvironment().invokeUiLater(t);
+        }
       }
     }
   }// end P_ScoutTableListener
@@ -1099,13 +1119,11 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
     menu.setVisible(true);
   }
 
-  private class P_RwtTableListener implements Listener {
+  private class P_RwtTableListener extends AbstractAvoidWrongDoubleClickListener {
     private static final long serialVersionUID = 1L;
 
-    private Boolean m_doubleClicked = Boolean.FALSE;
-
     @Override
-    public void handleEvent(Event event) {
+    public void handleEventInternal(Event event) {
       Point eventPosition = new Point(event.x, event.y);
       TableViewer uiTableViewer = getUiTableViewer();
       switch (event.type) {
@@ -1123,12 +1141,6 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
           break;
         }
         case SWT.MouseUp: {
-          synchronized (m_doubleClicked) {
-            if (m_doubleClicked == Boolean.TRUE) {
-              m_doubleClicked = Boolean.FALSE;
-              break;
-            }
-          }
           StructuredSelection selection = (StructuredSelection) uiTableViewer.getSelection();
           if (selection != null && selection.size() == 1) {
             handleUiRowClick((ITableRow) selection.getFirstElement());
@@ -1136,9 +1148,6 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
           break;
         }
         case SWT.MouseDoubleClick: {
-          synchronized (m_doubleClicked) {
-            m_doubleClicked = Boolean.TRUE;
-          }
           StructuredSelection selection = (StructuredSelection) uiTableViewer.getSelection();
           if (selection != null && selection.size() == 1) {
             handleUiRowAction((ITableRow) selection.getFirstElement());
@@ -1198,6 +1207,71 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
     }
   }
 
+  /**
+   * @since 4.1
+   */
+  private class P_RwtHeaderMenuDetectListener implements MenuDetectListener {
+
+    private static final long serialVersionUID = 1L;
+
+    @Override
+    public void menuDetected(MenuDetectEvent event) {
+      Table table = getUiField();
+      Point pTable = table.getDisplay().map(null, table, new Point(event.x, event.y));
+      Rectangle clientArea = table.getClientArea();
+      boolean header = clientArea.y <= pTable.y && pTable.y < clientArea.y + table.getHeaderHeight();
+      if (!header) {
+        return;
+      }
+//      // clear all previous
+//      // Windows BUG: fires menu hide before the selection on the menu item is
+//      // propagated.
+//      if (m_headerMenu != null) {
+//        for (MenuItem item : m_headerMenu.getItems()) {
+//          disposeMenuItem(item);
+//        }
+//      }
+      setContextColumnFromUi(getUiColumnAt(pTable));
+//      final AtomicReference<IContextMenu> scoutMenusRef = new AtomicReference<IContextMenu>();
+//      Runnable t = new Runnable() {
+//        @SuppressWarnings("deprecation")
+//        @Override
+//        public void run() {
+//          IContextMenu contextMenu = getScoutObject().getContextMenu();
+//          // manually call about to show
+//          contextMenu.aboutToShow();
+//          contextMenu.prepareAction();
+//          scoutMenusRef.set(contextMenu);
+//        }
+//      };
+//      JobEx job = getEnvironment().invokeScoutLater(t, 1200);
+//      try {
+//        job.join(1200);
+//      }
+//      catch (InterruptedException ex) {
+//        //nop
+//      }
+//      // grab the actions out of the job, when the actions are providden
+//      // within the scheduled time the popup will be handled.
+//      if (scoutMenusRef.get() != null) {
+//        SwtMenuUtility.fillMenu(m_headerMenu, scoutMenusRef.get().getChildActions(),
+//            ActionUtility.createMenuFilterVisibleAndMenuTypes(CollectionUtility.hashSet(TableMenuType.EmptySpace, TableMenuType.Header)), getEnvironment());
+//      }
+    }
+
+//    private void disposeMenuItem(MenuItem item) {
+//      Menu menu = item.getMenu();
+//      if (menu != null) {
+//        for (MenuItem childItem : menu.getItems()) {
+//          disposeMenuItem(childItem);
+//        }
+//        menu.dispose();
+//      }
+//      item.dispose();
+//    }
+
+  } // end class P_HeaderMenuListener
+
   private class P_TableColumnListener implements Listener {
     private static final long serialVersionUID = 1L;
 
@@ -1251,28 +1325,16 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
     @Override
     public void menuShown(MenuEvent e) {
       super.menuShown(e);
-
-      IMenu[] menus = null;
-      if (m_header) {
-        menus = collectHeaderMenus();
-      }
-      else {
-        final boolean emptySelection = getUiTableViewer().getSelection().isEmpty();
-        menus = RwtMenuUtility.collectMenus(getScoutObject(), emptySelection, !emptySelection, getUiEnvironment());
-      }
-      if (menus != null) {
-        Menu menu = ((Menu) e.getSource());
-        RwtMenuUtility.fillContextMenu(menus, getUiEnvironment(), menu);
-      }
-    }
-
-    private IMenu[] collectHeaderMenus() {
-      final AtomicReference<IMenu[]> scoutMenusRef = new AtomicReference<IMenu[]>();
+      final AtomicReference<IContextMenu> scoutMenusRef = new AtomicReference<IContextMenu>();
       Runnable t = new Runnable() {
+        @SuppressWarnings("deprecation")
         @Override
         public void run() {
-          IMenu[] scoutMenus = getScoutObject().getUIFacade().fireHeaderPopupFromUI();
-          scoutMenusRef.set(scoutMenus);
+          IContextMenu contextMenu = getScoutObject().getContextMenu();
+          // manually call about to show
+          contextMenu.aboutToShow();
+          contextMenu.prepareAction();
+          scoutMenusRef.set(contextMenu);
         }
       };
       JobEx job = getUiEnvironment().invokeScoutLater(t, 1200);
@@ -1282,13 +1344,17 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
       catch (InterruptedException ex) {
         //nop
       }
-      // grab the actions out of the job, when the actions are providden
-      // within the scheduled time the popup will be handled.
-      if (scoutMenusRef.get() != null) {
-        return scoutMenusRef.get();
+      IContextMenu contextMenu = scoutMenusRef.get();
+      if (contextMenu != null) {
+        IActionFilter filter = null;
+        if (m_header) {
+          filter = ActionUtility.createMenuFilterVisibleAndMenuTypes(TableMenuType.EmptySpace, TableMenuType.Header);
+        }
+        else {
+          filter = contextMenu.getActiveFilter();
+        }
+        RwtMenuUtility.fillMenu((Menu) e.getSource(), contextMenu.getChildActions(), filter, getUiEnvironment());
       }
-
-      return new IMenu[0];
     }
   }
 

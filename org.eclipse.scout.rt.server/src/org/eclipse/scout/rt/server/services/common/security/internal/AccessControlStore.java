@@ -11,7 +11,10 @@
 package org.eclipse.scout.rt.server.services.common.security.internal;
 
 import java.security.Permissions;
+import java.util.Collection;
+import java.util.Set;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.TTLCache;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
@@ -113,33 +116,50 @@ public class AccessControlStore {
    * clears the cache
    */
   public void clearCache() {
-    String[] userIds;
-    synchronized (m_storeLock) {
-      userIds = m_store.keySet().toArray(new String[m_store.size()]);
-    }
     // notify with a filter, that will be accepted nowhere
     SERVICES.getService(IClientNotificationService.class).putNotification(new ResetAccessControlChangedNotification(), new SingleUserFilter(null, 0L));
-    clearCacheOfUserIds(userIds);
+    clearCacheOfUserIds(CollectionUtility.hashSet(m_store.keySet()));
   }
 
   /**
-   * clears the cache for a set of userIds
+   * clears the cache
+   */
+  public void clearCacheNoFire() {
+    clearCacheOfUserIdsNoFire(CollectionUtility.hashSet(m_store.keySet()));
+  }
+
+  /**
+   * Clears the cache for a set of userIds and sends a notification for these users.
    * 
    * @param userIds
    *          derived from the Subject, see{@link IAccessControlService#getUserIdOfCurrentSubject()}
    */
-  public void clearCacheOfUserIds(String... userIds) {
+  public void clearCacheOfUserIds(Collection<String> userIds0) {
+    clearCacheOfUserIdsNoFire(userIds0);
+    //notify clients
+    for (String userId : userIds0) {
+      if (userId != null) {
+        SERVICES.getService(IClientNotificationService.class).putNotification(new AccessControlChangedNotification(null), new SingleUserFilter(userId, 120000L));
+      }
+    }
+  }
+
+  /**
+   * Clears the cache for a set of userIds and sends a notification for these users.
+   * 
+   * @param userIds
+   *          derived from the Subject, see{@link IAccessControlService#getUserIdOfCurrentSubject()}
+   */
+  public void clearCacheOfUserIdsNoFire(Collection<String> userIds0) {
+    Set<String> userIds = CollectionUtility.hashSetWithoutNullElements(userIds0);
+    if (userIds.isEmpty()) {
+      return;
+    }
     synchronized (m_storeLock) {
       for (String userId : userIds) {
         if (userId != null) {
           m_store.remove(userId.toLowerCase());
         }
-      }
-    }
-    //notify clients
-    for (String userId : userIds) {
-      if (userId != null) {
-        SERVICES.getService(IClientNotificationService.class).putNotification(new AccessControlChangedNotification(null), new SingleUserFilter(userId, 120000L));
       }
     }
   }

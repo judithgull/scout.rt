@@ -14,7 +14,7 @@ import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.AbstractClientSession;
 import org.eclipse.scout.rt.client.ClientJob;
 import org.eclipse.scout.rt.client.IClientSession;
-import org.eclipse.scout.rt.client.servicetunnel.IServiceTunnel;
+import org.eclipse.scout.rt.client.servicetunnel.http.IClientServiceTunnel;
 import org.eclipse.scout.rt.client.testenvironment.ui.desktop.TestEnvironmentDesktop;
 
 /**
@@ -36,20 +36,20 @@ public class TestEnvironmentClientSession extends AbstractClientSession {
   }
 
   @Override
-  public void execLoadSession() throws ProcessingException {
+  protected void execLoadSession() throws ProcessingException {
     //do not enable client notifications, do not add service tunnel
     setDesktop(new TestEnvironmentDesktop());
   }
 
   @Override
-  public void execStoreSession() throws ProcessingException {
+  protected void execStoreSession() throws ProcessingException {
   }
 
   /**
    * export method as public setter
    */
   @Override
-  public void setServiceTunnel(IServiceTunnel tunnel) {
+  public void setServiceTunnel(IClientServiceTunnel tunnel) {
     super.setServiceTunnel(tunnel);
   }
 }

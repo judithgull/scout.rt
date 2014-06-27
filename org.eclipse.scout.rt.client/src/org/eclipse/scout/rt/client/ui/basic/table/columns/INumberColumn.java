@@ -12,26 +12,18 @@ package org.eclipse.scout.rt.client.ui.basic.table.columns;
 
 import java.text.NumberFormat;
 
-/**
- *
- */
-public interface INumberColumn<T extends Number> extends IColumn<T> {
+import org.eclipse.scout.rt.client.ui.valuecontainer.INumberValueContainer;
 
-  void setFormat(String s);
+public interface INumberColumn<T extends Number> extends IColumn<T>, INumberValueContainer<T> {
 
-  String getFormat();
+  void setValidateOnAnyKey(boolean b);
 
-  void setGroupingUsed(boolean b);
+  boolean isValidateOnAnyKey();
 
-  boolean isGroupingUsed();
-
-  void setMinValue(T value);
-
-  T getMinValue();
-
-  void setMaxValue(T value);
-
-  T getMaxValue();
-
+  /**
+   * @deprecated Will be removed in the 5.0 Release. Use {@link #getFormat()}.
+   */
+  @Deprecated
   NumberFormat getNumberFormat();
+
 }

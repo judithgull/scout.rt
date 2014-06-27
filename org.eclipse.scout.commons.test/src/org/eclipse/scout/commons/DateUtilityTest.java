@@ -12,69 +12,302 @@ package org.eclipse.scout.commons;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.TimeZone;
 
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 /**
  * JUnit tests for {@link DateUtility}
+ * <p>
+ * Tests in this class change global state (timezone). Not designed to run in parallel.
+ * </p>
  */
 public class DateUtilityTest {
-  static final String EXPEC_DATE_1970_01_01_000000 = "1970-01-01_00:00:00.000";
-  static final String EXPEC_DATE_1970_01_01_003000 = "1970-01-01_00:30:00.000";
-  static final String EXPEC_DATE_1970_01_01_010000 = "1970-01-01_01:00:00.000";
-  static final String EXPEC_DATE_1970_01_01_013000 = "1970-01-01_01:30:00.000";
-  static final String EXPEC_DATE_1970_01_01_020000 = "1970-01-01_02:00:00.000";
-  static final String EXPEC_DATE_1970_01_01_023000 = "1970-01-01_02:30:00.000";
-  static final String EXPEC_DATE_1970_01_01_030000 = "1970-01-01_03:00:00.000";
-  static final String EXPEC_DATE_1970_01_01_033000 = "1970-01-01_03:30:00.000";
-  static final String EXPEC_DATE_1970_01_01_040000 = "1970-01-01_04:00:00.000";
-  static final String EXPEC_DATE_1970_01_01_043000 = "1970-01-01_04:30:00.000";
-  static final String EXPEC_DATE_1970_01_01_050000 = "1970-01-01_05:00:00.000";
-  static final String EXPEC_DATE_1970_01_01_053000 = "1970-01-01_05:30:00.000";
-  static final String EXPEC_DATE_1970_01_01_060000 = "1970-01-01_06:00:00.000";
-  static final String EXPEC_DATE_1970_01_01_063000 = "1970-01-01_06:30:00.000";
-  static final String EXPEC_DATE_1970_01_01_070000 = "1970-01-01_07:00:00.000";
-  static final String EXPEC_DATE_1970_01_01_073000 = "1970-01-01_07:30:00.000";
-  static final String EXPEC_DATE_1970_01_01_080000 = "1970-01-01_08:00:00.000";
-  static final String EXPEC_DATE_1970_01_01_083000 = "1970-01-01_08:30:00.000";
-  static final String EXPEC_DATE_1970_01_01_090000 = "1970-01-01_09:00:00.000";
-  static final String EXPEC_DATE_1970_01_01_093000 = "1970-01-01_09:30:00.000";
-  static final String EXPEC_DATE_1970_01_01_100000 = "1970-01-01_10:00:00.000";
-  static final String EXPEC_DATE_1970_01_01_103000 = "1970-01-01_10:30:00.000";
-  static final String EXPEC_DATE_1970_01_01_110000 = "1970-01-01_11:00:00.000";
-  static final String EXPEC_DATE_1970_01_01_113000 = "1970-01-01_11:30:00.000";
-  static final String EXPEC_DATE_1970_01_01_120000 = "1970-01-01_12:00:00.000";
-  static final String EXPEC_DATE_1970_01_01_123000 = "1970-01-01_12:30:00.000";
-  static final String EXPEC_DATE_1970_01_01_130000 = "1970-01-01_13:00:00.000";
-  static final String EXPEC_DATE_1970_01_01_133000 = "1970-01-01_13:30:00.000";
-  static final String EXPEC_DATE_1970_01_01_140000 = "1970-01-01_14:00:00.000";
-  static final String EXPEC_DATE_1970_01_01_143000 = "1970-01-01_14:30:00.000";
-  static final String EXPEC_DATE_1970_01_01_150000 = "1970-01-01_15:00:00.000";
-  static final String EXPEC_DATE_1970_01_01_153000 = "1970-01-01_15:30:00.000";
-  static final String EXPEC_DATE_1970_01_01_160000 = "1970-01-01_16:00:00.000";
-  static final String EXPEC_DATE_1970_01_01_163000 = "1970-01-01_16:30:00.000";
-  static final String EXPEC_DATE_1970_01_01_170000 = "1970-01-01_17:00:00.000";
-  static final String EXPEC_DATE_1970_01_01_173000 = "1970-01-01_17:30:00.000";
-  static final String EXPEC_DATE_1970_01_01_180000 = "1970-01-01_18:00:00.000";
-  static final String EXPEC_DATE_1970_01_01_183000 = "1970-01-01_18:30:00.000";
-  static final String EXPEC_DATE_1970_01_01_190000 = "1970-01-01_19:00:00.000";
-  static final String EXPEC_DATE_1970_01_01_193000 = "1970-01-01_19:30:00.000";
-  static final String EXPEC_DATE_1970_01_01_200000 = "1970-01-01_20:00:00.000";
-  static final String EXPEC_DATE_1970_01_01_203000 = "1970-01-01_20:30:00.000";
-  static final String EXPEC_DATE_1970_01_01_210000 = "1970-01-01_21:00:00.000";
-  static final String EXPEC_DATE_1970_01_01_213000 = "1970-01-01_21:30:00.000";
-  static final String EXPEC_DATE_1970_01_01_220000 = "1970-01-01_22:00:00.000";
-  static final String EXPEC_DATE_1970_01_01_223000 = "1970-01-01_22:30:00.000";
-  static final String EXPEC_DATE_1970_01_01_230000 = "1970-01-01_23:00:00.000";
-  static final String EXPEC_DATE_1970_01_01_233000 = "1970-01-01_23:30:00.000";
-  static final String EXPEC_DATE_1970_01_01_235959 = "1970-01-01_23:59:59.000";
+  private static final String EXPEC_DATE_1970_01_01_000000 = "1970-01-01_00:00:00.000";
+  private static final String EXPEC_DATE_1970_01_01_003000 = "1970-01-01_00:30:00.000";
+  private static final String EXPEC_DATE_1970_01_01_010000 = "1970-01-01_01:00:00.000";
+  private static final String EXPEC_DATE_1970_01_01_013000 = "1970-01-01_01:30:00.000";
+  private static final String EXPEC_DATE_1970_01_01_020000 = "1970-01-01_02:00:00.000";
+  private static final String EXPEC_DATE_1970_01_01_023000 = "1970-01-01_02:30:00.000";
+  private static final String EXPEC_DATE_1970_01_01_030000 = "1970-01-01_03:00:00.000";
+  private static final String EXPEC_DATE_1970_01_01_033000 = "1970-01-01_03:30:00.000";
+  private static final String EXPEC_DATE_1970_01_01_040000 = "1970-01-01_04:00:00.000";
+  private static final String EXPEC_DATE_1970_01_01_043000 = "1970-01-01_04:30:00.000";
+  private static final String EXPEC_DATE_1970_01_01_050000 = "1970-01-01_05:00:00.000";
+  private static final String EXPEC_DATE_1970_01_01_053000 = "1970-01-01_05:30:00.000";
+  private static final String EXPEC_DATE_1970_01_01_060000 = "1970-01-01_06:00:00.000";
+  private static final String EXPEC_DATE_1970_01_01_063000 = "1970-01-01_06:30:00.000";
+  private static final String EXPEC_DATE_1970_01_01_070000 = "1970-01-01_07:00:00.000";
+  private static final String EXPEC_DATE_1970_01_01_073000 = "1970-01-01_07:30:00.000";
+  private static final String EXPEC_DATE_1970_01_01_080000 = "1970-01-01_08:00:00.000";
+  private static final String EXPEC_DATE_1970_01_01_083000 = "1970-01-01_08:30:00.000";
+  private static final String EXPEC_DATE_1970_01_01_090000 = "1970-01-01_09:00:00.000";
+  private static final String EXPEC_DATE_1970_01_01_093000 = "1970-01-01_09:30:00.000";
+  private static final String EXPEC_DATE_1970_01_01_100000 = "1970-01-01_10:00:00.000";
+  private static final String EXPEC_DATE_1970_01_01_103000 = "1970-01-01_10:30:00.000";
+  private static final String EXPEC_DATE_1970_01_01_110000 = "1970-01-01_11:00:00.000";
+  private static final String EXPEC_DATE_1970_01_01_113000 = "1970-01-01_11:30:00.000";
+  private static final String EXPEC_DATE_1970_01_01_120000 = "1970-01-01_12:00:00.000";
+  private static final String EXPEC_DATE_1970_01_01_123000 = "1970-01-01_12:30:00.000";
+  private static final String EXPEC_DATE_1970_01_01_130000 = "1970-01-01_13:00:00.000";
+  private static final String EXPEC_DATE_1970_01_01_133000 = "1970-01-01_13:30:00.000";
+  private static final String EXPEC_DATE_1970_01_01_140000 = "1970-01-01_14:00:00.000";
+  private static final String EXPEC_DATE_1970_01_01_143000 = "1970-01-01_14:30:00.000";
+  private static final String EXPEC_DATE_1970_01_01_150000 = "1970-01-01_15:00:00.000";
+  private static final String EXPEC_DATE_1970_01_01_153000 = "1970-01-01_15:30:00.000";
+  private static final String EXPEC_DATE_1970_01_01_160000 = "1970-01-01_16:00:00.000";
+  private static final String EXPEC_DATE_1970_01_01_163000 = "1970-01-01_16:30:00.000";
+  private static final String EXPEC_DATE_1970_01_01_170000 = "1970-01-01_17:00:00.000";
+  private static final String EXPEC_DATE_1970_01_01_173000 = "1970-01-01_17:30:00.000";
+  private static final String EXPEC_DATE_1970_01_01_180000 = "1970-01-01_18:00:00.000";
+  private static final String EXPEC_DATE_1970_01_01_183000 = "1970-01-01_18:30:00.000";
+  private static final String EXPEC_DATE_1970_01_01_190000 = "1970-01-01_19:00:00.000";
+  private static final String EXPEC_DATE_1970_01_01_193000 = "1970-01-01_19:30:00.000";
+  private static final String EXPEC_DATE_1970_01_01_200000 = "1970-01-01_20:00:00.000";
+  private static final String EXPEC_DATE_1970_01_01_203000 = "1970-01-01_20:30:00.000";
+  private static final String EXPEC_DATE_1970_01_01_210000 = "1970-01-01_21:00:00.000";
+  private static final String EXPEC_DATE_1970_01_01_213000 = "1970-01-01_21:30:00.000";
+  private static final String EXPEC_DATE_1970_01_01_220000 = "1970-01-01_22:00:00.000";
+  private static final String EXPEC_DATE_1970_01_01_223000 = "1970-01-01_22:30:00.000";
+  private static final String EXPEC_DATE_1970_01_01_230000 = "1970-01-01_23:00:00.000";
+  private static final String EXPEC_DATE_1970_01_01_233000 = "1970-01-01_23:30:00.000";
+  private static final String EXPEC_DATE_1970_01_01_235959 = "1970-01-01_23:59:59.000";
 
-  static final String DATE_TIME_PATTERN = "dd-MM-yyyy HH:mm";
-  static final String YEAR_DATE_TIME_PATTERN = "yyyy-MM-dd_HH:mm:ss.SSS";
+  private static final String DATE_TIME_PATTERN = "dd-MM-yyyy HH:mm";
+  private static final String YEAR_DATE_TIME_PATTERN = "yyyy-MM-dd_HH:mm:ss.SSS";
+  private static final int HOURS_IN_DAY = 24;
+
+  private static final double MINUTES_IN_HOURS = 60;
+  private static final double SECONDS_IN_MINUTES = 60;
+  private static final double SECONDS_IN_DAY = HOURS_IN_DAY * MINUTES_IN_HOURS * SECONDS_IN_MINUTES;
+
+  private TimeZone m_timezoneBackup;
+
+  /**
+   * Store original timezone, such that it can be changed in tests.
+   */
+  @Before
+  public void backupOriginalTimeZone() {
+    m_timezoneBackup = TimeZone.getDefault();
+  }
+
+  /**
+   * Reset the timezone to the original timezone.
+   */
+  @After
+  public void restoreOriginalTimeZone() {
+    TimeZone.setDefault(m_timezoneBackup);
+  }
+
+  /**
+   * Test for {@link DateUtility#addDays(Date, double)}
+   *
+   * @throws ParseException
+   */
+  @Test
+  public void testAddDaysFull() throws ParseException {
+    SimpleDateFormat sdf = new SimpleDateFormat(YEAR_DATE_TIME_PATTERN);
+    Date date1 = sdf.parse("2013-09-30_10:10:10.111");
+    Date date2 = sdf.parse("2013-10-01_10:10:10.111");
+    assertEquals(date2.getTime(), DateUtility.addDays(date1, 1).getTime());
+    assertEquals(date1.getTime(), DateUtility.addDays(date2, -1).getTime());
+  }
+
+  /**
+   * Test for {@link DateUtility#addDays(Date, double)} for a larger day period
+   *
+   * @throws ParseException
+   */
+  @Test
+  public void testAddDaysLarge() throws ParseException {
+    SimpleDateFormat sdf = new SimpleDateFormat(YEAR_DATE_TIME_PATTERN);
+    Date testDate = sdf.parse("1990-01-01_0:0:0.000");
+    Date expectedDate = sdf.parse("2030-12-31_0:0:0.000");
+    Date res = DateUtility.addDays(testDate, 14974);
+    assertEquals(expectedDate.getTime(), res.getTime());
+  }
+
+  /**
+   * Test for {@link DateUtility#addDays(Date, double)}
+   *
+   * @throws ParseException
+   */
+  @Test
+  public void testAddDatetoNullFull() throws ParseException {
+    assertNull(DateUtility.addDays(null, -1));
+  }
+
+  /**
+   * Tests for all seconds in a day, if adding this fraction of the day is the same as setting the seconds directly.
+   * {@link DateUtility#addDays(Date, double)}
+   */
+  @Test
+  public void testAddDays() {
+    TimeZone.setDefault(TimeZone.getTimeZone("GMT+1"));
+    assertEquals("Test only works without day Daylight Saving Time", 0, TimeZone.getDefault().getDSTSavings());
+
+    for (int sec = 0; sec < SECONDS_IN_DAY; sec++) {
+      double d = sec / SECONDS_IN_DAY;
+      Calendar cal = getCalendar(1, 0);
+
+      SimpleDateFormat sdf = new SimpleDateFormat(YEAR_DATE_TIME_PATTERN);
+      String result = sdf.format(DateUtility.addDays(cal.getTime(), d));
+
+      cal.set(Calendar.SECOND, sec);
+
+      String expected = sdf.format(cal.getTime());
+      assertEquals(expected, result);
+    }
+  }
+
+  /**
+   * Tests for all seconds in a day, if subtracting this fraction of the day is the same as setting the seconds
+   * directly. {@link DateUtility#addDays(Date, double)}
+   */
+  @Test
+  public void testSubtractDays() {
+    TimeZone.setDefault(TimeZone.getTimeZone("GMT+1"));
+    assertEquals("Test only works without day Daylight Saving Time", 0, TimeZone.getDefault().getDSTSavings());
+
+    for (int sec = 0; sec < SECONDS_IN_DAY; sec++) {
+      double d = -sec / SECONDS_IN_DAY;
+      Calendar cal = getCalendar(1, 0);
+
+      SimpleDateFormat sdf = new SimpleDateFormat(YEAR_DATE_TIME_PATTERN);
+      String result = sdf.format(DateUtility.addDays(cal.getTime(), d));
+
+      cal.set(Calendar.SECOND, -sec);
+
+      String expected = sdf.format(cal.getTime());
+      assertEquals(expected, result);
+    }
+  }
+
+  private Calendar getCalendar(int hour, int minute) {
+    Calendar cal = Calendar.getInstance();
+    cal.set(Calendar.HOUR, hour);
+    cal.set(Calendar.MINUTE, minute);
+    cal.set(Calendar.SECOND, 0);
+    cal.set(Calendar.MILLISECOND, 0);
+    return cal;
+  }
+
+  /**
+   * Test for {@link DateUtility#addDays(Date, double)} using {@link DateUtility#convertDateToDoubleTime(Date)}
+   */
+  @Test
+  public void testDuration() {
+    final Calendar c1500 = getCalendar(15, 0);
+    final Calendar c1515 = getCalendar(15, 15);
+    final Calendar c1445 = getCalendar(14, 45);
+    final Calendar c1530 = getCalendar(15, 30);
+    final Calendar c1600 = getCalendar(16, 00);
+    final Calendar c1700 = getCalendar(17, 0);
+    assertCorrectDuration(c1500, c1500);
+    assertCorrectDuration(c1500, c1515);
+    assertCorrectDuration(c1500, c1445);
+    assertCorrectDuration(c1500, c1530);
+    assertCorrectDuration(c1500, c1600);
+    assertCorrectDuration(c1500, c1700);
+    assertCorrectDuration(c1700, c1500);
+  }
+
+  public void assertCorrectDuration(Calendar start, Calendar end) {
+    Date startDate = start.getTime();
+    Date endDate = end.getTime();
+    Double duration = (DateUtility.convertDateToDoubleTime(endDate) - DateUtility.convertDateToDoubleTime(startDate));
+    assertEquals(endDate, DateUtility.addDays(startDate, duration));
+  }
+
+  /**
+   * Test for {@link DateUtility#addMilliseconds(Date, int)}
+   * <p>
+   * This test changes global state while running: Sets the default timezone to GMT+1 (no daylight safing time)
+   * </p>
+   */
+  @Test
+  public void testAddMilliseconds() {
+    TimeZone.setDefault(TimeZone.getTimeZone("GMT+1"));
+    assertEquals("Test only works without day Daylight Saving Time", 0, TimeZone.getDefault().getDSTSavings());
+
+    for (int i = 0; i < SECONDS_IN_DAY; i++) {
+      Calendar cal = Calendar.getInstance();
+      cal.set(Calendar.DATE, 1);
+      cal.set(Calendar.HOUR_OF_DAY, 0);
+      cal.set(Calendar.MINUTE, 0);
+      cal.set(Calendar.SECOND, 0);
+      cal.set(Calendar.MILLISECOND, 0);
+      SimpleDateFormat sdf = new SimpleDateFormat(YEAR_DATE_TIME_PATTERN);
+      String result = sdf.format(DateUtility.addMilliseconds(cal.getTime(), i));
+      cal.set(Calendar.MILLISECOND, i);
+      String expected = sdf.format(cal.getTime());
+      assertEquals(expected, result);
+    }
+  }
+
+  /**
+   * Test for {@link DateUtility#addSeconds(Date, int)}
+   * <p>
+   * This test changes global state while running: Sets the default timezone to GMT+1 (no daylight safing time)
+   * </p>
+   */
+  @Test
+  public void testAddSeconds() {
+    TimeZone.setDefault(TimeZone.getTimeZone("GMT+1"));
+    assertEquals("Test only works without day Daylight Saving Time", 0, TimeZone.getDefault().getDSTSavings());
+
+    Calendar cal = Calendar.getInstance();
+    for (int i = 0; i < SECONDS_IN_DAY; i++) {
+      cal.set(Calendar.DATE, 1);
+      cal.set(Calendar.HOUR_OF_DAY, 0);
+      cal.set(Calendar.MINUTE, 0);
+      cal.set(Calendar.SECOND, 0);
+      SimpleDateFormat sdf = new SimpleDateFormat(YEAR_DATE_TIME_PATTERN);
+      String result = sdf.format(DateUtility.addSeconds(cal.getTime(), i));
+      cal.set(Calendar.SECOND, i);
+      String expected = sdf.format(cal.getTime());
+      assertEquals(expected, result);
+    }
+  }
+
+  /**
+   * Test for {@link DateUtility#addMinutes(Date, int)}
+   * <p>
+   * This test changes global state while running: Sets the default timezone to GMT+1 (no daylight safing time)
+   * </p>
+   */
+  @Test
+  public void testAddMinutes() {
+    TimeZone.setDefault(TimeZone.getTimeZone("GMT+1"));
+    assertEquals("Test only works without day Daylight Saving Time", 0, TimeZone.getDefault().getDSTSavings());
+    //test adding minutes for 10 days
+    int testDays = 10;
+    double minutes = testDays * MINUTES_IN_HOURS * HOURS_IN_DAY;
+    SimpleDateFormat sdf = new SimpleDateFormat(YEAR_DATE_TIME_PATTERN);
+    Calendar cal = Calendar.getInstance();
+
+    for (int i = 0; i < minutes; i++) {
+      cal.set(Calendar.DATE, 1);
+      cal.set(Calendar.HOUR_OF_DAY, 0);
+      cal.set(Calendar.SECOND, 0);
+      cal.set(Calendar.MINUTE, 0);
+
+      String originalTime = sdf.format(cal.getTime());
+      String resultTime = sdf.format(DateUtility.addMinutes(cal.getTime(), i));
+      cal.set(Calendar.MINUTE, i);
+      String expectedTime = sdf.format(cal.getTime());
+      assertEquals("Add " + i + "minutes to " + originalTime, expectedTime, resultTime);
+    }
+  }
 
   @Test
   public void testIsInDateRange() {
@@ -405,5 +638,38 @@ public class DateUtilityTest {
     assertEquals(message + "[YEAR]", e.get(Calendar.YEAR), v.get(Calendar.YEAR));
 
     assertEquals(message + "(DATE)", expected, value);
+  }
+
+  @Test
+  public void testDaysBetween() {
+    Calendar cal = Calendar.getInstance();
+    Date d1, d2;
+
+    assertEquals(-1, DateUtility.getDaysBetween(null, null));
+    assertEquals(-1, DateUtility.getDaysBetween(cal.getTime(), null));
+    assertEquals(-1, DateUtility.getDaysBetween(null, cal.getTime()));
+
+    cal.set(2000, Calendar.JANUARY, 1, 0, 0);
+    d1 = cal.getTime();
+    cal.set(2000, Calendar.JANUARY, 2, 0, 0);
+    d2 = cal.getTime();
+    assertEquals(1, DateUtility.getDaysBetween(d1, d2));
+    assertEquals(1, DateUtility.getDaysBetween(d2, d1));
+
+    cal.set(2014, Calendar.FEBRUARY, 23, 0, 0);
+    d1 = cal.getTime();
+    cal.set(2014, Calendar.MARCH, 31, 0, 0);
+    d2 = cal.getTime();
+    assertEquals(36, DateUtility.getDaysBetween(d1, d2));
+    assertEquals(36, DateUtility.getDaysBetween(d2, d1));
+
+    cal.set(2000, Calendar.JANUARY, 1, 23, 59);
+    d1 = cal.getTime();
+    cal.set(2000, Calendar.JANUARY, 2, 0, 0);
+    d2 = cal.getTime();
+    assertEquals(1, DateUtility.getDaysBetween(d1, d2));
+    assertEquals(1, DateUtility.getDaysBetween(d2, d1));
+
+    assertEquals(0, DateUtility.getDaysBetween(d1, d1));
   }
 }

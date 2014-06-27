@@ -16,6 +16,9 @@ import java.util.Date;
 
 import org.eclipse.scout.commons.ConfigurationUtility;
 import org.eclipse.scout.commons.OptimisticLock;
+import org.eclipse.scout.commons.annotations.ClassId;
+import org.eclipse.scout.commons.annotations.ConfigProperty;
+import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
@@ -23,7 +26,10 @@ import org.eclipse.scout.rt.client.ui.ClientUIPreferences;
 import org.eclipse.scout.rt.client.ui.basic.calendar.AbstractCalendar;
 import org.eclipse.scout.rt.client.ui.basic.calendar.ICalendar;
 import org.eclipse.scout.rt.client.ui.form.fields.AbstractValueField;
+import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
+import org.eclipse.scout.service.SERVICES;
 
+@ClassId("0b1ac83b-6fa4-4e12-88d0-680ed168e914")
 public abstract class AbstractCalendarField<T extends ICalendar> extends AbstractValueField<Date> implements ICalendarField<T> {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractCalendarField.class);
 
@@ -44,6 +50,13 @@ public abstract class AbstractCalendarField<T extends ICalendar> extends Abstrac
   private Class<? extends ICalendar> getConfiguredCalendar() {
     Class[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
     return ConfigurationUtility.filterClass(dca, ICalendar.class);
+  }
+
+  @Override
+  @Order(210)
+  @ConfigProperty(ConfigProperty.BOOLEAN)
+  protected boolean getConfiguredAutoAddDefaultMenus() {
+    return false;
   }
 
   @Override
@@ -78,7 +91,7 @@ public abstract class AbstractCalendarField<T extends ICalendar> extends Abstrac
         syncCalendarToCalendarField();
       }
       catch (Exception e) {
-        LOG.warn(null, e);
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + getConfiguredCalendar().getName() + "'.", e));
       }
     }
     else {
@@ -153,4 +166,5 @@ public abstract class AbstractCalendarField<T extends ICalendar> extends Abstrac
   public void reloadCalendarItems() {
     getCalendar().reloadCalendarItems();
   }
+
 }

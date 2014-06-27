@@ -17,20 +17,25 @@ import java.util.List;
 import org.eclipse.scout.commons.ConfigurationUtility;
 import org.eclipse.scout.commons.EventListenerList;
 import org.eclipse.scout.commons.OptimisticLock;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.services.common.icon.IIconProviderService;
+import org.eclipse.scout.rt.client.ui.action.ActionUtility;
+import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.MenuUtility;
+import org.eclipse.scout.rt.client.ui.action.menu.root.IContextMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.root.internal.FormFieldContextMenu;
 import org.eclipse.scout.rt.client.ui.form.fields.AbstractFormField;
-import org.eclipse.scout.rt.client.ui.form.fields.radiobuttongroup.AbstractRadioButtonGroup;
 import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.service.SERVICES;
 
+@ClassId("998788cf-df0f-480b-bd5a-5037805610c9")
 public abstract class AbstractButton extends AbstractFormField implements IButton {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractButton.class);
 
@@ -39,7 +44,7 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
   private int m_displayStyle;
   private boolean m_processButton;
   private Object m_radioValue;
-  private IMenu[] m_menus;
+  private List<IMenu> m_menus;
   private final IButtonUIFacade m_uiFacade;
   private final OptimisticLock m_uiFacadeSetSelectedLock;
 
@@ -70,7 +75,6 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
    */
   @ConfigProperty(ConfigProperty.BUTTON_SYSTEM_TYPE)
   @Order(200)
-  @ConfigPropertyValue("SYSTEM_TYPE_NONE")
   protected int getConfiguredSystemType() {
     return SYSTEM_TYPE_NONE;
   }
@@ -86,7 +90,6 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(220)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredProcessButton() {
     return true;
   }
@@ -101,7 +104,6 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
    */
   @ConfigProperty(ConfigProperty.BUTTON_DISPLAY_STYLE)
   @Order(210)
-  @ConfigPropertyValue("DISPLAY_STYLE_DEFAULT")
   protected int getConfiguredDisplayStyle() {
     return DISPLAY_STYLE_DEFAULT;
   }
@@ -110,7 +112,6 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
    * {@inheritDoc} Default for buttons is false because they usually should only take as much place as is needed to
    * display the button label, but not necessarily more. See also {@link #getConfiguredGridUseUiWidth()}.
    */
-  @ConfigPropertyValue("false")
   @Override
   protected boolean getConfiguredFillHorizontal() {
     return false;
@@ -120,7 +121,6 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
    * {@inheritDoc} Default for buttons is false because they usually should only take as much place as is needed to
    * display the button label, but not necessarily more.
    */
-  @ConfigPropertyValue("false")
   @Override
   protected boolean getConfiguredFillVertical() {
     return false;
@@ -130,7 +130,6 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
    * {@inheritDoc} Default for buttons is true because they usually should only take as much place as is needed to
    * display the button label, but not necessarily more.
    */
-  @ConfigPropertyValue("true")
   @Override
   protected boolean getConfiguredGridUseUiWidth() {
     return true;
@@ -139,28 +138,9 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
   /**
    * {@inheritDoc}
    */
-  @ConfigPropertyValue("false")
   @Override
   protected boolean getConfiguredGridUseUiHeight() {
     return false;
-  }
-
-  /**
-   * Configures the value represented by this radio button. This is the value that is
-   * returned if you query a radio button group for the current value and this button is the
-   * currently selected radio button.
-   * <p>
-   * Subclasses can override this method. Default is {@code null}.
-   * 
-   * @return an {@code Object} representing the value of this radio button
-   * @see AbstractRadioButton
-   * @see AbstractRadioButtonGroup
-   */
-  @ConfigProperty(ConfigProperty.OBJECT)
-  @Order(230)
-  @ConfigPropertyValue("null")
-  protected Object getConfiguredRadioValue() {
-    return null;
   }
 
   /**
@@ -176,7 +156,6 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
    */
   @ConfigProperty(ConfigProperty.ICON_ID)
   @Order(190)
-  @ConfigPropertyValue("null")
   protected String getConfiguredIconId() {
     return null;
   }
@@ -208,10 +187,17 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
   protected void execToggleAction(boolean selected) throws ProcessingException {
   }
 
-  private Class<? extends IMenu>[] getConfiguredMenus() {
+  protected List<Class<? extends IMenu>> getDeclaredMenus() {
     Class[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
-    Class<IMenu>[] foca = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(dca, IMenu.class);
-    return ConfigurationUtility.removeReplacedClasses(foca);
+    List<Class<IMenu>> menuClasses = ConfigurationUtility.filterClasses(dca, IMenu.class);
+    List<Class<? extends IMenu>> filteredMenuClasses = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(menuClasses, IMenu.class);
+    List<Class<? extends IMenu>> a = ConfigurationUtility.removeReplacedClasses(filteredMenuClasses);
+    return a;
+  }
+
+  @Override
+  public List<IKeyStroke> getContributedKeyStrokes() {
+    return MenuUtility.getKeyStrokesFromMenus(getMenus());
   }
 
   @Override
@@ -221,18 +207,16 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
     setDisplayStyleInternal(getConfiguredDisplayStyle());
     setProcessButton(getConfiguredProcessButton());
     setIconId(getConfiguredIconId());
-    setRadioValue(getConfiguredRadioValue());
     // menus
-    ArrayList<IMenu> menuList = new ArrayList<IMenu>();
-    Class<? extends IMenu>[] menuArray = getConfiguredMenus();
-    for (int i = 0; i < menuArray.length; i++) {
+    List<IMenu> menuList = new ArrayList<IMenu>();
+    for (Class<? extends IMenu> menuClazz : getDeclaredMenus()) {
       IMenu menu;
       try {
-        menu = ConfigurationUtility.newInnerInstance(this, menuArray[i]);
+        menu = ConfigurationUtility.newInnerInstance(this, menuClazz);
         menuList.add(menu);
       }
       catch (Throwable t) {
-        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("menu: " + menuArray[i].getName(), t));
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + menuClazz.getName() + "'.", t));
       }
     }
     try {
@@ -241,7 +225,16 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
     catch (Exception e) {
       LOG.error("error occured while dynamically contributing menus.", e);
     }
-    m_menus = menuList.toArray(new IMenu[0]);
+    IContextMenu contextMenu = new FormFieldContextMenu<IButton>(this, menuList);
+    contextMenu.setContainerInternal(this);
+    setContextMenu(contextMenu);
+  }
+
+  @Override
+  protected void initFieldInternal() throws ProcessingException {
+    super.initFieldInternal();
+    // init actions
+    ActionUtility.initActions(getMenus());
   }
 
   /**
@@ -298,13 +291,17 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
   }
 
   @Override
-  public boolean hasMenus() {
-    return m_menus.length > 0;
+  public List<IMenu> getMenus() {
+    return getContextMenu().getChildActions();
+  }
+
+  protected void setContextMenu(IContextMenu contextMenu) {
+    propertySupport.setProperty(PROP_CONTEXT_MENU, contextMenu);
   }
 
   @Override
-  public IMenu[] getMenus() {
-    return m_menus;
+  public IContextMenu getContextMenu() {
+    return (IContextMenu) propertySupport.getProperty(PROP_CONTEXT_MENU);
   }
 
   @Override
@@ -320,19 +317,6 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
         setEnabledProcessingButton(true);
       }
     }
-  }
-
-  /*
-   * Radio Buttons
-   */
-  @Override
-  public Object getRadioValue() {
-    return m_radioValue;
-  }
-
-  @Override
-  public void setRadioValue(Object o) {
-    m_radioValue = o;
   }
 
   /**
@@ -410,21 +394,6 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
     fireButtonEvent(new ButtonEvent(this, ButtonEvent.TYPE_REQUEST_POPUP));
   }
 
-  private IMenu[] fireButtonPopup() {
-    ButtonEvent e = new ButtonEvent(this, ButtonEvent.TYPE_POPUP);
-    // single observer add our menus
-    IMenu[] a = getMenus();
-    for (int i = 0; i < a.length; i++) {
-      IMenu m = a[i];
-      m.prepareAction();
-      if (m.isVisible()) {
-        e.addPopupMenu(m);
-      }
-    }
-    fireButtonEvent(e);
-    return e.getPopupMenus();
-  }
-
   // main handler
   private void fireButtonEvent(ButtonEvent e) {
     EventListener[] listeners = m_listenerList.getListeners(ButtonListener.class);
@@ -449,11 +418,6 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
       catch (ProcessingException e) {
         SERVICES.getService(IExceptionHandlerService.class).handleException(e);
       }
-    }
-
-    @Override
-    public IMenu[] fireButtonPopupFromUI() {
-      return fireButtonPopup();
     }
 
     /**

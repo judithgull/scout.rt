@@ -16,7 +16,6 @@ import java.util.regex.Pattern;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
@@ -53,6 +52,7 @@ import org.eclipse.scout.rt.shared.security.UpdateUserBookmarkPermission;
 import org.eclipse.scout.rt.shared.services.common.bookmark.Bookmark;
 import org.eclipse.scout.rt.shared.services.common.bookmark.BookmarkChangedClientNotification;
 import org.eclipse.scout.rt.shared.services.common.bookmark.BookmarkFolder;
+import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.service.SERVICES;
 
 public class BookmarkViewForm extends AbstractForm {
@@ -64,7 +64,6 @@ public class BookmarkViewForm extends AbstractForm {
 
   @ConfigProperty(ConfigProperty.FORM)
   @Order(10)
-  @ConfigPropertyValue("null")
   protected Class<? extends IBookmarkForm> getConfiguredBookmarkForm() {
     return BookmarkForm.class;
   }
@@ -144,7 +143,7 @@ public class BookmarkViewForm extends AbstractForm {
           }
 
           @Override
-          public int getConfiguredLabelPosition() {
+          protected int getConfiguredLabelPosition() {
             return IFormField.LABEL_POSITION_ON_FIELD;
           }
 
@@ -231,7 +230,7 @@ public class BookmarkViewForm extends AbstractForm {
                   form = getConfiguredBookmarkForm().newInstance();
                 }
                 catch (Exception e) {
-                  LOG.warn(null, e);
+                  SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + getConfiguredBookmarkForm().getName() + "'.", e));
                 }
               }
               if (form == null) {

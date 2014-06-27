@@ -18,10 +18,7 @@ import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.action.IAction;
-import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
-import org.eclipse.scout.rt.client.ui.action.keystroke.KeyStroke;
 import org.eclipse.scout.rt.ui.rap.IRwtEnvironment;
-import org.eclipse.scout.rt.ui.rap.keystroke.IRwtKeyStroke;
 import org.eclipse.scout.rt.ui.rap.testing.CustomWidgetIdGenerator;
 import org.eclipse.scout.rt.ui.rap.util.RwtUtility;
 import org.eclipse.swt.events.DisposeEvent;
@@ -42,21 +39,20 @@ public class AbstractRwtMenuAction {
 
   private boolean m_initialized;
   private boolean m_connectedToScout;
+  private boolean m_addKeyStrokeTextEnabled;
   private P_ScoutPropertyChangeListener m_scoutPropertyListener;
 
   private MenuItem m_uiMenuItem;
   private final Menu m_uiMenu;
-  // cache
-  private IRwtKeyStroke[] m_uiKeyStrokes;
-
   private SelectionListener m_menuSelectionListener;
 
-  public AbstractRwtMenuAction(Menu uiMenu, IAction scoutAction, IRwtEnvironment uiEnvironment, boolean createInitial) {
+  public AbstractRwtMenuAction(Menu uiMenu, IAction scoutAction, IRwtEnvironment uiEnvironment, boolean callInitializer) {
     m_uiMenu = uiMenu;
     m_scoutAction = scoutAction;
     m_uiEnvironment = uiEnvironment;
-    if (createInitial) {
-      callInitializers(m_uiMenu);
+    m_addKeyStrokeTextEnabled = true;
+    if (callInitializer) {
+      init();
     }
 
     m_uiMenu.addDisposeListener(new DisposeListener() {
@@ -67,6 +63,10 @@ public class AbstractRwtMenuAction {
         disconnectFromScout();
       }
     });
+  }
+
+  public void init() {
+    callInitializers(m_uiMenu);
   }
 
   protected final void callInitializers(Menu menu) {
@@ -94,7 +94,6 @@ public class AbstractRwtMenuAction {
       detachScoutListeners();
       m_connectedToScout = false;
     }
-    removeKeyStrokes();
   }
 
   protected void attachScoutListeners() {
@@ -114,11 +113,9 @@ public class AbstractRwtMenuAction {
   protected void applyScoutProperties() {
     IAction scoutAction = getScoutAction();
     setEnabledFromScout(scoutAction.isEnabled());
-    setTextFromScout(scoutAction.getText());
+    setTextFromScout(scoutAction.getTextWithMnemonic());
     setTooltipTextFromScout(scoutAction.getTooltipText());
-    // setMnemonicFromScout(scoutAction.getMnemonic());
     setIconFromScout(scoutAction.getIconId());
-    updateKeyStrokeFromScout();
   }
 
   protected void setIconFromScout(String iconId) {
@@ -142,34 +139,18 @@ public class AbstractRwtMenuAction {
       text = "";
     }
 
+    if (isAddKeyStrokeTextEnabled()) {
+      IAction action = getScoutAction();
+      if (action != null && StringUtility.hasText(action.getKeyStroke())) {
+        text += "\t" + RwtUtility.getKeyStrokePrettyPrinted(action);
+      }
+    }
     getUiMenuItem().setText(text);
   }
 
   protected void setEnabledFromScout(boolean enabled) {
     if (!getUiMenuItem().isDisposed()) {
       getUiMenuItem().setEnabled(enabled);
-    }
-  }
-
-  private void removeKeyStrokes() {
-    if (m_uiKeyStrokes == null) {
-      return;
-    }
-
-    for (IRwtKeyStroke uiStroke : m_uiKeyStrokes) {
-      getUiEnvironment().removeGlobalKeyStroke(uiStroke);
-    }
-  }
-
-  protected void updateKeyStrokeFromScout() {
-    removeKeyStrokes();
-    m_uiKeyStrokes = null;
-    if (getScoutAction().getKeyStroke() != null) {
-      IKeyStroke scoutKeyStroke = new KeyStroke(getScoutAction().getKeyStroke());
-      m_uiKeyStrokes = RwtUtility.getKeyStrokes(scoutKeyStroke, getUiEnvironment());
-      for (IRwtKeyStroke uiStroke : m_uiKeyStrokes) {
-        getUiEnvironment().addGlobalKeyStroke(uiStroke, false);
-      }
     }
   }
 
@@ -214,6 +195,7 @@ public class AbstractRwtMenuAction {
   }
 
   private void handleUiAction() {
+    RwtUtility.runUiInputVerifier();
     Runnable t = new Runnable() {
       @Override
       public void run() {
@@ -225,6 +207,14 @@ public class AbstractRwtMenuAction {
 
   private boolean isHandleScoutPropertyChange(String propertyName, Object newValue) {
     return true;
+  }
+
+  public boolean isAddKeyStrokeTextEnabled() {
+    return m_addKeyStrokeTextEnabled;
+  }
+
+  public void setAddKeyStrokeTextEnabled(boolean addKeyStrokeTextEnabled) {
+    m_addKeyStrokeTextEnabled = addKeyStrokeTextEnabled;
   }
 
   /**
@@ -244,7 +234,8 @@ public class AbstractRwtMenuAction {
       setIconFromScout((String) newValue);
     }
     else if (name.equals(IAction.PROP_KEYSTROKE)) {
-      updateKeyStrokeFromScout();
+      //Menu keystrokes are handled along with regular keystrokes, therefore it's only necessary to set a textual hint
+      setTextFromScout(getScoutAction().getText());
     }
   }
 

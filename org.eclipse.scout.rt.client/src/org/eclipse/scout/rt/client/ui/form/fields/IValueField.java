@@ -4,13 +4,18 @@
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- * 
+ *
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.form.fields;
 
+import java.util.List;
+
 import org.eclipse.scout.commons.holders.IHolder;
+import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.IValueFieldContextMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.root.IContextMenu;
 
 /**
  * Basic interface for all user fields where user inputs a value
@@ -24,6 +29,12 @@ public interface IValueField<T> extends IFormField, IHolder<T> {
    */
   String PROP_DISPLAY_TEXT = "displayText";
   String PROP_VALUE = "value";
+  String PROP_AUTO_DISPLAY_TEXT = "autoDisplayText";
+  String PROP_AUTO_ADD_DEFAULT_MENUS = "autoAddDefaultMenus";
+  /**
+   * {@link IContextMenu}
+   */
+  String PROP_CONTEXT_MENU = "contextMenu";
 
   /**
    * set field value to initValue and clear all error flags
@@ -106,5 +117,40 @@ public interface IValueField<T> extends IFormField, IHolder<T> {
    * @see setValue()
    */
   void fireValueChanged();
+
+  /**
+   * @param listener
+   */
+  void addValueFieldListener(ValueFieldListener listener);
+
+  /**
+   * @param listener
+   */
+  void removeValueFieldListener(ValueFieldListener listener);
+
+  /**
+   * @return the child list of {@link #getContextMenu()}
+   */
+  List<IMenu> getMenus();
+
+  /**
+   * @return the invisible root menu container of all value field menus.
+   */
+  IValueFieldContextMenu getContextMenu();
+
+  /**
+   * Gets if the default system menus (cut, copy, paste) should be added automatically to the menus of this field.
+   * 
+   * @return true if the default system menus should be available automatically, false otherwise.
+   */
+  boolean isAutoAddDefaultMenus();
+
+  /**
+   * Sets if the default system menus (cut, copy, paste) should be added automatically to the menus of this field.
+   * 
+   * @param b
+   *          true if the menus should be available automatically, false otherwise.
+   */
+  void setAutoAddDefaultMenus(boolean b);
 
 }

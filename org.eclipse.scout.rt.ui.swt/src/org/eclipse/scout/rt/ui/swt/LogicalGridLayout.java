@@ -52,6 +52,10 @@ public class LogicalGridLayout extends Layout implements ILayoutExtension {
     m_vgap = vgap;
   }
 
+  public LogicalGridLayoutInfo getInfo() {
+    return m_info;
+  }
+
   @Override
   public int computeMinimumWidth(Composite parent, boolean changed) {
     return computeMinimumSize(parent, changed).x;
@@ -204,7 +208,6 @@ public class LogicalGridLayout extends Layout implements ILayoutExtension {
       }
       comp.setBounds(r);
     }
-
   }
 
   public void setDebug(boolean b) {
@@ -250,14 +253,6 @@ public class LogicalGridLayout extends Layout implements ILayoutExtension {
       }
     }
     out.flush();
-  }
-
-  /**
-   * @deprecated use {@link #validateLayout(Composite, int, boolean)}. Will be removed in Release 3.10.
-   */
-  @Deprecated
-  protected void validateLayout(Composite parent) {
-    validateLayout(parent, SWT.DEFAULT, false);
   }
 
   protected void validateLayout(Composite parent, int wHint, boolean flushCache) {

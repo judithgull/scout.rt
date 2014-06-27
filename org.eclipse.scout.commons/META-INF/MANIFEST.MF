@@ -2,7 +2,7 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: Scout Commons
 Bundle-SymbolicName: org.eclipse.scout.commons;singleton:=true
-Bundle-Version: 3.9.2.qualifier
+Bundle-Version: 4.0.0.qualifier
 Bundle-Activator: org.eclipse.scout.commons.internal.Activator
 Bundle-Vendor: Eclipse Scout Project
 Require-Bundle: org.eclipse.core.runtime;bundle-version="[3.4.0,4.0.0)",
@@ -17,6 +17,7 @@ Export-Package: org.eclipse.scout.commons,
  org.eclipse.scout.commons.eventlistprofiler,
  org.eclipse.scout.commons.exception,
  org.eclipse.scout.commons.holders,
+ org.eclipse.scout.commons.internal.runtime;x-internal:=true,
  org.eclipse.scout.commons.job,
  org.eclipse.scout.commons.logger,
  org.eclipse.scout.commons.logger.analysis,

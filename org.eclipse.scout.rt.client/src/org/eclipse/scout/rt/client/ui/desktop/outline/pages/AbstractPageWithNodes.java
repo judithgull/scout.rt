@@ -13,7 +13,9 @@ package org.eclipse.scout.rt.client.ui.desktop.outline.pages;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.CompareUtility;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.Order;
@@ -21,7 +23,12 @@ import org.eclipse.scout.commons.exception.IProcessingStatus;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.ui.action.ActionUtility;
+import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.TableMenuType;
+import org.eclipse.scout.rt.client.ui.action.menu.TreeMenuType;
 import org.eclipse.scout.rt.client.ui.basic.cell.Cell;
+import org.eclipse.scout.rt.client.ui.basic.cell.ICell;
 import org.eclipse.scout.rt.client.ui.basic.table.AbstractTable;
 import org.eclipse.scout.rt.client.ui.basic.table.ITable;
 import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
@@ -29,10 +36,10 @@ import org.eclipse.scout.rt.client.ui.basic.table.TableAdapter;
 import org.eclipse.scout.rt.client.ui.basic.table.TableEvent;
 import org.eclipse.scout.rt.client.ui.basic.table.TableRow;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.AbstractStringColumn;
+import org.eclipse.scout.rt.client.ui.basic.table.internal.TablePageTreeMenuWrapper;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITree;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
 import org.eclipse.scout.rt.client.ui.desktop.outline.OutlineMediator;
-import org.eclipse.scout.rt.shared.ContextMap;
 import org.eclipse.scout.rt.shared.ScoutTexts;
 
 /**
@@ -57,7 +64,14 @@ public abstract class AbstractPageWithNodes extends AbstractPage implements IPag
     this(callInitializer, null, null);
   }
 
-  public AbstractPageWithNodes(ContextMap contextMap) {
+  /**
+   * @deprecated Will be removed in the 6.0 Release.
+   *             Use {@link #AbstractPageWithNodes()} in combination with getter and setter on the page
+   *             instead.
+   */
+  @Deprecated
+  @SuppressWarnings("deprecation")
+  public AbstractPageWithNodes(org.eclipse.scout.rt.shared.ContextMap contextMap) {
     this(true, contextMap, null);
   }
 
@@ -69,7 +83,14 @@ public abstract class AbstractPageWithNodes extends AbstractPage implements IPag
     this(callInitializer, null, userPreferenceContext);
   }
 
-  public AbstractPageWithNodes(boolean callInitializer, ContextMap contextMap, String userPreferenceContext) {
+  /**
+   * @deprecated Will be removed in the 6.0 Release.
+   *             Use {@link #AbstractPageWithNodes(boolean, String)} in combination with getter and setter on the page
+   *             instead.
+   */
+  @Deprecated
+  @SuppressWarnings("deprecation")
+  public AbstractPageWithNodes(boolean callInitializer, org.eclipse.scout.rt.shared.ContextMap contextMap, String userPreferenceContext) {
     super(callInitializer, contextMap, userPreferenceContext);
   }
 
@@ -109,6 +130,29 @@ public abstract class AbstractPageWithNodes extends AbstractPage implements IPag
     }
     catch (Exception e) {
       LOG.warn(null, e);
+    }
+  }
+
+  @Override
+  public void cellChanged(ICell cell, int changedBit) {
+    super.cellChanged(cell, changedBit);
+    updateParentTableRow(cell);
+  }
+
+  /**
+   * If the cell has changed (e.g. the text) we inform our parent as well.
+   * If the parent page is a {@link IPageWithNodes}, update its table accordingly.
+   * Since the table {@link P_Table} has only one column, we update the first column.
+   * 
+   * @since 3.10.0-M5
+   */
+  protected void updateParentTableRow(ICell cell) {
+    IPage parent = getParentPage();
+    if (parent != null && parent instanceof IPageWithNodes) {
+      ITableRow row = ((IPageWithNodes) parent).getTableRowFor(this);
+      if (row != null) {
+        row.getCellForUpdate(0).setText(cell.getText());
+      }
     }
   }
 
@@ -152,7 +196,6 @@ public abstract class AbstractPageWithNodes extends AbstractPage implements IPag
   public void loadChildren() throws ProcessingException {
     ArrayList<IPage> pageList = new ArrayList<IPage>();
     createChildPagesInternal(pageList);
-    IPage[] pages = pageList.toArray(new IPage[pageList.size()]);
     // load tree
     ITree tree = getTree();
     try {
@@ -184,7 +227,7 @@ public abstract class AbstractPageWithNodes extends AbstractPage implements IPag
       setChildrenLoaded(false);
       //
       getTree().removeAllChildNodes(this);
-      getTree().addChildNodes(this, pages);
+      getTree().addChildNodes(this, pageList);
       //
       setChildrenLoaded(true);
       setChildrenDirty(false);
@@ -223,21 +266,22 @@ public abstract class AbstractPageWithNodes extends AbstractPage implements IPag
     finally {
       getInternalTable().setTableChanging(false);
     }
+    super.loadChildren();
   }
 
   @Override
   public void rebuildTableInternal() throws ProcessingException {
-    ITreeNode[] childNodes = getChildNodes();
+    List<ITreeNode> childNodes = getChildNodes();
     try {
       getInternalTable().setTableChanging(true);
       //
       unlinkAllTableRowWithPage();
       getInternalTable().discardAllRows();
-      for (int i = 0; i < childNodes.length; i++) {
+      for (ITreeNode childNode : childNodes) {
         ITableRow row = new TableRow(getInternalTable().getColumnSet());
-        row.setCell(0, childNodes[i].getCell());
+        row.setCell(0, childNode.getCell());
         ITableRow insertedRow = getInternalTable().addRow(row);
-        linkTableRowWithPage(insertedRow, (IPage) childNodes[i]);
+        linkTableRowWithPage(insertedRow, (IPage) childNode);
       }
     }
     finally {
@@ -275,33 +319,51 @@ public abstract class AbstractPageWithNodes extends AbstractPage implements IPag
     return m_pageToTableRowMap.get(childPageNode);
   }
 
-  private ITreeNode[] getTreeNodesFor(ITableRow[] tableRows) {
-    ITreeNode[] nodes = new ITreeNode[tableRows.length];
-    int missingCount = 0;
-    for (int i = 0; i < tableRows.length; i++) {
-      nodes[i] = m_tableRowToPageMap.get(tableRows[i]);
-      if (nodes[i] == null) {
-        missingCount++;
-      }
+  private List<? extends IMenu> m_pageMenusOfSelection;
+
+  /**
+   *
+   */
+  protected void updateContextMenusForSelection() {
+    // remove old
+    if (m_pageMenusOfSelection != null) {
+      getInternalTable().getContextMenu().removeChildActions(m_pageMenusOfSelection);
+      m_pageMenusOfSelection = null;
     }
-    if (missingCount > 0) {
-      ITreeNode[] tmp = new ITreeNode[nodes.length - missingCount];
-      int index = 0;
-      for (int i = 0; i < nodes.length; i++) {
-        if (nodes[i] != null) {
-          tmp[index] = nodes[i];
-          index++;
+
+    List<IMenu> pageMenus = new ArrayList<IMenu>();
+    List<ITableRow> selectedRows = getInternalTable().getSelectedRows();
+    if (CollectionUtility.size(selectedRows) == 1) {
+      ITreeNode node = getTreeNodeFor(CollectionUtility.firstElement(selectedRows));
+      if (node instanceof IPageWithTable<?>) {
+        IPageWithTable<?> tablePage = (IPageWithTable<?>) node;
+        List<IMenu> menus = ActionUtility.getActions(tablePage.getTable().getContextMenu().getChildActions(), ActionUtility.createMenuFilterMenuTypes(TableMenuType.EmptySpace));
+        for (IMenu m : menus) {
+          pageMenus.add(new TablePageTreeMenuWrapper(m, TableMenuType.SingleSelection));
         }
       }
-      nodes = tmp;
+      else if (node instanceof IPageWithNodes) {
+        IPageWithNodes pageWithNodes = (IPageWithNodes) node;
+        List<IMenu> menus = ActionUtility.getActions(pageWithNodes.getMenus(), ActionUtility.createMenuFilterMenuTypes(TreeMenuType.SingleSelection));
+        for (IMenu m : menus) {
+          pageMenus.add(new TablePageTreeMenuWrapper(m, TableMenuType.SingleSelection));
+        }
+      }
     }
-    return nodes;
+    getInternalTable().getContextMenu().addChildActions(pageMenus);
+    m_pageMenusOfSelection = pageMenus;
+
   }
 
   /**
    * inner table
    */
   private class P_Table extends AbstractTable {
+
+    @Override
+    protected void execRowsSelected(List<? extends ITableRow> rows) throws ProcessingException {
+      super.execRowsSelected(rows);
+    }
 
     @Override
     protected boolean getConfiguredSortEnabled() {
@@ -331,7 +393,11 @@ public abstract class AbstractPageWithNodes extends AbstractPage implements IPag
 
       @Override
       protected void decorateCellInternal(Cell cell, ITableRow row) {
-        // Cells were already decorated by the tree, where they are taken from.
+        //if we encounter a cell change, update the tree as well
+        IPage page = m_tableRowToPageMap.get(row);
+        if (page != null) {
+          page.getCellForUpdate().setText(cell.getText());
+        }
       }
 
       @Override
@@ -365,10 +431,6 @@ public abstract class AbstractPageWithNodes extends AbstractPage implements IPag
           outlineMediator.mediateTableRowAction(e, AbstractPageWithNodes.this);
           break;
         }
-        case TableEvent.TYPE_ROW_POPUP: {
-          outlineMediator.mediateTableRowPopup(e, AbstractPageWithNodes.this);
-          break;
-        }
         case TableEvent.TYPE_ROW_DROP_ACTION: {
           outlineMediator.mediateTableRowDropAction(e, AbstractPageWithNodes.this);
           break;
@@ -377,9 +439,13 @@ public abstract class AbstractPageWithNodes extends AbstractPage implements IPag
           outlineMediator.mediateTableRowFilterChanged(AbstractPageWithNodes.this);
           break;
         }
+        case TableEvent.TYPE_ROWS_SELECTED: {
+          updateContextMenusForSelection();
+          break;
+        }
       }
 
     }
-
   }
+
 }

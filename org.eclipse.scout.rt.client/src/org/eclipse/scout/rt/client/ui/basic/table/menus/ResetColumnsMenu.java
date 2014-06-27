@@ -10,10 +10,17 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.basic.table.menus;
 
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
+import java.util.Set;
+
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.ui.action.menu.AbstractMenu;
-import org.eclipse.scout.rt.client.ui.action.menu.MenuSeparator;
+import org.eclipse.scout.rt.client.ui.action.menu.AbstractMenuSeparator;
+import org.eclipse.scout.rt.client.ui.action.menu.IMenuType;
+import org.eclipse.scout.rt.client.ui.action.menu.TableMenuType;
 import org.eclipse.scout.rt.client.ui.basic.table.ITable;
 import org.eclipse.scout.rt.client.ui.basic.table.columnfilter.ITableColumnFilterManager;
 import org.eclipse.scout.rt.client.ui.basic.table.customizer.ITableCustomizer;
@@ -40,6 +47,16 @@ public class ResetColumnsMenu extends AbstractMenu {
     }
 
     @Override
+    protected boolean getConfiguredInheritAccessibility() {
+      return false;
+    }
+
+    @Override
+    protected Set<IMenuType> getConfiguredMenuTypes() {
+      return CollectionUtility.<IMenuType> hashSet(TableMenuType.Header);
+    }
+
+    @Override
     protected void execAction() throws ProcessingException {
       try {
         m_table.setTableChanging(true);
@@ -61,7 +78,7 @@ public class ResetColumnsMenu extends AbstractMenu {
   }
 
   @Order(20.0)
-  public class Separator1Menu extends MenuSeparator {
+  public class Separator1Menu extends AbstractMenuSeparator {
   }
 
   @Order(30.0)
@@ -70,6 +87,16 @@ public class ResetColumnsMenu extends AbstractMenu {
     @Override
     protected String getConfiguredText() {
       return ScoutTexts.get("ResetTableColumnsView");
+    }
+
+    @Override
+    protected boolean getConfiguredInheritAccessibility() {
+      return false;
+    }
+
+    @Override
+    protected Set<IMenuType> getConfiguredMenuTypes() {
+      return CollectionUtility.<IMenuType> hashSet(TableMenuType.Header);
     }
 
     @Override
@@ -100,6 +127,16 @@ public class ResetColumnsMenu extends AbstractMenu {
     }
 
     @Override
+    protected boolean getConfiguredInheritAccessibility() {
+      return false;
+    }
+
+    @Override
+    protected Set<IMenuType> getConfiguredMenuTypes() {
+      return CollectionUtility.<IMenuType> hashSet(TableMenuType.Header);
+    }
+
+    @Override
     protected void execAction() {
       try {
         m_table.setTableChanging(true);
@@ -121,7 +158,31 @@ public class ResetColumnsMenu extends AbstractMenu {
     }
 
     @Override
-    protected void execPrepareAction() throws ProcessingException {
+    protected boolean getConfiguredInheritAccessibility() {
+      return false;
+    }
+
+    @Override
+    protected Set<IMenuType> getConfiguredMenuTypes() {
+      return CollectionUtility.<IMenuType> hashSet(TableMenuType.Header);
+    }
+
+    @Override
+    protected void execInitAction() throws ProcessingException {
+      m_table.addPropertyChangeListener(new PropertyChangeListener() {
+
+        @Override
+        public void propertyChange(PropertyChangeEvent evt) {
+          if (ITable.PROP_COLUMN_FILTER_MANAGER.equals(evt.getPropertyName())) {
+            updateVisibility();
+          }
+        }
+
+      });
+      updateVisibility();
+    }
+
+    private void updateVisibility() {
       setVisible(m_table.getColumnFilterManager() != null);
     }
 

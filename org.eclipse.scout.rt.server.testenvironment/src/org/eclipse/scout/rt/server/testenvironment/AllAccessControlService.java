@@ -11,10 +11,10 @@
 
 package org.eclipse.scout.rt.server.testenvironment;
 
-import java.lang.reflect.Method;
 import java.security.AllPermission;
 import java.security.Permission;
 import java.security.Permissions;
+import java.util.Collection;
 import java.util.Enumeration;
 import java.util.List;
 
@@ -97,22 +97,11 @@ public class AllAccessControlService extends AbstractService implements IAccessC
   }
 
   @Override
-  public void clearCacheOfUserIds(String... userIds) {
+  public void clearCacheOfUserIds(Collection<String> userIds) {
   }
 
   @Override
   public String getUserIdOfCurrentSubject() {
     return null;
-  }
-
-  @SuppressWarnings("deprecation")
-  @Override
-  public void clearCacheOfPrincipals(String... userIds) {
-  }
-
-  @SuppressWarnings("deprecation")
-  @Override
-  public boolean checkServiceTunnelAccess(Class serviceInterfaceClass, Method method, Object[] args) {
-    return true;
   }
 }

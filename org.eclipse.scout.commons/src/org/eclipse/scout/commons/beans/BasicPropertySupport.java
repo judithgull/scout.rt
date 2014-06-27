@@ -21,7 +21,9 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.CompareUtility;
 import org.eclipse.scout.commons.WeakEventListener;
 import org.eclipse.scout.commons.eventlistprofiler.EventListenerProfiler;
@@ -29,11 +31,6 @@ import org.eclipse.scout.commons.eventlistprofiler.IEventListenerSnapshot;
 import org.eclipse.scout.commons.eventlistprofiler.IEventListenerSource;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
-
-/**
- * Company: BSI AG
- * www.bsiag.com
- */
 
 public class BasicPropertySupport implements IEventListenerSource {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(BasicPropertySupport.class);
@@ -45,10 +42,10 @@ public class BasicPropertySupport implements IEventListenerSource {
   public static final long DEFAULT_LONG_VALUE = DEFAULT_INT_VALUE;
   public static final Long DEFAULT_LONG = Long.valueOf(DEFAULT_LONG_VALUE);
   private static final Boolean DEFAULT_BOOL = Boolean.FALSE;
-  private Map<String, Object> m_props = new HashMap<String, Object>();
+  private final Map<String, Object> m_props = new HashMap<String, Object>();
   private Object m_source;
   // observer
-  private Object m_listenerLock = new Object();
+  private final Object m_listenerLock = new Object();
   private List<Object> m_listeners;
   private Map<String, List<Object>> m_childListeners;
   private int m_propertiesChanging;
@@ -118,7 +115,7 @@ public class BasicPropertySupport implements IEventListenerSource {
     // loop and catch exception instead of using lock (better performance)
     for (int i = 0; i < 10; i++) {
       try {
-        return new HashMap<String, Object>(m_props);
+        return CollectionUtility.copyMap(m_props);
       }
       catch (ConcurrentModificationException cme) {
         if (LOG.isDebugEnabled()) {
@@ -126,7 +123,7 @@ public class BasicPropertySupport implements IEventListenerSource {
         }
       }
     }
-    return new HashMap<String, Object>(m_props);
+    return CollectionUtility.copyMap(m_props);
   }
 
   public void putPropertiesMap(Map<String, Object> map) {
@@ -192,6 +189,72 @@ public class BasicPropertySupport implements IEventListenerSource {
 
   public Object getProperty(String name) {
     return m_props.get(name);
+  }
+
+  public <T> boolean setPropertyList(String name, List<T> newValue) {
+    return setPropertyList(name, newValue, false);
+  }
+
+  public <T> boolean setPropertyListAlwaysFire(String name, List<T> newValue) {
+    return setPropertyList(name, newValue, true);
+  }
+
+  @SuppressWarnings("unchecked")
+  private <T> boolean setPropertyList(String name, List<T> newValue, boolean alwaysFire) {
+    Object oldValue = m_props.get(name);
+    boolean propChanged = setPropertyNoFire(name, newValue);
+    if (propChanged || alwaysFire) {
+      Object eventOldValue = null;
+      if (oldValue instanceof List) {
+        eventOldValue = CollectionUtility.arrayList((List) oldValue);
+      }
+      // fire a copy
+      List<T> eventNewValue = null;
+      if (newValue != null) {
+        eventNewValue = CollectionUtility.arrayList(newValue);
+      }
+      firePropertyChangeImpl(name, eventOldValue, eventNewValue);
+      return propChanged;
+    }
+    return false;
+  }
+
+  @SuppressWarnings("unchecked")
+  public <T> List<T> getPropertyList(String name) {
+    return (List<T>) m_props.get(name);
+  }
+
+  public <T> boolean setPropertySet(String name, Set<T> newValue) {
+    return setPropertySet(name, newValue, false);
+  }
+
+  public <T> boolean setPropertySetAlwaysFire(String name, Set<T> newValue) {
+    return setPropertySet(name, newValue, true);
+  }
+
+  @SuppressWarnings("unchecked")
+  private <T> boolean setPropertySet(String name, Set<T> newValue, boolean alwaysFire) {
+    Object oldValue = m_props.get(name);
+    boolean propChanged = setPropertyNoFire(name, newValue);
+    if (propChanged || alwaysFire) {
+      Object eventOldValue = null;
+      if (oldValue instanceof Set) {
+        eventOldValue = CollectionUtility.hashSet((Set) oldValue);
+      }
+      // fire a copy
+      Set<T> eventNewValue = null;
+      if (newValue != null) {
+        eventNewValue = CollectionUtility.hashSet(newValue);
+      }
+      firePropertyChangeImpl(name, eventOldValue, eventNewValue);
+      return propChanged;
+    }
+    return false;
+  }
+
+  @SuppressWarnings("unchecked")
+  public <T> Set<T> getPropertySet(String name) {
+    return (Set<T>) m_props.get(name);
   }
 
   public boolean setProperty(String name, Object newValue) {

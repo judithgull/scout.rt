@@ -20,10 +20,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.ConfigurationUtility;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.FormData;
 import org.eclipse.scout.commons.annotations.FormData.SdkCommand;
 import org.eclipse.scout.commons.annotations.Order;
@@ -40,6 +41,7 @@ import org.eclipse.scout.rt.client.ClientSyncJob;
 import org.eclipse.scout.rt.client.services.common.search.ISearchFilterService;
 import org.eclipse.scout.rt.client.ui.DataChangeListener;
 import org.eclipse.scout.rt.client.ui.WeakDataChangeListener;
+import org.eclipse.scout.rt.client.ui.action.ActionUtility;
 import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
 import org.eclipse.scout.rt.client.ui.desktop.IDesktop;
 import org.eclipse.scout.rt.client.ui.form.IForm;
@@ -56,6 +58,8 @@ import org.eclipse.scout.rt.shared.services.common.jdbc.SearchFilter;
 import org.eclipse.scout.rt.shared.services.common.security.IAccessControlService;
 import org.eclipse.scout.service.SERVICES;
 
+@SuppressWarnings("deprecation")
+@ClassId("cb3204c4-71bf-4dc6-88a4-3a8f81a7ca10")
 @FormData(value = AbstractFormFieldData.class, sdkCommand = SdkCommand.USE)
 public abstract class AbstractFormField extends AbstractPropertyObserver implements IFormField {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractFormField.class);
@@ -134,13 +138,16 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
   }
 
   /**
-   * @deprecated processing logic belongs to server
+   * @deprecated processing logic belongs to server. Will be removed in the 5.0 Release.
    */
   @Deprecated
   protected String getConfiguredSearchTerm() {
     return null;
   }
 
+  /**
+   * @deprecated Will be removed in the 5.0 Release.
+   */
   @Deprecated
   public final String getLegacySearchTerm() {
     return getConfiguredSearchTerm();
@@ -151,7 +158,6 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.TEXT)
   @Order(10)
-  @ConfigPropertyValue("null")
   protected String getConfiguredLabel() {
     return null;
   }
@@ -164,7 +170,6 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.LABEL_POSITION)
   @Order(15)
-  @ConfigPropertyValue("LABEL_POSITION_DEFAULT")
   protected int getConfiguredLabelPosition() {
     return LABEL_POSITION_DEFAULT;
   }
@@ -176,7 +181,6 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(16)
-  @ConfigPropertyValue("LABEL_WIDTH_DEFAULT")
   protected int getConfiguredLabelWidthInPixel() {
     return LABEL_WIDTH_DEFAULT;
   }
@@ -188,47 +192,42 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.LABEL_HORIZONTAL_ALIGNMENT)
   @Order(17)
-  @ConfigPropertyValue("LABEL_HORIZONTAL_ALIGNMENT_DEFAULT")
   protected int getConfiguredLabelHorizontalAlignment() {
     return LABEL_HORIZONTAL_ALIGNMENT_DEFAULT;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(20)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredLabelVisible() {
     return true;
   }
 
   /**
-   * affects only the filed itself. in case of a composite field initially the property
-   * does not gets broadcasted.
+   * Specifies if the form field is enabled initially.<br>
+   * Affects only the field itself. In case of a composite field the property does not get broadcasted initially.
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(30)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredEnabled() {
     return true;
   }
 
   /**
-   * affects only the filed itself. in case of a composite field initially the property
-   * does not gets broadcasted.
+   * Specifies if the form field is visible initially.<br>
+   * Affects only the field itself. In case of a composite field the property does not get broadcasted initially.
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(40)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredVisible() {
     return true;
   }
 
   /**
-   * affects only the filed itself. in case of a composite field initially the property
-   * does not gets broadcasted.
+   * Specifies if the form field is mandatory (required) initially.<br>
+   * Affects only the field itself. In case of a composite field the property does not get broadcasted initially.
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(45)
-  @ConfigPropertyValue("false")
   @ValidationRule(ValidationRule.MANDATORY)
   protected boolean getConfiguredMandatory() {
     return false;
@@ -236,28 +235,24 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
 
   @ConfigProperty(ConfigProperty.TEXT)
   @Order(50)
-  @ConfigPropertyValue("null")
   protected String getConfiguredTooltipText() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.COLOR)
   @Order(60)
-  @ConfigPropertyValue("null")
   protected String getConfiguredForegroundColor() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.COLOR)
   @Order(70)
-  @ConfigPropertyValue("null")
   protected String getConfiguredBackgroundColor() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.FONT)
   @Order(80)
-  @ConfigPropertyValue("null")
   protected String getConfiguredFont() {
     return null;
   }
@@ -271,7 +266,6 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.COLOR)
   @Order(60)
-  @ConfigPropertyValue("null")
   protected String getConfiguredLabelForegroundColor() {
     return null;
   }
@@ -285,7 +279,6 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.COLOR)
   @Order(70)
-  @ConfigPropertyValue("null")
   protected String getConfiguredLabelBackgroundColor() {
     return null;
   }
@@ -299,7 +292,6 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.FONT)
   @Order(80)
-  @ConfigPropertyValue("null")
   protected String getConfiguredLabelFont() {
     return null;
   }
@@ -316,7 +308,6 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.HORIZONTAL_ALIGNMENT)
   @Order(85)
-  @ConfigPropertyValue("-1")
   protected int getConfiguredHorizontalAlignment() {
     return -1;
   }
@@ -333,7 +324,6 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.VERTICAL_ALIGNMENT)
   @Order(86)
-  @ConfigPropertyValue("-1")
   protected int getConfiguredVerticalAlignment() {
     return -1;
   }
@@ -353,7 +343,6 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(87)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredFillHorizontal() {
     return true;
   }
@@ -372,7 +361,6 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(88)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredFillVertical() {
     return true;
   }
@@ -393,7 +381,6 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(90)
-  @ConfigPropertyValue("-1")
   protected int getConfiguredGridX() {
     return -1;
   }
@@ -413,7 +400,6 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(95)
-  @ConfigPropertyValue("-1")
   protected int getConfiguredGridY() {
     return -1;
   }
@@ -446,7 +432,6 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(100)
-  @ConfigPropertyValue("1")
   protected int getConfiguredGridW() {
     return 1;
   }
@@ -479,7 +464,6 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(105)
-  @ConfigPropertyValue("1")
   protected int getConfiguredGridH() {
     return 1;
   }
@@ -511,7 +495,6 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.DOUBLE)
   @Order(130)
-  @ConfigPropertyValue("-1")
   protected double getConfiguredGridWeightX() {
     return -1;
   }
@@ -545,7 +528,6 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.DOUBLE)
   @Order(140)
-  @ConfigPropertyValue("-1")
   protected double getConfiguredGridWeightY() {
     return -1;
   }
@@ -563,7 +545,6 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(142)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredGridUseUiWidth() {
     return false;
   }
@@ -581,7 +562,6 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(142)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredGridUseUiHeight() {
     return false;
   }
@@ -597,7 +577,6 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(150)
-  @ConfigPropertyValue("0")
   protected int getConfiguredWidthInPixel() {
     return 0;
   }
@@ -613,14 +592,12 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(160)
-  @ConfigPropertyValue("0")
   protected int getConfiguredHeightInPixel() {
     return 0;
   }
 
   @ConfigProperty(ConfigProperty.MASTER_FIELD)
   @Order(170)
-  @ConfigPropertyValue("null")
   @ValidationRule(ValidationRule.MASTER_VALUE_FIELD)
   protected Class<? extends IValueField> getConfiguredMasterField() {
     return null;
@@ -628,7 +605,6 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(180)
-  @ConfigPropertyValue("false")
   @ValidationRule(ValidationRule.MASTER_VALUE_REQUIRED)
   protected boolean getConfiguredMasterRequired() {
     return false;
@@ -636,21 +612,22 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(190)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredFocusable() {
     return true;
   }
 
-  @ConfigProperty(ConfigProperty.DOC)
+  /**
+   * @deprecated: Use a {@link ClassId} annotation as key for Doc-Text. Will be removed in the 5.0 Release.
+   */
+  @Deprecated
   @Order(20)
-  @ConfigPropertyValue("null")
   protected String getConfiguredDoc() {
     return null;
   }
 
-  private Class<? extends IKeyStroke>[] getConfiguredKeyStrokes() {
+  private List<Class<? extends IKeyStroke>> getConfiguredKeyStrokes() {
     Class[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
-    Class<IKeyStroke>[] fca = ConfigurationUtility.filterClasses(dca, IKeyStroke.class);
+    List<Class<IKeyStroke>> fca = ConfigurationUtility.filterClasses(dca, IKeyStroke.class);
     return ConfigurationUtility.removeReplacedClasses(fca);
   }
 
@@ -829,6 +806,8 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
       //
       initFieldInternal();
       execInitField();
+      // init key strokes
+      ActionUtility.initActions(getKeyStrokes());
     }
     finally {
       setValueChangeTriggerEnabled(true);
@@ -1028,6 +1007,81 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
     return c.getSimpleName();
   }
 
+  /**
+   * Computes a unique class id.
+   * <p>
+   * If the class is annotated with {@link ClassId}, the annotation value is used. If the field is defined in a template
+   * (outside of its form class), the ids of the enclosing fields are appended, if necessary, to make the id unique.
+   * </p>
+   * <p>
+   * If the class is not annotated with {@link ClassId}, a unique id is computed using the simple class name.
+   * </p>
+   * <p>
+   * For dynamically injected fields this method (or {@link getSimpleClassId}) needs to be overridden to make sure it is
+   * unique.
+   * </p>
+   */
+  @Override
+  public String classId() {
+    StringBuilder classId = new StringBuilder(computeClassId());
+
+    boolean appendFormId = !getClass().isAnnotationPresent(ClassId.class);
+    if (appendFormId && getForm() != null) {
+      classId.append(ID_CONCAT_SYMBOL).append(getForm().classId());
+    }
+    boolean duplicate = existsDuplicateClassId();
+    if (duplicate) {
+      LOG.warn("Found a duplicate classid for {}, adding field index. Override classId for dynamically injected fields.", classId);
+      int fieldIndex = getParentField().getFieldIndex(this);
+      classId.append(ID_CONCAT_SYMBOL).append(fieldIndex);
+    }
+
+    return classId.toString();
+  }
+
+  /**
+   * Computes a class id by considering the enclosing field list.
+   * <p>
+   * Does not consider the complete path for lenient support. For dynamically injected fields {@link #classid()} needs
+   * to be overriden.
+   * </p>
+   */
+  private String computeClassId() {
+    StringBuilder fieldId = new StringBuilder();
+    String simpleClassId = ConfigurationUtility.getAnnotatedClassIdWithFallback(getClass(), true);
+    fieldId.append(simpleClassId);
+    List<ICompositeField> enclosingFieldList = getEnclosingFieldList();
+    for (int i = enclosingFieldList.size() - 1; i >= 0; --i) {
+      ICompositeField enclosingField = enclosingFieldList.get(i);
+      String enclosingClassId = ConfigurationUtility.getAnnotatedClassIdWithFallback(enclosingField.getClass(), true);
+      fieldId.append(ID_CONCAT_SYMBOL).append(enclosingClassId);
+    }
+    return fieldId.toString();
+  }
+
+  /**
+   * Sanity check for class ids. Scans all fields in a form to find duplicate class ids.
+   * 
+   * @return <code>true</code>, if another field with the same id is found. <code>false</code> otherwise.
+   */
+  private boolean existsDuplicateClassId() {
+    IForm form = getForm();
+    String currentClassId = computeClassId();
+    if (form != null) {
+      List<String> classIds = new ArrayList<String>();
+      for (IFormField f : form.getAllFields()) {
+        if (f != this) {
+          String fClassId = ConfigurationUtility.getAnnotatedClassIdWithFallback(f.getClass(), true);
+          classIds.add(fClassId);
+        }
+      }
+      if (classIds.contains(currentClassId)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /*
    * Data i/o
    */
@@ -1205,26 +1259,6 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
   public void setLabelSuppressed(boolean b) {
     m_labelSuppressed = b;
     calculateLabelVisible();
-  }
-
-  /**
-   * @deprecated Use {@link #getProperty(String)} instead. Will be removed in Release 3.10.
-   */
-  @Deprecated
-  @SuppressWarnings("deprecation")
-  @Override
-  public Object getCustomProperty(String propName) {
-    return getProperty(propName);
-  }
-
-  /**
-   * @deprecated Use {@link #setProperty(String, Object)} instead. Will be removed in Release 3.10.
-   */
-  @Deprecated
-  @SuppressWarnings("deprecation")
-  @Override
-  public void setCustomProperty(String propName, Object o) {
-    setProperty(propName, o);
   }
 
   @Override
@@ -1634,7 +1668,6 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
     }
   }
 
-  @SuppressWarnings("deprecation")
   @Override
   public boolean fetchFocusRequested() {
     return false;
@@ -1695,9 +1728,9 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
 
   @Override
   public void updateKeyStrokes() {
-    HashMap<String, IKeyStroke> ksMap = new HashMap<String, IKeyStroke>();
+    Map<String, IKeyStroke> ksMap = new HashMap<String, IKeyStroke>();
     //
-    IKeyStroke[] c = getLocalKeyStrokes();
+    List<IKeyStroke> c = getLocalKeyStrokes();
     if (c != null) {
       for (IKeyStroke ks : c) {
         if (ks != null) {
@@ -1714,39 +1747,35 @@ public abstract class AbstractFormField extends AbstractPropertyObserver impleme
         }
       }
     }
-    propertySupport.setProperty(PROP_KEY_STROKES, ksMap.values().toArray(new IKeyStroke[ksMap.size()]));
+    propertySupport.setPropertyList(PROP_KEY_STROKES, CollectionUtility.arrayListWithoutNullElements(ksMap.values()));
   }
 
   @Override
-  public IKeyStroke[] getContributedKeyStrokes() {
+  public List<IKeyStroke> getContributedKeyStrokes() {
     return null;
   }
 
   @Override
-  public IKeyStroke[] getLocalKeyStrokes() {
-    HashMap<String, IKeyStroke> ksMap = new HashMap<String, IKeyStroke>();
-    Class<? extends IKeyStroke>[] shortcutArray = getConfiguredKeyStrokes();
-    for (int i = 0; i < shortcutArray.length; i++) {
+  public List<IKeyStroke> getLocalKeyStrokes() {
+    List<Class<? extends IKeyStroke>> configuredKeyStrokes = getConfiguredKeyStrokes();
+    Map<String, IKeyStroke> ksMap = new HashMap<String, IKeyStroke>(configuredKeyStrokes.size());
+    for (Class<? extends IKeyStroke> keystrokeClazz : configuredKeyStrokes) {
       IKeyStroke ks;
       try {
-        ks = ConfigurationUtility.newInnerInstance(this, shortcutArray[i]);
+        ks = ConfigurationUtility.newInnerInstance(this, keystrokeClazz);
+        ks.initAction();
         ksMap.put(ks.getKeyStroke().toUpperCase(), ks);
       }
       catch (Throwable t) {
-        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("keyStroke: " + shortcutArray[i].getName(), t));
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + keystrokeClazz.getName() + "'.", t));
       }
     }
-    List<IKeyStroke> ksList = new ArrayList<IKeyStroke>(ksMap.values());
-    return ksList.toArray(new IKeyStroke[ksList.size()]);
+    return CollectionUtility.arrayList(ksMap.values());
   }
 
   @Override
-  public IKeyStroke[] getKeyStrokes() {
-    IKeyStroke[] keyStrokes = (IKeyStroke[]) propertySupport.getProperty(PROP_KEY_STROKES);
-    if (keyStrokes == null) {
-      keyStrokes = new IKeyStroke[0];
-    }
-    return keyStrokes;
+  public List<IKeyStroke> getKeyStrokes() {
+    return CollectionUtility.arrayList(propertySupport.<IKeyStroke> getPropertyList(PROP_KEY_STROKES));
   }
 
   private class P_MasterListener implements MasterListener {

@@ -15,7 +15,6 @@ import java.util.List;
 
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
@@ -24,8 +23,8 @@ import org.eclipse.scout.rt.client.ClientSyncJob;
 import org.eclipse.scout.rt.client.services.common.bookmark.BookmarkServiceEvent;
 import org.eclipse.scout.rt.client.services.common.bookmark.BookmarkServiceListener;
 import org.eclipse.scout.rt.client.services.common.bookmark.IBookmarkService;
-import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
 import org.eclipse.scout.rt.client.ui.action.menu.AbstractMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.AbstractMenuSeparator;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 import org.eclipse.scout.rt.client.ui.action.menu.MenuSeparator;
 import org.eclipse.scout.rt.client.ui.desktop.IDesktop;
@@ -37,6 +36,7 @@ import org.eclipse.scout.rt.shared.security.CreateGlobalBookmarkPermission;
 import org.eclipse.scout.rt.shared.security.CreateUserBookmarkPermission;
 import org.eclipse.scout.rt.shared.services.common.bookmark.Bookmark;
 import org.eclipse.scout.rt.shared.services.common.bookmark.BookmarkFolder;
+import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.service.SERVICES;
 
 /**
@@ -46,8 +46,6 @@ import org.eclipse.scout.service.SERVICES;
 public abstract class AbstractBookmarkMenu extends AbstractMenu {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractBookmarkMenu.class);
 
-  private ArrayList<IKeyStroke> m_keyStrokes;
-
   public AbstractBookmarkMenu() {
   }
 
@@ -56,7 +54,6 @@ public abstract class AbstractBookmarkMenu extends AbstractMenu {
 
   @Override
   @ConfigProperty(ConfigProperty.TEXT)
-  @ConfigPropertyValue("ScoutTexts.get(\"BookmarksMainMenu\")")
   @Order(10)
   protected String getConfiguredText() {
     return ScoutTexts.get("BookmarksMainMenu");
@@ -79,7 +76,6 @@ public abstract class AbstractBookmarkMenu extends AbstractMenu {
 
   @ConfigProperty(ConfigProperty.FORM)
   @Order(20)
-  @ConfigPropertyValue("null")
   protected Class<? extends IBookmarkForm> getConfiguredBookmarkForm() {
     return BookmarkForm.class;
   }
@@ -95,7 +91,7 @@ public abstract class AbstractBookmarkMenu extends AbstractMenu {
           form = getConfiguredBookmarkForm().newInstance();
         }
         catch (Exception e) {
-          LOG.warn(null, e);
+          SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + getConfiguredBookmarkForm().getName() + "'.", e));
         }
       }
       if (form == null) {
@@ -126,7 +122,7 @@ public abstract class AbstractBookmarkMenu extends AbstractMenu {
   private void handleBookmarksChanged() {
     IBookmarkService service = SERVICES.getService(IBookmarkService.class);
     List<IMenu> oldList = getChildActions();
-    ArrayList<IMenu> newList = new ArrayList<IMenu>();
+    List<IMenu> newList = new ArrayList<IMenu>();
     for (IMenu m : oldList) {
       if (m.getClass() == AddUserBookmarkMenu.class) {
         newList.add(m);
@@ -165,7 +161,7 @@ public abstract class AbstractBookmarkMenu extends AbstractMenu {
     }
 
     @Override
-    protected void execPrepareAction() {
+    protected void execInitAction() throws ProcessingException {
       setVisiblePermission(new CreateUserBookmarkPermission());
     }
 
@@ -183,7 +179,7 @@ public abstract class AbstractBookmarkMenu extends AbstractMenu {
     }
 
     @Override
-    protected void execPrepareAction() {
+    protected void execInitAction() throws ProcessingException {
       setVisiblePermission(new CreateGlobalBookmarkPermission());
     }
 
@@ -278,7 +274,7 @@ public abstract class AbstractBookmarkMenu extends AbstractMenu {
   }
 
   @Order(5f)
-  public class Separator1Menu extends MenuSeparator {
+  public class Separator1Menu extends AbstractMenuSeparator {
   }
 
   private void addBookmarkTreeInternal(BookmarkFolder folder, List<IMenu> actionList) {

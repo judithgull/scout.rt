@@ -398,20 +398,26 @@ public class UserNavigationHistory {
     }
   }
 
-  public IMenu[] getMenus() {
+  public List<IMenu> getMenus() {
     List<Bookmark> bookmarks = getBookmarks();
     Bookmark current = getActiveBookmark();
     // children
-    ArrayList<IMenu> newList = new ArrayList<IMenu>();
+    List<IMenu> newList = new ArrayList<IMenu>(bookmarks.size());
     for (Bookmark b : bookmarks) {
-      ActivateNavigationHistoryMenu m = new ActivateNavigationHistoryMenu(b);
-      if (b == current) {
-        m.setIconId(AbstractIcons.NavigationCurrent);
-        m.setEnabled(false);
+      try {
+        ActivateNavigationHistoryMenu m = new ActivateNavigationHistoryMenu(b);
+        m.initAction();
+        if (b == current) {
+          m.setIconId(AbstractIcons.NavigationCurrent);
+          m.setEnabled(false);
+        }
+        newList.add(m);
       }
-      newList.add(m);
+      catch (ProcessingException e) {
+        LOG.error("could not initialize menu for bookmark '" + b + "'.", e);
+      }
     }
-    return newList.toArray(new IMenu[newList.size()]);
+    return newList;
   }
 
   /**

@@ -10,12 +10,16 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.form.fields.booleanfield;
 
+import org.eclipse.scout.commons.annotations.ClassId;
+import org.eclipse.scout.commons.annotations.ConfigProperty;
+import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.form.fields.AbstractValueField;
 import org.eclipse.scout.rt.shared.ScoutTexts;
 
+@ClassId("3f14b55f-b49b-428a-92c4-05745d6d48c4")
 public abstract class AbstractBooleanField extends AbstractValueField<Boolean> implements IBooleanField {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractBooleanField.class);
 
@@ -38,6 +42,13 @@ public abstract class AbstractBooleanField extends AbstractValueField<Boolean> i
     propertySupport.setProperty(PROP_VALUE, false);
     // ticket 79554
     propertySupport.setProperty(PROP_DISPLAY_TEXT, execFormatValue(getValue()));
+  }
+
+  @Override
+  @Order(210)
+  @ConfigProperty(ConfigProperty.BOOLEAN)
+  protected boolean getConfiguredAutoAddDefaultMenus() {
+    return false;
   }
 
   @Override
@@ -100,12 +111,11 @@ public abstract class AbstractBooleanField extends AbstractValueField<Boolean> i
 
   private class P_UIFacade implements IBooleanFieldUIFacade {
     @Override
-    public void setSelectedFromUI(boolean checked) {
+    public boolean setSelectedFromUI() {
       if (isEnabled() && isVisible()) {
-        setChecked(checked);
+        setChecked(!isChecked());
       }
+      return isChecked();
     }
-
   }
-
 }

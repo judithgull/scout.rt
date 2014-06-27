@@ -15,7 +15,6 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -23,6 +22,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.IOrdered;
 import org.eclipse.scout.commons.annotations.InjectFieldTo;
 import org.eclipse.scout.commons.annotations.Order;
@@ -53,31 +53,25 @@ public final class ConfigurationUtility {
    * @throws IllegalArgumentException
    */
   @SuppressWarnings("unchecked")
-  public static <T> Class<T>[] sortFilteredClassesByOrderAnnotation(Class[] classes, Class<T> filter) {
-    TreeMap<CompositeObject, Class> orderedClassesMap = new TreeMap<CompositeObject, Class>();
-    for (int i = 0; i < classes.length; i++) {
-      if (filter.isAssignableFrom(classes[i])) {
-        if (classes[i].isAnnotationPresent(Order.class)) {
-          Order order = (Order) classes[i].getAnnotation(Order.class);
-          orderedClassesMap.put(new CompositeObject(order.value(), i), classes[i]);
+  public static <T> List<Class<? extends T>> sortFilteredClassesByOrderAnnotation(List<? extends Class> classes, Class<T> filter) {
+    TreeMap<CompositeObject, Class<? extends T>> orderedClassesMap = new TreeMap<CompositeObject, Class<? extends T>>();
+    int i = 0;
+    for (Class candidate : classes) {
+      if (filter.isAssignableFrom(candidate)) {
+        if (candidate.isAnnotationPresent(Order.class)) {
+          Order order = (Order) candidate.getAnnotation(Order.class);
+          orderedClassesMap.put(new CompositeObject(order.value(), i), (Class<T>) candidate);
         }
         else {
-          if (!classes[i].isAnnotationPresent(Replace.class)) {
-            LOG.error("missing @Order annotation: " + classes[i].getName());
+          if (!candidate.isAnnotationPresent(Replace.class)) {
+            LOG.error("missing @Order annotation: " + candidate.getName());
           }
-          orderedClassesMap.put(new CompositeObject(Double.MAX_VALUE, i), classes[i]);
+          orderedClassesMap.put(new CompositeObject(Double.MAX_VALUE, i), (Class<T>) candidate);
         }
+        i++;
       }
     }
-    return orderedClassesMap.values().toArray(new Class[orderedClassesMap.size()]);
-  }
-
-  /**
-   * @deprecated use {@link #sortByOrder(Collection)} instead. Will be removed in release 3.10.
-   */
-  @Deprecated
-  public static <T> Collection<T> sortByOrderAnnotation(Collection<T> list) {
-    return sortByOrder(list);
+    return CollectionUtility.arrayList(orderedClassesMap.values());
   }
 
   /**
@@ -91,7 +85,7 @@ public final class ConfigurationUtility {
    * 
    * @since 3.8.1
    */
-  public static <T> Collection<T> sortByOrder(Collection<T> list) {
+  public static <T> List<T> sortByOrder(Collection<T> list) {
     if (list == null) {
       return null;
     }
@@ -116,7 +110,7 @@ public final class ConfigurationUtility {
       sortMap.put(new CompositeObject(order, index), element);
       index++;
     }
-    return sortMap.values();
+    return CollectionUtility.arrayList(sortMap.values());
   }
 
   /**
@@ -165,14 +159,14 @@ public final class ConfigurationUtility {
    * @since 3.8.1
    */
   @SuppressWarnings("unchecked")
-  public static <T> Class<T>[] filterClasses(Class[] classes, Class<T> filter) {
-    ArrayList<Class<T>> list = new ArrayList<Class<T>>();
+  public static <T> List<Class<T>> filterClasses(Class[] classes, Class<T> filter) {
+    List<Class<T>> result = new ArrayList<Class<T>>();
     for (Class c : classes) {
       if (filter.isAssignableFrom(c) && !Modifier.isAbstract(c.getModifiers())) {
-        list.add(c);
+        result.add(c);
       }
     }
-    return list.toArray(new Class[0]);
+    return result;
   }
 
   /**
@@ -299,15 +293,15 @@ public final class ConfigurationUtility {
    * @since 3.8.2
    */
   @SuppressWarnings("unchecked")
-  public static <T> Class<? extends T>[] removeReplacedClasses(Class<? extends T>[] classes) {
+  public static <T> List<Class<? extends T>> removeReplacedClasses(List<? extends Class<? extends T>> classes) {
     Set<Class<? extends T>> replacingClasses = getReplacingLeafClasses(classes);
     if (replacingClasses.isEmpty()) {
-      // there are no replacing classes -> return original array
-      return classes;
+      // there are no replacing classes -> return original list copy
+      return CollectionUtility.arrayList(classes);
     }
 
     // compute resulting list of ordered classes
-    List<Class<? extends T>> list = new ArrayList<Class<? extends T>>();
+    List<Class<? extends T>> list = new ArrayList<Class<? extends T>>(classes.size());
     for (Class<? extends T> c : classes) {
       list.add(c);
     }
@@ -334,7 +328,7 @@ public final class ConfigurationUtility {
       list.remove(classToBeReplaced);
     }
 
-    return list.toArray(new Class[list.size()]);
+    return list;
   }
 
   /**
@@ -359,11 +353,11 @@ public final class ConfigurationUtility {
    * @return
    * @since 3.8.2
    */
-  public static <T> Map<Class<?>, Class<? extends T>> getReplacementMapping(Class<? extends T>[] classes) {
+  public static <T> Map<Class<?>, Class<? extends T>> getReplacementMapping(List<? extends Class<? extends T>> classes) {
     Set<Class<? extends T>> replacingClasses = getReplacingLeafClasses(classes);
     if (replacingClasses.isEmpty()) {
-      // there are no replacing classes -> return original array
-      return Collections.emptyMap();
+      // there are no replacing classes
+      return new HashMap<Class<?>, Class<? extends T>>(0);
     }
 
     // compute resulting replacement mapping
@@ -402,7 +396,7 @@ public final class ConfigurationUtility {
    * @return Returns the set of replacing leaf classes or an empty set.
    * @since 3.8.2
    */
-  public static <T> Set<Class<? extends T>> getReplacingLeafClasses(Class<? extends T>[] classes) {
+  public static <T> Set<Class<? extends T>> getReplacingLeafClasses(List<? extends Class<? extends T>> classes) {
     // gather all replacing and replaced classes (i.e. those annotated with @Replace and their super classes)
     Set<Class<? extends T>> replacingClasses = new HashSet<Class<? extends T>>();
     Set<Class<?>> replacedClasses = new HashSet<Class<?>>();
@@ -419,7 +413,7 @@ public final class ConfigurationUtility {
     }
 
     if (replacingClasses.isEmpty()) {
-      return Collections.emptySet();
+      return replacingClasses;
     }
 
     // remove transitive replacements (e.g. if A replaces B and B replaces C, A and B are replacing classes but we are interested in A only)
@@ -446,5 +440,57 @@ public final class ConfigurationUtility {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Returns the value of the {@link ClassId} annotation or the class name as fallback, the annotation is undefined.
+   * <p>
+   * If the class is replaced, the id of the replaced field is used ({@link ClassId}).
+   * </p>
+   * 
+   * @param clazz
+   * @return annotated id or class name fallback
+   * @since 3.10.0
+   */
+  public static String getAnnotatedClassIdWithFallback(Class<?> clazz) {
+    return getAnnotatedClassIdWithFallback(clazz, false);
+  }
+
+  /**
+   * Returns the value of the {@link ClassId} annotation or the class name as fallback, the annotation is undefined.
+   * <p>
+   * If the class is replaced, the id of the replaced field is used ({@link ClassId}).
+   * </p>
+   * 
+   * @param clazz
+   * @param simpleName
+   *          use the simple class name instead of the fully qualified class name.
+   * @return annotated id or class name fallback
+   * @since 3.10.0
+   */
+  public static String getAnnotatedClassIdWithFallback(Class<?> clazz, boolean simpleName) {
+    Class<?> replaced = getOriginalClass(clazz);
+    ClassId id = replaced.getAnnotation(ClassId.class);
+    String annotatedClassId = (id == null) ? null : id.value();
+    if (annotatedClassId != null) {
+      return annotatedClassId;
+    }
+    else if (simpleName && !StringUtility.isNullOrEmpty(replaced.getSimpleName())) {
+      return replaced.getSimpleName();
+    }
+    return replaced.getName();
+  }
+
+  /**
+   * If the class is replacing another class, the one that is being replaced is returned. Otherwise the class itself is
+   * returned.
+   * 
+   * @return class to be replaced
+   */
+  private static Class<?> getOriginalClass(Class<?> c) {
+    while (c.isAnnotationPresent(Replace.class)) {
+      c = c.getSuperclass();
+    }
+    return c;
   }
 }

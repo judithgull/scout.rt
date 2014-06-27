@@ -12,16 +12,21 @@ package org.eclipse.scout.rt.server;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-import java.util.Collections;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
+import javax.security.auth.Subject;
+
+import org.eclipse.core.runtime.Platform;
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.LocaleThreadLocal;
 import org.eclipse.scout.commons.TypeCastUtility;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
@@ -38,19 +43,25 @@ import org.eclipse.scout.rt.shared.ui.UserAgent;
 import org.eclipse.scout.service.SERVICES;
 import org.osgi.framework.Bundle;
 
-public abstract class AbstractServerSession implements IServerSession {
+public abstract class AbstractServerSession implements IServerSession, Serializable {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractServerSession.class);
 
-  private Bundle m_bundle;
+  private static final long serialVersionUID = 1L;
+
+  private transient Bundle m_bundle;
   private boolean m_initialized;
   private boolean m_active;
   private Locale m_locale;
   private final HashMap<String, Object> m_attributes;
-  private final Object m_attributesLock;
+  private transient Object m_attributesLock;
   private final SharedVariableMap m_sharedVariableMap;
   private boolean m_singleThreadSession;
-  private ScoutTexts m_scoutTexts;
+  private transient ScoutTexts m_scoutTexts;
   private UserAgent m_userAgent;
+  private String m_virtualSessionId;
+  private Subject m_subject;
+  private String m_sessionId;
+  private String m_symbolicBundleName;
 
   public AbstractServerSession(boolean autoInitConfig) {
     m_locale = LocaleThreadLocal.get();
@@ -62,24 +73,31 @@ public abstract class AbstractServerSession implements IServerSession {
     }
   }
 
-  /**
-   * @deprecated use {@link #getConfiguredSingleThreadSession()} instead. Will be removed in Release 3.10.
-   */
-  @Deprecated
-  protected boolean getConfiguredWebSession() {
-    return getConfiguredSingleThreadSession();
+  private void readObject(ObjectInputStream ois) throws ClassNotFoundException, IOException {
+    ois.defaultReadObject();
+    if (m_bundle == null && m_symbolicBundleName != null) {
+      m_bundle = Platform.getBundle(m_symbolicBundleName);
+    }
+
+    if (m_scoutTexts == null) {
+      m_scoutTexts = new ScoutTexts();
+      TextsThreadLocal.set(m_scoutTexts);
+    }
+
+    if (m_attributesLock == null) {
+      m_attributesLock = new Object();
+    }
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(100)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredSingleThreadSession() {
     return false;
   }
 
   @Override
   public Map<String, Object> getSharedVariableMap() {
-    return Collections.unmodifiableMap(m_sharedVariableMap);
+    return CollectionUtility.copyMap(m_sharedVariableMap);
   }
 
   /**
@@ -161,7 +179,7 @@ public abstract class AbstractServerSession implements IServerSession {
 
   protected void initConfig() {
     m_singleThreadSession = getConfiguredSingleThreadSession();
-    if (!isWebSession()) {
+    if (!isSingleThreadSession()) {
       m_sharedVariableMap.addPropertyChangeListener(new PropertyChangeListener() {
         @Override
         public void propertyChange(PropertyChangeEvent e) {
@@ -192,6 +210,7 @@ public abstract class AbstractServerSession implements IServerSession {
       throw new IllegalArgumentException("bundle must not be null");
     }
     m_bundle = bundle;
+    m_symbolicBundleName = bundle.getSymbolicName();
     m_active = true;
     m_scoutTexts = new ScoutTexts();
     // explicitly set the just created instance to the ThreadLocal because it was not available yet, when the job was started.
@@ -213,21 +232,6 @@ public abstract class AbstractServerSession implements IServerSession {
   protected void execLoadSession() throws ProcessingException {
   }
 
-  /**
-   * @deprecated never called by the framework. Will be removed in Release 3.10.
-   */
-  @Deprecated
-  protected void execLocaleChanged() throws ProcessingException {
-  }
-
-  /**
-   * @deprecated use #isSingleThreadSession instead. Will be removed in Release 3.10.
-   */
-  @Deprecated
-  public boolean isWebSession() {
-    return isSingleThreadSession();
-  }
-
   @Override
   public boolean isSingleThreadSession() {
     return m_singleThreadSession;
@@ -243,4 +247,33 @@ public abstract class AbstractServerSession implements IServerSession {
     m_userAgent = userAgent;
   }
 
+  @Override
+  public String getVirtualSessionId() {
+    return m_virtualSessionId;
+  }
+
+  @Override
+  public void setVirtualSessionId(String sessionId) {
+    m_virtualSessionId = sessionId;
+  }
+
+  @Override
+  public Subject getSubject() {
+    return m_subject;
+  }
+
+  @Override
+  public void setSubject(Subject subject) {
+    m_subject = subject;
+  }
+
+  @Override
+  public void setIdInternal(String sessionId) {
+    m_sessionId = sessionId;
+  }
+
+  @Override
+  public String getId() {
+    return m_sessionId;
+  }
 }

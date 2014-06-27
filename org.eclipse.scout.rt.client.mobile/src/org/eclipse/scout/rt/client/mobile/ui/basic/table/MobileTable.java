@@ -11,9 +11,12 @@
 package org.eclipse.scout.rt.client.mobile.ui.basic.table;
 
 import java.net.URL;
+import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.ConfigurationUtility;
 import org.eclipse.scout.commons.OptimisticLock;
 import org.eclipse.scout.commons.annotations.Order;
@@ -23,7 +26,6 @@ import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.mobile.ui.basic.table.columns.AbstractRowSummaryColumn;
 import org.eclipse.scout.rt.client.mobile.ui.basic.table.columns.IRowSummaryColumn;
-import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 import org.eclipse.scout.rt.client.ui.basic.table.AbstractTable;
 import org.eclipse.scout.rt.client.ui.basic.table.ITable;
 import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
@@ -40,7 +42,7 @@ import org.eclipse.scout.service.SERVICES;
  * A table optimized for mobile devices which wraps another table.
  * <p>
  * It consists of a content column which displays the relevant information of the original table.
- *
+ * 
  * @since 3.9.0
  */
 public class MobileTable extends AbstractMobileTable implements IMobileTable {
@@ -94,8 +96,18 @@ public class MobileTable extends AbstractMobileTable implements IMobileTable {
   }
 
   @Override
+  protected void execDisposeTable() throws ProcessingException {
+    super.execDisposeTable();
+    if (m_tableListener != null) {
+      getOriginalTable().removeTableListener(m_tableListener);
+      m_tableListener = null;
+    }
+    m_propertyDelegator.dispose();
+  }
+
+  @Override
   protected boolean execIsAutoCreateTableRowForm() {
-    if(getOriginalTable().hasProperty(IMobileTable.PROP_AUTO_CREATE_TABLE_ROW_FORM)) {
+    if (getOriginalTable().hasProperty(IMobileTable.PROP_AUTO_CREATE_TABLE_ROW_FORM)) {
       return isAutoCreateRowForm(getOriginalTable());
     }
 
@@ -108,7 +120,7 @@ public class MobileTable extends AbstractMobileTable implements IMobileTable {
 
   @Override
   protected String execComputeDefaultDrillDownStyle() {
-    if(getOriginalTable().hasProperty(PROP_DEFAULT_DRILL_DOWN_STYLE)) {
+    if (getOriginalTable().hasProperty(PROP_DEFAULT_DRILL_DOWN_STYLE)) {
       return getDefaultDrillDownStyle(getOriginalTable());
     }
 
@@ -118,7 +130,7 @@ public class MobileTable extends AbstractMobileTable implements IMobileTable {
 
     //Check if the original table already has a selection or click behavior implemented. If yes, use the drill down button style to not break the original selection or click behavior.
     if (!(getOriginalTable() instanceof IMobileTable)) {
-      if (ConfigurationUtility.isMethodOverwrite(AbstractTable.class, "execRowsSelected", new Class[]{ITableRow[].class}, getOriginalTable().getClass()) ||
+      if (ConfigurationUtility.isMethodOverwrite(AbstractTable.class, "execRowsSelected", new Class[]{List.class}, getOriginalTable().getClass()) ||
           ConfigurationUtility.isMethodOverwrite(AbstractTable.class, "execRowClick", new Class[]{ITableRow.class}, getOriginalTable().getClass())) {
         return IRowSummaryColumn.DRILL_DOWN_STYLE_BUTTON;
       }
@@ -136,15 +148,6 @@ public class MobileTable extends AbstractMobileTable implements IMobileTable {
     }
   }
 
-  public void dispose() {
-    if (m_tableListener == null) {
-      return;
-    }
-
-    getOriginalTable().removeTableListener(m_tableListener);
-    m_tableListener = null;
-  }
-
   public ITable getOriginalTable() {
     return m_propertyDelegator.getSender();
   }
@@ -160,7 +163,7 @@ public class MobileTable extends AbstractMobileTable implements IMobileTable {
   }
 
   @Override
-  protected void execRowsSelected(ITableRow[] rows) throws ProcessingException {
+  protected void execRowsSelected(List<? extends ITableRow> rows) throws ProcessingException {
     try {
       if (!m_selectionLock.acquire()) {
         //Prevent loop which could happen because delegation of selection is done from this to original table and vice versa
@@ -171,8 +174,8 @@ public class MobileTable extends AbstractMobileTable implements IMobileTable {
       getOriginalTable().getUIFacade().setSelectedRowsFromUI(getRowMapColumn().getValues(rows));
 
       ITableRow originalRow = null;
-      if (rows != null && rows.length > 0) {
-        originalRow = getRowMapColumn().getValue(rows[0]);
+      if (CollectionUtility.hasElements(rows)) {
+        originalRow = getRowMapColumn().getValue(rows.get(0));
       }
       if (originalRow != null) {
         if (isAutoCreateTableRowForm() && IRowSummaryColumn.DRILL_DOWN_STYLE_ICON.equals(getDrillDownStyle(originalRow))) {
@@ -246,7 +249,7 @@ public class MobileTable extends AbstractMobileTable implements IMobileTable {
     discardAllRows();
   }
 
-  private void handleWrappedTableRowsDeleted(ITableRow[] rows) {
+  private void handleWrappedTableRowsDeleted(List<? extends ITableRow> rows) {
     try {
       setTableChanging(true);
       for (ITableRow deletedRow : rows) {
@@ -259,18 +262,17 @@ public class MobileTable extends AbstractMobileTable implements IMobileTable {
     }
   }
 
-  private void handleWrappedTableRowsSelected(ITableRow[] rows) {
+  private void handleWrappedTableRowsSelected(List<? extends ITableRow> rows) {
     try {
       setTableChanging(true);
-      ITableRow[] mappedRows = getRowMapColumn().findRows(rows);
-      selectRows(mappedRows);
+      selectRows(getRowMapColumn().findRows(rows));
     }
     finally {
       setTableChanging(false);
     }
   }
 
-  private void handleWrappedTableRowsInserted(ITableRow[] rows) {
+  private void handleWrappedTableRowsInserted(List<? extends ITableRow> rows) {
     try {
       setTableChanging(true);
       insertWrappedTableRows(rows);
@@ -282,7 +284,7 @@ public class MobileTable extends AbstractMobileTable implements IMobileTable {
     }
   }
 
-  private void insertWrappedTableRows(ITableRow[] rows) {
+  private void insertWrappedTableRows(List<? extends ITableRow> rows) {
     if (!getContentColumn().isInitialized()) {
       getContentColumn().initializeDecorationConfiguration(getOriginalTable(), m_maxCellDetailColumns);
     }
@@ -302,12 +304,11 @@ public class MobileTable extends AbstractMobileTable implements IMobileTable {
     }
   }
 
-  private void handleWrappedTableRowOrderChanged(ITableRow[] rows) {
-    ITableRow[] sortedMobileRows = getRowMapColumn().findRows(rows);
-    sort(sortedMobileRows);
+  private void handleWrappedTableRowOrderChanged(List<? extends ITableRow> rows) {
+    sort(getRowMapColumn().findRows(rows));
   }
 
-  private void handleWrappedTableRowsUpdated(ITableRow[] originalRows) {
+  private void handleWrappedTableRowsUpdated(List<? extends ITableRow> originalRows) {
     if (getOriginalTable() == null || getOriginalTable().getRowCount() == 0) {
       return;
     }
@@ -345,7 +346,7 @@ public class MobileTable extends AbstractMobileTable implements IMobileTable {
   }
 
   private void syncCheckedRows() throws ProcessingException {
-    if (!isCheckable() || getOriginalTable().getCheckedRows().length == 0) {
+    if (!isCheckable() || getOriginalTable().getCheckedRows().isEmpty()) {
       return;
     }
 
@@ -412,20 +413,6 @@ public class MobileTable extends AbstractMobileTable implements IMobileTable {
   protected class P_DispatchingMobileTableUIFacade extends P_MobileTableUIFacade {
 
     //------------- pass events only to original table -------------
-    @Override
-    public IMenu[] fireRowPopupFromUI() {
-      return getOriginalTable().getUIFacade().fireRowPopupFromUI();
-    }
-
-    @Override
-    public IMenu[] fireEmptySpacePopupFromUI() {
-      return getOriginalTable().getUIFacade().fireEmptySpacePopupFromUI();
-    }
-
-    @Override
-    public IMenu[] fireHeaderPopupFromUI() {
-      return getOriginalTable().getUIFacade().fireHeaderPopupFromUI();
-    }
 
     @Override
     public TransferObject fireRowsDragRequestFromUI() {
@@ -454,22 +441,22 @@ public class MobileTable extends AbstractMobileTable implements IMobileTable {
     }
 
     @Override
-    public void fireColumnMovedFromUI(IColumn<?> c, int toViewIndex) {
+    public void fireColumnMovedFromUI(IColumn c, int toViewIndex) {
       //nop; not allowed
     }
 
     @Override
-    public void fireVisibleColumnsChangedFromUI(IColumn<?>[] visibleColumns) {
+    public void fireVisibleColumnsChangedFromUI(Collection<IColumn<?>> visibleColumns) {
+      super.fireVisibleColumnsChangedFromUI(visibleColumns);
+    }
+
+    @Override
+    public void setColumnWidthFromUI(IColumn c, int newWidth) {
       //nop; not allowed
     }
 
     @Override
-    public void setColumnWidthFromUI(IColumn<?> c, int newWidth) {
-      //nop; not allowed
-    }
-
-    @Override
-    public IFormField prepareCellEditFromUI(ITableRow row, IColumn<?> col) {
+    public IFormField prepareCellEditFromUI(ITableRow row, IColumn col) {
       //nop; not allowed
       return null;
     }

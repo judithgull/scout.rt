@@ -13,7 +13,9 @@ package org.eclipse.scout.rt.ui.rap.basic.tree;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.jface.viewers.DoubleClickEvent;
 import org.eclipse.jface.viewers.IDoubleClickListener;
@@ -28,16 +30,21 @@ import org.eclipse.jface.viewers.TreePath;
 import org.eclipse.jface.viewers.TreeViewer;
 import org.eclipse.jface.viewers.ViewerCell;
 import org.eclipse.rap.rwt.RWT;
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.beans.IPropertyObserver;
 import org.eclipse.scout.commons.dnd.TransferObject;
 import org.eclipse.scout.commons.holders.Holder;
+import org.eclipse.scout.commons.job.JobEx;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.IDNDSupport;
 import org.eclipse.scout.rt.client.ui.IEventHistory;
+import org.eclipse.scout.rt.client.ui.action.ActionUtility;
+import org.eclipse.scout.rt.client.ui.action.IActionFilter;
 import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
-import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.TreeMenuType;
+import org.eclipse.scout.rt.client.ui.action.menu.root.IContextMenu;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITree;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
 import org.eclipse.scout.rt.client.ui.basic.tree.TreeEvent;
@@ -52,6 +59,8 @@ import org.eclipse.scout.rt.ui.rap.keystroke.IRwtKeyStroke;
 import org.eclipse.scout.rt.ui.rap.keystroke.RwtKeyStroke;
 import org.eclipse.scout.rt.ui.rap.util.RwtUtility;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.dnd.DND;
+import org.eclipse.swt.dnd.DragSource;
 import org.eclipse.swt.dnd.DropTargetEvent;
 import org.eclipse.swt.events.MenuEvent;
 import org.eclipse.swt.graphics.Point;
@@ -154,6 +163,10 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
     }
   }
 
+  protected boolean isDragEnabled() {
+    return getScoutObject().isDragEnabled();
+  }
+
   protected void setUiTreeViewer(TreeViewer viewer) {
     m_treeViewer = viewer;
   }
@@ -197,7 +210,7 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
         setExpansionFromScout(node);
       }
     }
-    setSelectionFromScout(getScoutObject().getSelectedNodes());
+    setSelectionFromScout(CollectionUtility.arrayList(getScoutObject().getSelectedNodes()));
     setKeyStrokeFormScout();
     setNodeHeightFromScout();
     attachDndSupport();
@@ -268,9 +281,8 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
     else {
       exp = scoutNode.isExpanded();
     }
-    ITreeNode[] filteredChildNodes = scoutNode.getFilteredChildNodes();
-    boolean hasChilds = filteredChildNodes.length > 0;
-    if (hasChilds && exp != getUiTreeViewer().getExpandedState(scoutNode)) {
+    List<ITreeNode> filteredChildNodes = scoutNode.getFilteredChildNodes();
+    if (CollectionUtility.hasElements(filteredChildNodes) && exp != getUiTreeViewer().getExpandedState(scoutNode)) {
       getUiTreeViewer().setExpandedState(scoutNode, exp);
     }
     if (exp) {
@@ -280,7 +292,7 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
     }
   }
 
-  protected void setSelectionFromScout(ITreeNode[] scoutNodes) {
+  protected void setSelectionFromScout(List<ITreeNode> scoutNodes) {
     if (getUiField().isDisposed()) {
       return;
     }
@@ -296,9 +308,8 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
       }
     }
     // add new
-    ArrayList<IRwtKeyStroke> newKeyStrokes = new ArrayList<IRwtKeyStroke>();
-    IKeyStroke[] scoutKeyStrokes = getScoutObject().getKeyStrokes();
-    for (IKeyStroke scoutKeyStroke : scoutKeyStrokes) {
+    List<IRwtKeyStroke> newKeyStrokes = new ArrayList<IRwtKeyStroke>();
+    for (IKeyStroke scoutKeyStroke : getScoutObject().getKeyStrokes()) {
       IRwtKeyStroke[] strokes = RwtUtility.getKeyStrokes(scoutKeyStroke, getUiEnvironment());
       for (IRwtKeyStroke stroke : strokes) {
         getUiEnvironment().addKeyStroke(getUiField(), stroke, false);
@@ -360,14 +371,29 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
           break;
         }
         case TreeEvent.TYPE_NODES_SELECTED: {
-          setSelectionFromScout(e.getNodes());
+          setSelectionFromScout(CollectionUtility.arrayList(e.getNodes()));
           break;
         }
         case TreeEvent.TYPE_SCROLL_TO_SELECTION: {
           scrollToSelection();
           break;
         }
+        case TreeEvent.TYPE_NODE_CHANGED: {
+          updateTreeNode(e.getNode());
+          break;
+        }
       }
+    }
+  }
+
+  /**
+   * Update the given node.
+   * 
+   * @since 3.10.0-M5
+   */
+  protected void updateTreeNode(ITreeNode node) {
+    if (getUiTreeViewer() != null) {
+      getUiTreeViewer().update(node, null);
     }
   }
 
@@ -382,7 +408,7 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
     }
   }
 
-  protected void setSelectionFromRwt(final ITreeNode[] nodes) {
+  protected void setSelectionFromRwt(final List<ITreeNode> nodes) {
     if (getUpdateUiFromScoutLock().isAcquired()) {
       return;
     }
@@ -457,14 +483,15 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
   /**
    * model thread: scout table observer
    */
-  protected boolean isHandleScoutTreeEvent(TreeEvent[] a) {
-    for (TreeEvent element : a) {
-      switch (element.getType()) {
+  protected boolean isHandleScoutTreeEvent(List<? extends TreeEvent> events) {
+    for (TreeEvent event : events) {
+      switch (event.getType()) {
         case TreeEvent.TYPE_REQUEST_FOCUS:
         case TreeEvent.TYPE_NODE_EXPANDED:
         case TreeEvent.TYPE_NODE_COLLAPSED:
         case TreeEvent.TYPE_NODES_INSERTED:
         case TreeEvent.TYPE_NODES_UPDATED:
+        case TreeEvent.TYPE_NODE_CHANGED:
         case TreeEvent.TYPE_NODES_DELETED:
         case TreeEvent.TYPE_NODE_FILTER_CHANGED:
         case TreeEvent.TYPE_NODES_SELECTED:
@@ -489,10 +516,14 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
         setExpansionFromScout(e.getCommonParentNode());
         break;
       }
+      case TreeEvent.TYPE_NODE_CHANGED: {
+        updateTreeNode(e.getNode());
+        break;
+      }
       case TreeEvent.TYPE_NODES_UPDATED: {
         //in case a virtual node was resolved, check if selection still valid
         ISelection oldSelection = getUiTreeViewer().getSelection();
-        ISelection newSelection = new StructuredSelection(getScoutObject().getSelectedNodes());
+        ISelection newSelection = new StructuredSelection(CollectionUtility.arrayList(getScoutObject().getSelectedNodes()));
         updateTreeStructureAndKeepSelection(e.getCommonParentNode());
         if (!newSelection.equals(oldSelection)) {
           getUiTreeViewer().setSelection(newSelection);
@@ -515,7 +546,7 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
         break;
       }
       case TreeEvent.TYPE_NODES_SELECTED: {
-        setSelectionFromScout(e.getNodes());
+        setSelectionFromScout(CollectionUtility.arrayList(e.getNodes()));
         break;
       }
       case TreeEvent.TYPE_SCROLL_TO_SELECTION: {
@@ -621,7 +652,7 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
   private class P_ScoutTreeListener implements TreeListener {
     @Override
     public void treeChanged(final TreeEvent e) {
-      if (isHandleScoutTreeEvent(new TreeEvent[]{e})) {
+      if (isHandleScoutTreeEvent(CollectionUtility.arrayList(e))) {
         if (isIgnoredScoutEvent(TreeEvent.class, "" + e.getType())) {
           return;
         }
@@ -643,48 +674,50 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
     }
 
     @Override
-    public void treeChangedBatch(final TreeEvent[] a) {
-      if (isHandleScoutTreeEvent(a)) {
-        final ArrayList<TreeEvent> filteredList = new ArrayList<TreeEvent>();
-        for (TreeEvent element : a) {
+    public void treeChangedBatch(final List<? extends TreeEvent> events) {
+      if (isHandleScoutTreeEvent(events)) {
+        final List<TreeEvent> filteredList = new ArrayList<TreeEvent>();
+        for (TreeEvent element : events) {
           if (!isIgnoredScoutEvent(TreeEvent.class, "" + element.getType())) {
             filteredList.add(element);
           }
         }
-        if (filteredList.size() == 0) {
-          return;
+        if (CollectionUtility.hasElements(filteredList)) {
+          Runnable t = new Runnable() {
+            @Override
+            public void run() {
+              try {
+                getUpdateUiFromScoutLock().acquire();
+                if (!getUiField().isDisposed()) {
+                  getUiField().setRedraw(false);
+                }
+                //
+                handleScoutTreeEventBatchInUi(filteredList);
+              }
+              finally {
+                getUpdateUiFromScoutLock().release();
+                if (!getUiField().isDisposed()) {
+                  getUiField().setRedraw(true);
+                }
+              }
+            }
+          };
+          getUiEnvironment().invokeUiLater(t);
         }
-        Runnable t = new Runnable() {
-          @Override
-          public void run() {
-            try {
-              getUpdateUiFromScoutLock().acquire();
-              if (!getUiField().isDisposed()) {
-                getUiField().setRedraw(false);
-              }
-              //
-              handleScoutTreeEventBatchInUi(filteredList);
-            }
-            finally {
-              getUpdateUiFromScoutLock().release();
-              if (!getUiField().isDisposed()) {
-                getUiField().setRedraw(true);
-              }
-            }
-          }
-        };
-        getUiEnvironment().invokeUiLater(t);
       }
     }
   }// end private class
 
   private class P_RwtSelectionListener implements ISelectionChangedListener {
     @Override
-    @SuppressWarnings("unchecked")
     public void selectionChanged(SelectionChangedEvent event) {
       if (isEnabledFromScout()) {
         StructuredSelection sel = (StructuredSelection) event.getSelection();
-        ITreeNode[] nodes = (ITreeNode[]) sel.toList().toArray(new ITreeNode[sel.size()]);
+        List<ITreeNode> nodes = new ArrayList<ITreeNode>();
+        Iterator selectionIt = sel.iterator();
+        while (selectionIt.hasNext()) {
+          nodes.add((ITreeNode) selectionIt.next());
+        }
         setSelectionFromRwt(nodes);
       }
     }
@@ -823,11 +856,36 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
         return;
       }
 
-      final boolean emptySpace = (getUiField().getContextItem() == null);
-      IMenu[] menus = RwtMenuUtility.collectMenus(getScoutObject(), emptySpace, !emptySpace, getUiEnvironment());
-
-      Menu menu = ((Menu) e.getSource());
-      RwtMenuUtility.fillContextMenu(menus, getUiEnvironment(), menu);
+      final AtomicReference<IContextMenu> scoutMenusRef = new AtomicReference<IContextMenu>();
+      Runnable t = new Runnable() {
+        @SuppressWarnings("deprecation")
+        @Override
+        public void run() {
+          IContextMenu contextMenu = getScoutObject().getContextMenu();
+          // manually call about to show
+          contextMenu.aboutToShow();
+          contextMenu.prepareAction();
+          scoutMenusRef.set(contextMenu);
+        }
+      };
+      JobEx job = getUiEnvironment().invokeScoutLater(t, 1200);
+      try {
+        job.join(1200);
+      }
+      catch (InterruptedException ex) {
+        //nop
+      }
+      IContextMenu contextMenu = scoutMenusRef.get();
+      if (contextMenu != null) {
+        IActionFilter filter = null;
+        if ((getUiField().getContextItem() == null)) {
+          filter = ActionUtility.createMenuFilterVisibleAndMenuTypes(TreeMenuType.EmptySpace);
+        }
+        else {
+          filter = contextMenu.getActiveFilter();
+        }
+        RwtMenuUtility.fillMenu(((Menu) e.getSource()), contextMenu.getChildActions(), filter, getUiEnvironment());
+      }
     }
 
   } // end class P_ContextMenuListener
@@ -835,6 +893,14 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
   private class P_DndSupport extends AbstractRwtScoutDndSupport {
     public P_DndSupport(IPropertyObserver scoutObject, IDNDSupport scoutDndSupportable, Control control) {
       super(scoutObject, scoutDndSupportable, control, RwtScoutTree.this.getUiEnvironment());
+    }
+
+    @Override
+    protected DragSource createDragSource(Control control) {
+      if (isDragEnabled()) {
+        return new DragSource(control, DND.DROP_COPY | DND.DROP_MOVE);
+      }
+      return null;
     }
 
     @Override
@@ -857,6 +923,22 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
     }
 
     @Override
+    protected void handleUiDragFinished() {
+      Runnable t = new Runnable() {
+        @Override
+        public void run() {
+          getScoutObject().getUIFacade().fireDragFinishedFromUI();
+        }
+      };
+      try {
+        getUiEnvironment().invokeScoutLater(t, 20000).join(20000);
+      }
+      catch (InterruptedException e) {
+        //nop
+      }
+    }
+
+    @Override
     protected void handleUiDropAction(DropTargetEvent event, final TransferObject scoutTransferObject) {
       Object dropTarget = event.item != null ? event.item.getData() : null;
       final ITreeNode node = dropTarget instanceof ITreeNode ? (ITreeNode) dropTarget : null;
@@ -864,6 +946,19 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
         @Override
         public void run() {
           getScoutObject().getUIFacade().fireNodeDropActionFromUI(node, scoutTransferObject);
+        }
+      };
+      getUiEnvironment().invokeScoutLater(job, 200);
+    }
+
+    @Override
+    protected void handleUiDropTargetChanged(DropTargetEvent event) {
+      Object dropTarget = event.item != null ? event.item.getData() : null;
+      final ITreeNode node = dropTarget instanceof ITreeNode ? (ITreeNode) dropTarget : null;
+      Runnable job = new Runnable() {
+        @Override
+        public void run() {
+          getScoutObject().getUIFacade().fireNodeDropTargetChangedFromUI(node);
         }
       };
       getUiEnvironment().invokeScoutLater(job, 200);

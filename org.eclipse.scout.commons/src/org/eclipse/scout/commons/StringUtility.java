@@ -17,8 +17,11 @@ import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.text.Collator;
+import java.text.DecimalFormat;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -35,6 +38,8 @@ public final class StringUtility {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(StringUtility.class);
   public static final Pattern PATTERN_TRIM_NEWLINES = Pattern.compile("^[\r\n]*(.*?)[\r\n]*$", Pattern.DOTALL);
 
+  private static final String[] EMPTY_ARRAY = new String[0];
+
   public static interface ITagProcessor {
     String/* tagReplacement */processTag(String tagName, String tagContent);
   }
@@ -46,8 +51,26 @@ public final class StringUtility {
     return s == null || s.length() == 0;
   }
 
+  /**
+   * Checks whether the given {@link String} contains visible characters. <br>
+   * More formally:
+   * Checks whether the given {@link String} contains at least one character bigger than the whitespace character:
+   * '\u0020'.
+   * 
+   * @param s
+   *          The {@link String} to check.
+   * @return <code>true</code> if the provided {@link String} contains visible characters. <code>false</code> otherwise.
+   */
   public static boolean hasText(String s) {
-    return s != null && !"".equals(s.trim());
+    if (s == null) {
+      return false;
+    }
+    for (int i = 0; i < s.length(); i++) {
+      if (s.charAt(i) > '\u0020') {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -59,7 +82,7 @@ public final class StringUtility {
     if (wildcardPattern == null) {
       wildcardPattern = "";
     }
-    StringBuffer buf = new StringBuffer();
+    StringBuilder buf = new StringBuilder();
     char[] ch = wildcardPattern.toCharArray();
     for (int i = 0; i < ch.length; i++) {
       switch (ch[i]) {
@@ -172,19 +195,55 @@ public final class StringUtility {
     return returnValue;
   }
 
+  private static final Set<String> booleanTrue = new HashSet<String>(3);
+  static {
+    booleanTrue.add("true");
+    booleanTrue.add("yes");
+    booleanTrue.add("1");
+  }
+  private static final Set<String> booleanFalse = new HashSet<String>(3);
+  static {
+    booleanFalse.add("false");
+    booleanFalse.add("no");
+    booleanFalse.add("0");
+  }
+
+  /**
+   * This method parses a string and returns the associated boolean value.
+   * If the string does not represent a valid boolean value, the defaultValue will be returned.
+   * If no defaultValue is given, Boolean.False will be returned.
+   * The Strings "true", "1", "yes" (case insensitive) are considered true whereas the strings "false", "0", "no" are
+   * considered false.
+   * <p>
+   * Examples:
+   * <ul>
+   * <li>parseBoolean("true") -> Boolean.True
+   * <li>parseBoolean("1") -> Boolean.True
+   * <li>parseBoolean("yes") -> Boolean.True
+   * <li>parseBoolean("False") -> Boolean.False
+   * <li>parseBoolean("0") -> Boolean.False
+   * <li>parseBoolean("test") -> Boolean.False
+   * <li>parseBoolean("test", true) -> Boolean.True
+   * </ul>
+   */
   public static boolean parseBoolean(String s, boolean defaultValue) {
     if (s == null || s.length() == 0) {
       return defaultValue;
     }
     s = s.toLowerCase().trim();
     if (defaultValue) {
-      return !("0,false,no".indexOf(s) >= 0);
+      return !booleanFalse.contains(s);
     }
     else {
-      return "1,true,yes".indexOf(s) >= 0;
+      return booleanTrue.contains(s);
     }
   }
 
+  /**
+   * This method parses a string and returns the associated boolean value.
+   * 
+   * @see #parseBoolean(String, boolean)
+   */
   public static boolean parseBoolean(String s) {
     return parseBoolean(s, false);
   }
@@ -359,7 +418,8 @@ public final class StringUtility {
   }
 
   /**
-   * @return the contents between a start and a end tag, resp "" when there is a single tag
+   * @return the contents between a start and a end tag, resp "" when there is a single tag. Returns <code>null</code>
+   *         when the tag is not found in the text.
    */
   public static String getTag(String text, String tagName) {
     if (text == null) {
@@ -411,9 +471,21 @@ public final class StringUtility {
     return text;
   }
 
+  /**
+   * Removes the tags from the given text. If the tag is not found, the original text is returned.
+   * <p>
+   * Example:
+   * <p>
+   * <code>String text = "&lt;html>some &lt;b&gt;bold&lt;/b> text&lt;/html&gt;";</code>
+   * <p>
+   * <code>removeTag(text, "b")</code> will return '&lt;html>some text&lt;/html&gt;'</code>
+   */
   public static String removeTag(String text, String tagName) {
     if (text == null) {
       return null;
+    }
+    else if (tagName == null) {
+      return text;
     }
     TagBounds a;
     TagBounds b;
@@ -426,6 +498,9 @@ public final class StringUtility {
     return text;
   }
 
+  /**
+   * Remove the given tags from the text. See {@link #removeTag(String, String)} for more details.
+   */
   public static String removeTags(String text, String[] tagNames) {
     if (text == null) {
       return null;
@@ -479,7 +554,7 @@ public final class StringUtility {
     return text;
   }
 
-  public static final Pattern MNEMONIC_PATTERN = Pattern.compile("\\&([-?_.,a-zA-Z0-9])", Pattern.DOTALL);
+  public static final Pattern MNEMONIC_PATTERN = Pattern.compile("&([\\S])");
 
   public static char getMnemonic(String text) {
     if (text == null) {
@@ -898,6 +973,20 @@ public final class StringUtility {
   }
 
   /**
+   * Returns true if the given String contains a NewLine character, e.g. \n
+   * 
+   * @since 3.10.0-M4
+   */
+  public static boolean containsNewLines(String s) {
+    if (s != null) {
+      if (s.indexOf('\n') >= 0 || s.indexOf('\r') >= 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * converts all non-allowed characters in the text to the text contained in
    * replacementText
    * <p>
@@ -1064,7 +1153,7 @@ public final class StringUtility {
    * @since 3.8.2
    */
   public static String splitCamelCase(String s) {
-    if (s == null || s.trim().length() == 0) {
+    if (!hasText(s)) {
       return null;
     }
     return s.replaceAll(
@@ -1170,6 +1259,13 @@ public final class StringUtility {
     return ((st > 0) || (len < s.length())) ? s.substring(st, len) : s;
   }
 
+  /**
+   * Returns the string-representation of <code>value</code>, or <code>valueWhenNull</code> if value is null.
+   * 
+   * @param value
+   * @param valueWhenNull
+   * @see #substituteWhenEmpty(Object, String)
+   */
   public static String nvl(Object value, String valueWhenNull) {
     if (value != null) {
       return value.toString();
@@ -1296,6 +1392,7 @@ public final class StringUtility {
 
   /**
    * @see #join(String, Object...)
+   * @since 4.0.0
    */
   public static String join(String delimiter, Long[] parts) {
     return join(delimiter, (Object[]) parts);
@@ -1307,6 +1404,14 @@ public final class StringUtility {
    */
   public static String join(String delimiter, String[] parts) {
     return join(delimiter, (Object[]) parts);
+  }
+
+  /**
+   * @see #join(String, Object...)
+   * @since 4.0.0
+   */
+  public static String join(String delimiter, Collection<?> parts) {
+    return join(delimiter, parts == null ? EMPTY_ARRAY : parts.toArray());
   }
 
   /**
@@ -1475,28 +1580,32 @@ public final class StringUtility {
   }
 
   /**
-   * The String s0 will only be added, if it is not empty. String s1, s3, ...
-   * are treated as delimeters and are only inserted, if the corresponding
-   * String s2, s4, ... is not empty. <br>
-   * If there is an even number of Strings, the
-   * last one will only be appended, if the concatenated String so far is not <code>null</code>
-   * 
-   * @param s
-   *          list of strings to append, s0 will be appended first, s1 only if
-   *          s2 is not empty, dito for s3 and s4 ..
+   * Concatenates a set of strings with delimiters.
+   * <p>
+   * The parameters s0, s2, s4, ... are treated as normal Strings, whereas the parameters s1, s3, s5, ... are treated as
+   * delimiters. The delimiters are only inserted, if the corresponding element before or after the delimiter is not
+   * empty. <br>
+   * If there is an even number of Strings, the last one will only be appended, if the concatenated String so far is not
+   * <code>null</code>
+   * <p>
+   * <b>Example:</b>
+   * <ul>
+   * <li><code>concatenateTokens('2014','-','01','-','31')</code> --> <code>'2014-01-31'</code>
+   * <li><code>concatenateTokens(null,'-','01','-','31')</code> --> <code>'01-31'</code>
+   * </ul>
    */
   public static String concatenateTokens(String... s) {
     String retVal = "";
     if (s != null && s.length > 0) {
-      StringBuffer b = new StringBuffer();
+      StringBuilder b = new StringBuilder();
       String suffix = s[0];
-      if (suffix != null && suffix.trim().length() > 0) {
+      if (StringUtility.hasText(suffix)) {
         b.append(suffix.trim());
       }
       for (int i = 1, l = s.length - 1; i < l; i = i + 2) {
         String del = s[i];
         suffix = s[i + 1];
-        if (suffix != null && suffix.trim().length() > 0) {
+        if (StringUtility.hasText(suffix)) {
           if (b.length() > 0) {
             b.append(del);
           }
@@ -1515,7 +1624,7 @@ public final class StringUtility {
    * Delegate to {@link ListUtility.parse(String text)}
    */
   public static Collection<Object> stringToCollection(String text) {
-    return ListUtility.parse(text);
+    return CollectionUtility.parse(text);
   }
 
   /**
@@ -1529,7 +1638,7 @@ public final class StringUtility {
    * Delegate to {@link ListUtility.format(Collection c, boolean quoteStrings)}
    */
   public static String collectionToString(Collection<Object> c, boolean quoteStrings) {
-    return ListUtility.format(c, quoteStrings);
+    return CollectionUtility.format(c, quoteStrings);
   }
 
   /**
@@ -1600,5 +1709,89 @@ public final class StringUtility {
     catch (Throwable t) {
       return false;
     }
+  }
+
+  /**
+   * Creates a new string repeating the <code>token</code> <code>repetitions</code> times. If <code>repetitions</code>
+   * <= 0 an empty string is returned.
+   * 
+   * @param token
+   * @param repetitions
+   */
+  public static String repeat(CharSequence token, int repetitions) {
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < repetitions; ++i) {
+      sb.append(token);
+    }
+    return sb.toString();
+  }
+
+  /**
+   * Similar to {@link #nvl(Object, String)} but returns <code>valueWhenEmpty</code> not only if value is null, but as
+   * well when the String representation of <code>value</code> is empty or contains only whitespaces.
+   * 
+   * @param property
+   * @param string
+   * @return
+   */
+  public static String substituteWhenEmpty(Object value, String valueWhenEmpty) {
+    String stringValue = nvl(value, null);
+    return hasText(stringValue) ? stringValue : valueWhenEmpty;
+  }
+
+  /**
+   * Checks whether the given string modification still fulfills the given {@link DecimalFormat} max length constraints.
+   * 
+   * @param format
+   *          The {@link DecimalFormat} holding the constraints: {@link DecimalFormat#getMaximumIntegerDigits()},
+   *          {@link DecimalFormat#getMaximumFractionDigits()}.
+   * @param curText
+   *          The current text (before the modification).
+   * @param offset
+   *          The offset of the modification relative to the curText parameter.
+   * @param replaceLen
+   *          How many characters that will be replaced starting at the given offset.
+   * @param insertText
+   *          The new text that should be inserted at the given replace range.
+   * @return <code>true</code> if the given {@link DecimalFormat} length constraints are still fulfilled after the
+   *         string modification has been applied or if the resulting string is no valid number. <code>false</code>
+   *         otherwise.
+   */
+  public static boolean isWithinNumberFormatLimits(DecimalFormat format, String curText, int offset, int replaceLen, String insertText) {
+    // !! IMPORTANT NOTE: There is also a JavaScript implementation of this method: org/eclipse/scout/rt/ui/rap/form/fields/numberfield/RwtScoutNumberField.js
+    // When changing this implementation also consider updating the js version!
+    if (insertText == null || insertText.length() < 1) {
+      return true;
+    }
+
+    String futureText = null;
+    if (curText == null) {
+      futureText = insertText;
+    }
+    else {
+      StringBuilder docTxt = new StringBuilder(curText.length() + insertText.length());
+      docTxt.append(curText);
+      docTxt.replace(offset, offset + replaceLen, insertText);
+      futureText = docTxt.toString();
+    }
+
+    Pattern pat = Pattern.compile("[^1-9" + format.getDecimalFormatSymbols().getZeroDigit() + "]");
+	String decimalSeparator = String.valueOf(format.getDecimalFormatSymbols().getDecimalSeparator());
+    String[] parts = futureText.split(Pattern.quote(decimalSeparator));
+    if (parts.length >= 1) {
+      String intPartDigits = pat.matcher(parts[0]).replaceAll("");
+      boolean intPartValid = StringUtility.length(intPartDigits) <= format.getMaximumIntegerDigits();
+      if (!intPartValid) {
+        return false;
+      }
+    }
+    if (parts.length == 2) {
+      String fracPartDigits = pat.matcher(parts[1]).replaceAll("");
+      boolean fracPartValid = StringUtility.length(fracPartDigits) <= format.getMaximumFractionDigits();
+      if (!fracPartValid) {
+        return false;
+      }
+    }
+    return true;
   }
 }

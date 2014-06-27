@@ -10,14 +10,18 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.desktop.outline.pages;
 
-import static org.junit.Assert.assertArrayEquals;
-
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.testenvironment.TestEnvironmentClientSession;
 import org.eclipse.scout.rt.client.ui.action.menu.AbstractMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.IMenuType;
+import org.eclipse.scout.rt.client.ui.action.menu.TableMenuType;
 import org.eclipse.scout.rt.client.ui.basic.table.AbstractTable;
 import org.eclipse.scout.rt.client.ui.basic.table.ITable;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.AbstractIntegerColumn;
@@ -26,9 +30,9 @@ import org.eclipse.scout.rt.client.ui.basic.table.customizer.AbstractTableCustom
 import org.eclipse.scout.rt.client.ui.basic.table.customizer.ITableCustomizer;
 import org.eclipse.scout.rt.client.ui.desktop.IDesktop;
 import org.eclipse.scout.rt.client.ui.desktop.outline.AbstractOutline;
-import org.eclipse.scout.rt.client.ui.desktop.outline.IOutline;
 import org.eclipse.scout.rt.shared.services.common.jdbc.SearchFilter;
 import org.eclipse.scout.testing.client.runner.ScoutClientTestRunner;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -51,7 +55,7 @@ public class PageWithTableAndTableCustomizerWhenEditingThenMissingSelectionTest 
   public void setUp() {
     IDesktop desktop = TestEnvironmentClientSession.get().getDesktop();
     Outline outline = new Outline();
-    desktop.setAvailableOutlines(new IOutline[]{outline});
+    desktop.setAvailableOutlines(Collections.singletonList(outline));
     desktop.setOutline(outline);
   }
 
@@ -63,13 +67,13 @@ public class PageWithTableAndTableCustomizerWhenEditingThenMissingSelectionTest 
     PageWithTable.Table table = page.getTable();
     //
     table.selectRow(0);
-    assertSelection(table, new Integer[]{1});
+    assertSelection(table, CollectionUtility.arrayList(1));
     //
     table.selectRow(1);
-    assertSelection(table, new Integer[]{2});
+    assertSelection(table, CollectionUtility.arrayList(2));
     //
     table.getMenu(PageWithTable.Table.EditAccountMenu.class).doAction();
-    assertSelection(table, new Integer[]{2});
+    assertSelection(table, CollectionUtility.arrayList(2));
   }
 
   @Test
@@ -80,17 +84,17 @@ public class PageWithTableAndTableCustomizerWhenEditingThenMissingSelectionTest 
     PageWithTable.Table table = page.getTable();
     //
     table.selectRow(0);
-    assertSelection(table, new Integer[]{1});
+    assertSelection(table, CollectionUtility.arrayList(1));
     //
     table.selectRow(1);
-    assertSelection(table, new Integer[]{2});
+    assertSelection(table, CollectionUtility.arrayList(2));
     //
     table.getMenu(PageWithTable.Table.EditAccountMenu.class).doAction();
-    assertSelection(table, new Integer[]{2});
+    assertSelection(table, CollectionUtility.arrayList(2));
   }
 
-  private static void assertSelection(PageWithTable.Table table, Integer[] expectedIds) {
-    assertArrayEquals(expectedIds, table.getIdColumn().getSelectedValues());
+  private static void assertSelection(PageWithTable.Table table, List<Integer> expectedIds) {
+    Assert.assertTrue(CollectionUtility.equalsCollection(expectedIds, table.getIdColumn().getSelectedValues()));
   }
 
   public static class Outline extends AbstractOutline {
@@ -171,8 +175,8 @@ public class PageWithTableAndTableCustomizerWhenEditingThenMissingSelectionTest 
         }
 
         @Override
-        protected boolean getConfiguredSingleSelectionAction() {
-          return true;
+        protected Set<? extends IMenuType> getConfiguredMenuTypes() {
+          return CollectionUtility.hashSet(TableMenuType.SingleSelection);
         }
 
         @Override

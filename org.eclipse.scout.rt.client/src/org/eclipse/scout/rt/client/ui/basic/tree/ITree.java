@@ -12,6 +12,9 @@ package org.eclipse.scout.rt.client.ui.basic.tree;
 
 import java.net.URL;
 import java.security.Permission;
+import java.util.Collection;
+import java.util.List;
+import java.util.Set;
 
 import org.eclipse.scout.commons.beans.IPropertyObserver;
 import org.eclipse.scout.commons.exception.ProcessingException;
@@ -20,6 +23,7 @@ import org.eclipse.scout.rt.client.ui.IEventHistory;
 import org.eclipse.scout.rt.client.ui.action.ActionFinder;
 import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.root.ITreeContextMenu;
 import org.eclipse.scout.rt.client.ui.desktop.outline.IOutline;
 import org.eclipse.scout.rt.client.ui.desktop.outline.pages.IPage;
 import org.eclipse.scout.rt.client.ui.desktop.outline.pages.VirtualPage;
@@ -55,6 +59,11 @@ public interface ITree extends IPropertyObserver, IDNDSupport {
    */
   String PROP_CONTAINER = "container";
 
+  /**
+   * {@link ITreeContextMenu}
+   */
+  String PROP_CONTEXT_MENU = "contextMenu";
+
   void initTree() throws ProcessingException;
 
   void disposeTree();
@@ -68,9 +77,16 @@ public interface ITree extends IPropertyObserver, IDNDSupport {
 
   void requestFocus();
 
-  IMenu[] getMenus();
+  /**
+   * @return the child list of {@link #getContextMenu()}
+   */
+  List<IMenu> getMenus();
 
-  void setMenus(IMenu[] a);
+  /**
+   * @return the invisible root menu container of all tree menus.
+   */
+
+  ITreeContextMenu getContextMenu();
 
   /**
    * Convenience to find a menu, uses {@link ActionFinder}
@@ -97,7 +113,7 @@ public interface ITree extends IPropertyObserver, IDNDSupport {
    */
   void scrollToSelection();
 
-  ITreeNodeFilter[] getNodeFilters();
+  List<ITreeNodeFilter> getNodeFilters();
 
   boolean hasNodeFilters();
 
@@ -154,7 +170,7 @@ public interface ITree extends IPropertyObserver, IDNDSupport {
   /**
    * see {@link #resolveVirtualNode(ITreeNode)}
    */
-  ITreeNode[] resolveVirtualNodes(ITreeNode[] nodes) throws ProcessingException;
+  Set<ITreeNode> resolveVirtualNodes(Collection<? extends ITreeNode> nodes) throws ProcessingException;
 
   Object getProperty(String name);
 
@@ -181,7 +197,7 @@ public interface ITree extends IPropertyObserver, IDNDSupport {
 
   ITreeNode findNode(Object primaryKey);
 
-  ITreeNode[] findNodes(Object[] primaryKeys);
+  List<ITreeNode> findNodes(Collection<?> primaryKeys);
 
   boolean isRootNodeVisible();
 
@@ -211,7 +227,7 @@ public interface ITree extends IPropertyObserver, IDNDSupport {
 
   ITreeNode getSelectedNode();
 
-  ITreeNode[] getSelectedNodes();
+  Set<ITreeNode> getSelectedNodes();
 
   boolean isSelectedNode(ITreeNode node);
 
@@ -219,11 +235,11 @@ public interface ITree extends IPropertyObserver, IDNDSupport {
 
   void selectNode(ITreeNode node, boolean append);
 
-  void selectNodes(ITreeNode[] node, boolean append);
+  void selectNodes(Collection<? extends ITreeNode> nodes, boolean append);
 
   void deselectNode(ITreeNode node);
 
-  void deselectNodes(ITreeNode[] nodes);
+  void deselectNodes(Collection<? extends ITreeNode> nodes);
 
   /**
    * Select the previous selectable node in this tree. Does not expand any
@@ -262,7 +278,7 @@ public interface ITree extends IPropertyObserver, IDNDSupport {
   /**
    * @return a flat array of all checked nodes
    */
-  ITreeNode[] getCheckedNodes();
+  Set<ITreeNode> getCheckedNodes();
 
   /**
    * Container of this tree, {@link IPage}, {@link ITreeField}, {@link ITreeBox}
@@ -380,9 +396,9 @@ public interface ITree extends IPropertyObserver, IDNDSupport {
 
   void setNodeStatus(ITreeNode node, int status);
 
-  IKeyStroke[] getKeyStrokes();
+  List<IKeyStroke> getKeyStrokes();
 
-  void setKeyStrokes(IKeyStroke[] keyStrokes);
+  void setKeyStrokes(List<? extends IKeyStroke> keyStrokes);
 
   /*
    * modifications
@@ -397,21 +413,21 @@ public interface ITree extends IPropertyObserver, IDNDSupport {
    * append a list of child nodes or a complete subtree to the end of the
    * children of parent
    */
-  void addChildNodes(ITreeNode parent, ITreeNode[] children);
+  void addChildNodes(ITreeNode parent, List<? extends ITreeNode> children);
 
   void addChildNode(int startIndex, ITreeNode parent, ITreeNode child);
 
-  void addChildNodes(int startIndex, ITreeNode parent, ITreeNode[] children);
+  void addChildNodes(int startIndex, ITreeNode parent, List<? extends ITreeNode> children);
 
   void updateNode(ITreeNode node);
 
-  void updateChildNodes(ITreeNode parent, ITreeNode[] children);
+  void updateChildNodes(ITreeNode parent, Collection<? extends ITreeNode> children);
 
-  void updateChildNodeOrder(ITreeNode parent, ITreeNode[] newChildren);
+  void updateChildNodeOrder(ITreeNode parent, List<? extends ITreeNode> newChildren);
 
   void removeChildNode(ITreeNode parent, ITreeNode child);
 
-  void removeChildNodes(ITreeNode parent, ITreeNode[] children);
+  void removeChildNodes(ITreeNode parent, Collection<? extends ITreeNode> children);
 
   void removeAllChildNodes(ITreeNode parent);
 
@@ -424,15 +440,15 @@ public interface ITree extends IPropertyObserver, IDNDSupport {
 
   int getDeletedNodeCount();
 
-  ITreeNode[] getDeletedNodes();
+  Set<ITreeNode> getDeletedNodes();
 
   int getInsertedNodeCount();
 
-  ITreeNode[] getInsertedNodes();
+  Set<ITreeNode> getInsertedNodes();
 
   int getUpdatedNodeCount();
 
-  ITreeNode[] getUpdatedNodes();
+  Set<ITreeNode> getUpdatedNodes();
 
   boolean visitTree(ITreeVisitor v);
 
@@ -459,18 +475,6 @@ public interface ITree extends IPropertyObserver, IDNDSupport {
    */
   void importTreeData(AbstractTreeFieldData source) throws ProcessingException;
 
-  /**
-   * To obtain the menus that passed checks such as visibility, empty space action, ... for the given nodes.
-   * Please be cautious as depending on the given nodes, there might be a node mismatch among the selected tree nodes
-   * and the menu context node.
-   * This method is not part of the public API.
-   * 
-   * @param nodes
-   *          the nodes whose menus should be returned
-   * @return
-   */
-  IMenu[] fetchMenusForNodesInternal(ITreeNode[] nodes);
-
   /*
    * UI Processes
    */
@@ -488,4 +492,13 @@ public interface ITree extends IPropertyObserver, IDNDSupport {
    *          scrollbars.
    */
   void setSaveAndRestoreScrollbars(boolean b);
+
+  /**
+   * informs the attached UI that a node has changed in a way that may affect its presentation (e.g. text, font,
+   * color...) but no structural changes occurred
+   * 
+   * @param abstractTreeNode
+   * @since 3.10.0-M5
+   */
+  void fireNodeChanged(ITreeNode abstractTreeNode);
 }

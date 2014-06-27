@@ -12,17 +12,20 @@ package org.eclipse.scout.rt.client.ui.action;
 
 import java.security.Permission;
 
+import org.eclipse.scout.commons.ConfigurationUtility;
 import org.eclipse.scout.commons.EventListenerList;
+import org.eclipse.scout.commons.ITypeWithClassId;
 import org.eclipse.scout.commons.StringUtility;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.annotations.Replace;
 import org.eclipse.scout.commons.beans.AbstractPropertyObserver;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.ui.action.menu.AbstractMenu;
 import org.eclipse.scout.rt.client.ui.action.tree.IActionNode;
 import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.rt.shared.services.common.security.IAccessControlService;
@@ -41,10 +44,9 @@ public abstract class AbstractAction extends AbstractPropertyObserver implements
   private boolean m_enabledProcessingAction;
   private boolean m_visibleProperty;
   private boolean m_visibleGranted;
-  private boolean m_singleSelectionAction;
-  private boolean m_multiSelectionAction;
-  private boolean m_emptySpaceAction;
   private boolean m_toggleAction;
+
+  private boolean m_separator;
 
   public AbstractAction() {
     this(true);
@@ -63,14 +65,17 @@ public abstract class AbstractAction extends AbstractPropertyObserver implements
   protected void callInitializer() {
     if (!m_initialized) {
       initConfig();
-      try {
-        execInitAction();
-      }
-      catch (Throwable t) {
-        LOG.warn("Action " + getClass().getName(), t);
-      }
       m_initialized = true;
     }
+  }
+
+  /**
+   * This is the init of the runtime model after the environment (form, fields, ..) are built
+   * and configured
+   */
+  @Override
+  public final void initAction() throws ProcessingException {
+    execInitAction();
   }
 
   /*
@@ -78,42 +83,36 @@ public abstract class AbstractAction extends AbstractPropertyObserver implements
    */
   @ConfigProperty(ConfigProperty.ICON_ID)
   @Order(30)
-  @ConfigPropertyValue("null")
   protected String getConfiguredIconId() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.TEXT)
   @Order(40)
-  @ConfigPropertyValue("null")
   protected String getConfiguredText() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.TEXT)
   @Order(50)
-  @ConfigPropertyValue("null")
   protected String getConfiguredTooltipText() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.STRING)
   @Order(55)
-  @ConfigPropertyValue("null")
   protected String getConfiguredKeyStroke() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(10)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredEnabled() {
     return true;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(20)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredVisible() {
     return true;
   }
@@ -127,57 +126,27 @@ public abstract class AbstractAction extends AbstractPropertyObserver implements
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(22)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredInheritAccessibility() {
     return true;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(25)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredToggleAction() {
     return false;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
-  @Order(60)
-  @ConfigPropertyValue("true")
-  protected boolean getConfiguredSingleSelectionAction() {
-    return true;
-  }
-
-  @ConfigProperty(ConfigProperty.BOOLEAN)
-  @Order(70)
-  @ConfigPropertyValue("false")
-  protected boolean getConfiguredMultiSelectionAction() {
-    return false;
-  }
-
-  /**
-   * @deprecated obsolete, not used anymore. Will be removed in Release 3.10.
-   */
-  @Deprecated
-  protected boolean getConfiguredNonSelectionAction() {
-    return false;
-  }
-
-  @ConfigProperty(ConfigProperty.BOOLEAN)
-  @Order(90)
-  @ConfigPropertyValue("false")
-  protected boolean getConfiguredEmptySpaceAction() {
-    return false;
-  }
-
-  @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(100)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredSeparator() {
     return false;
   }
 
-  @ConfigProperty(ConfigProperty.DOC)
+  /**
+   * @deprecated: Use a {@link ClassId} annotation as key for Doc-Text. Will be removed in the 5.0 Release.
+   */
+  @Deprecated
   @Order(110)
-  @ConfigPropertyValue("null")
   protected String getConfiguredDoc() {
     return null;
   }
@@ -194,8 +163,10 @@ public abstract class AbstractAction extends AbstractPropertyObserver implements
   /**
    * called by prepareAction before action is added to list or used<br>
    * this way a menu can be made dynamically visible / enabled
+   * 
+   * @deprecated use {@link AbstractMenu#execOwnerValueChanged}
    */
-  @ConfigOperation
+  @Deprecated
   @Order(20)
   protected void execPrepareAction() throws ProcessingException {
   }
@@ -225,17 +196,8 @@ public abstract class AbstractAction extends AbstractPropertyObserver implements
     setEnabled(getConfiguredEnabled());
     setVisible(getConfiguredVisible());
     setToggleAction(getConfiguredToggleAction());
-    setSingleSelectionAction(getConfiguredSingleSelectionAction());
-    setMultiSelectionAction(getConfiguredMultiSelectionAction());
-    setEmptySpaceAction(getConfiguredEmptySpaceAction());
     setSeparator(getConfiguredSeparator());
-    if (isSingleSelectionAction() || isMultiSelectionAction() || isEmptySpaceAction()) {
-      // ok
-    }
-    else {
-      // legacy case of implicit new menu
-      setEmptySpaceAction(true);
-    }
+
   }
 
   protected IActionUIFacade createUIFacade() {
@@ -288,13 +250,25 @@ public abstract class AbstractAction extends AbstractPropertyObserver implements
     if (isEnabled() && isVisible()) {
       try {
         setEnabledProcessingAction(false);
-
-        execAction();
+        doActionInternal();
       }
       finally {
         setEnabledProcessingAction(true);
       }
     }
+  }
+
+  /**
+   * Please double check if implementing this method!
+   * Consider using {@link #execAction()} instead. If no other option ensure super call when overriding this method.
+   * 
+   * @throws ProcessingException
+   */
+  protected void doActionInternal() throws ProcessingException {
+    if (isToggleAction()) {
+      setSelected(!isSelected());
+    }
+    execAction();
   }
 
   @Override
@@ -313,13 +287,20 @@ public abstract class AbstractAction extends AbstractPropertyObserver implements
   }
 
   @Override
+  public String getTextWithMnemonic() {
+    return propertySupport.getPropertyString(PROP_TEXT_WITH_MNEMONIC);
+  }
+
+  @Override
   public void setText(String text) {
     if (text != null) {
       propertySupport.setPropertyString(PROP_TEXT, StringUtility.removeMnemonic(text));
+      propertySupport.setPropertyString(PROP_TEXT_WITH_MNEMONIC, text);
       propertySupport.setProperty(PROP_MNEMONIC, StringUtility.getMnemonic(text));
     }
     else {
       propertySupport.setPropertyString(PROP_TEXT, null);
+      propertySupport.setPropertyString(PROP_TEXT_WITH_MNEMONIC, null);
       propertySupport.setProperty(PROP_MNEMONIC, (char) 0x0);
     }
   }
@@ -385,6 +366,16 @@ public abstract class AbstractAction extends AbstractPropertyObserver implements
   }
 
   @Override
+  public boolean isSeparator() {
+    return m_separator;
+  }
+
+  @Override
+  public void setSeparator(boolean b) {
+    m_separator = b;
+  }
+
+  @Override
   public boolean isEnabled() {
     return propertySupport.getPropertyBool(PROP_ENABLED);
   }
@@ -420,8 +411,7 @@ public abstract class AbstractAction extends AbstractPropertyObserver implements
 
   @Override
   public void setSelected(boolean b) {
-    boolean changed = propertySupport.setPropertyBool(PROP_SELECTED, b);
-    if (changed) {
+    if (setSelectedInternal(b)) {
       try {
         execToggleAction(b);
       }
@@ -429,6 +419,10 @@ public abstract class AbstractAction extends AbstractPropertyObserver implements
         SERVICES.getService(IExceptionHandlerService.class).handleException(e);
       }
     }
+  }
+
+  protected boolean setSelectedInternal(boolean b) {
+    return propertySupport.setPropertyBool(PROP_SELECTED, b);
   }
 
   @Override
@@ -554,43 +548,12 @@ public abstract class AbstractAction extends AbstractPropertyObserver implements
   }
 
   @Override
-  public boolean isSeparator() {
-    return propertySupport.getPropertyBool(PROP_SEPARATOR);
-  }
-
-  @Override
-  public void setSeparator(boolean b) {
-    propertySupport.setPropertyBool(PROP_SEPARATOR, b);
-  }
-
-  @Override
-  public boolean isSingleSelectionAction() {
-    return m_singleSelectionAction;
-  }
-
-  @Override
-  public void setSingleSelectionAction(boolean b) {
-    m_singleSelectionAction = b;
-  }
-
-  @Override
-  public boolean isMultiSelectionAction() {
-    return m_multiSelectionAction;
-  }
-
-  @Override
-  public void setMultiSelectionAction(boolean b) {
-    m_multiSelectionAction = b;
-  }
-
-  @Override
-  public boolean isEmptySpaceAction() {
-    return m_emptySpaceAction;
-  }
-
-  @Override
-  public void setEmptySpaceAction(boolean b) {
-    m_emptySpaceAction = b;
+  public String classId() {
+    String simpleClassId = ConfigurationUtility.getAnnotatedClassIdWithFallback(getClass());
+    if (getContainer() != null) {
+      return simpleClassId + ID_CONCAT_SYMBOL + getContainer().classId();
+    }
+    return simpleClassId;
   }
 
   @Override
@@ -599,6 +562,8 @@ public abstract class AbstractAction extends AbstractPropertyObserver implements
     return c != null ? c.charValue() : 0x00;
   }
 
+  @SuppressWarnings("deprecation")
+  @Deprecated
   @Override
   public final void prepareAction() {
     try {
@@ -621,6 +586,16 @@ public abstract class AbstractAction extends AbstractPropertyObserver implements
   protected void prepareActionInternal() throws ProcessingException {
   }
 
+  @Override
+  public ITypeWithClassId getContainer() {
+    return (ITypeWithClassId) propertySupport.getProperty(PROP_CONTAINER);
+  }
+
+  @Override
+  public void setContainerInternal(ITypeWithClassId container) {
+    propertySupport.setProperty(PROP_CONTAINER, container);
+  }
+
   protected class P_UIFacade implements IActionUIFacade {
     @Override
     public void fireActionFromUI() {
@@ -637,6 +612,7 @@ public abstract class AbstractAction extends AbstractPropertyObserver implements
       }
     }
 
+    @SuppressWarnings("deprecation")
     @Override
     public void setSelectedFromUI(boolean b) {
       setSelected(b);

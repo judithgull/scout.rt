@@ -15,6 +15,7 @@ import java.security.Permission;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.scout.commons.ITypeWithClassId;
 import org.eclipse.scout.commons.beans.IPropertyObserver;
 import org.eclipse.scout.commons.exception.IProcessingStatus;
 import org.eclipse.scout.commons.exception.ProcessingException;
@@ -60,7 +61,7 @@ import org.eclipse.scout.rt.shared.services.common.jdbc.SearchFilter;
  * 
  * @see IForm
  */
-public interface IFormField extends IPropertyObserver {
+public interface IFormField extends IPropertyObserver, ITypeWithClassId {
   /*
    * Properties
    */
@@ -86,7 +87,7 @@ public interface IFormField extends IPropertyObserver {
   String PROP_KEY_STROKES = "keyStrokes";
   /**
    * @deprecated since 3.8, sent via {@link org.eclipse.scout.rt.client.ui.form.FormEvent#TYPE_REQUEST_FOCUS
-   *             FormEvent#TYPE_REQUEST_FOCUS}
+   *             FormEvent#TYPE_REQUEST_FOCUS}. Will be removed in the 5.0 Release.
    */
   @Deprecated
   String PROP_FOCUS_REQUESTED = "focusRequested";
@@ -381,18 +382,6 @@ public interface IFormField extends IPropertyObserver {
 
   void setLabelSuppressed(boolean b);
 
-  /**
-   * @deprecated Use {@link #getProperty(String)} instead. Will be removed in Release 3.10.
-   */
-  @Deprecated
-  Object getCustomProperty(String propName);
-
-  /**
-   * @deprecated Use {@link #setProperty(String, Object)} instead. Will be removed in Release 3.10.
-   */
-  @Deprecated
-  void setCustomProperty(String propName, Object o);
-
   Object getProperty(String name);
 
   /**
@@ -519,17 +508,17 @@ public interface IFormField extends IPropertyObserver {
   /**
    * @return only contributed key strokes
    */
-  IKeyStroke[] getContributedKeyStrokes();
+  List<IKeyStroke> getContributedKeyStrokes();
 
   /**
    * @return only local key strokes
    */
-  IKeyStroke[] getLocalKeyStrokes();
+  List<IKeyStroke> getLocalKeyStrokes();
 
   /**
    * @return local and contributed key strokes
    */
-  IKeyStroke[] getKeyStrokes();
+  List<IKeyStroke> getKeyStrokes();
 
   String getForegroundColor();
 
@@ -606,7 +595,7 @@ public interface IFormField extends IPropertyObserver {
   void requestFocus();
 
   /**
-   * @deprecated since 3.8
+   * @deprecated since 3.8. Use {@link IForm#requestFocus(IFormField)} instead. Will be removed in the 5.0 Release.
    */
   @Deprecated
   boolean fetchFocusRequested();

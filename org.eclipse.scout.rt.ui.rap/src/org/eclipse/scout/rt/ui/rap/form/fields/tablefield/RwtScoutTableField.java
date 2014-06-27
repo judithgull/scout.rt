@@ -15,19 +15,18 @@ import org.eclipse.scout.commons.exception.IProcessingStatus;
 import org.eclipse.scout.rt.client.ui.basic.table.ITable;
 import org.eclipse.scout.rt.client.ui.desktop.outline.IOutlineTableForm;
 import org.eclipse.scout.rt.client.ui.form.IForm;
-import org.eclipse.scout.rt.client.ui.form.fields.smartfield.ISmartFieldProposalForm;
+import org.eclipse.scout.rt.client.ui.form.fields.smartfield.IContentAssistFieldProposalForm;
 import org.eclipse.scout.rt.client.ui.form.fields.tablefield.ITableField;
 import org.eclipse.scout.rt.ui.rap.LogicalGridData;
 import org.eclipse.scout.rt.ui.rap.LogicalGridLayout;
 import org.eclipse.scout.rt.ui.rap.basic.table.IRwtScoutTable;
+import org.eclipse.scout.rt.ui.rap.basic.table.RwtScoutTable;
 import org.eclipse.scout.rt.ui.rap.ext.StatusLabelEx;
 import org.eclipse.scout.rt.ui.rap.form.fields.LogicalGridDataBuilder;
 import org.eclipse.scout.rt.ui.rap.form.fields.RwtScoutFieldComposite;
-import org.eclipse.scout.rt.ui.rap.services.common.patchedclass.IPatchedClassService;
 import org.eclipse.scout.rt.ui.rap.util.RwtLayoutUtility;
 import org.eclipse.scout.rt.ui.rap.util.RwtUtility;
 import org.eclipse.scout.rt.ui.rap.window.desktop.IRwtScoutActionBar;
-import org.eclipse.scout.service.SERVICES;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
@@ -127,7 +126,7 @@ public class RwtScoutTableField extends RwtScoutFieldComposite<ITableField<? ext
       form = getScoutObject().getForm();
     }
 
-    if (form == null || form instanceof ISmartFieldProposalForm || form instanceof IOutlineTableForm) {
+    if (form == null || form instanceof IContentAssistFieldProposalForm || form instanceof IOutlineTableForm) {
       return true;
     }
 
@@ -138,11 +137,11 @@ public class RwtScoutTableField extends RwtScoutFieldComposite<ITableField<? ext
    * @since 3.8.0
    */
   protected IRwtScoutTable createRwtScoutTable() {
-    if (getScoutObject().getForm() instanceof ISmartFieldProposalForm) {
-      return SERVICES.getService(IPatchedClassService.class).createRwtScoutTable(RwtUtility.VARIANT_PROPOSAL_FORM);
+    if (getScoutObject().getForm() instanceof IContentAssistFieldProposalForm) {
+      return new RwtScoutTable(RwtUtility.VARIANT_PROPOSAL_FORM);
     }
     else {
-      return SERVICES.getService(IPatchedClassService.class).createRwtScoutTable();
+      return new RwtScoutTable();
     }
   }
 

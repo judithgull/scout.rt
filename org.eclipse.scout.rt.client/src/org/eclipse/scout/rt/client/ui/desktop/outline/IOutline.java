@@ -11,7 +11,9 @@
 package org.eclipse.scout.rt.client.ui.desktop.outline;
 
 import java.security.Permission;
+import java.util.List;
 
+import org.eclipse.scout.commons.ITypeWithClassId;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.ui.basic.table.ITable;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITree;
@@ -19,7 +21,7 @@ import org.eclipse.scout.rt.client.ui.desktop.outline.pages.IPage;
 import org.eclipse.scout.rt.client.ui.desktop.outline.pages.IPageWithTable;
 import org.eclipse.scout.rt.client.ui.form.IForm;
 
-public interface IOutline extends ITree {
+public interface IOutline extends ITree, ITypeWithClassId {
 
   /**
    * {@link Boolean}
@@ -67,7 +69,14 @@ public interface IOutline extends ITree {
    * If currently active page(s) are affected they reload their data, otherwise
    * the pages is simply marked dirty and reloaded on next activation
    */
-  void refreshPages(Class... pageTypes);
+  void refreshPages(List<Class<? extends IPage>> pageTypes);
+
+  /**
+   * @param pageTypes
+   *          Must be classes that implement {@link IPage}.
+   * @see #refreshPages(List)
+   */
+  void refreshPages(Class<?>... pageTypes);
 
   /**
    * Unload and release unused pages, such as closed and non-selected nodes

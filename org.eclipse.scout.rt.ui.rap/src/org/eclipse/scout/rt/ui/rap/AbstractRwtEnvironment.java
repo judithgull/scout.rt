@@ -12,18 +12,18 @@ package org.eclipse.scout.rt.ui.rap;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-import java.text.MessageFormat;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
 import javax.security.auth.Subject;
-import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import javax.servlet.http.HttpSessionBindingEvent;
 import javax.servlet.http.HttpSessionBindingListener;
@@ -33,12 +33,11 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.rap.rwt.RWT;
-import org.eclipse.rap.rwt.client.service.JavaScriptExecutor;
 import org.eclipse.rap.rwt.lifecycle.PhaseEvent;
 import org.eclipse.rap.rwt.lifecycle.PhaseId;
 import org.eclipse.rap.rwt.lifecycle.PhaseListener;
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.EventListenerList;
-import org.eclipse.scout.commons.ListUtility;
 import org.eclipse.scout.commons.LocaleThreadLocal;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.exception.IProcessingStatus;
@@ -58,6 +57,7 @@ import org.eclipse.scout.rt.client.ui.basic.filechooser.IFileChooser;
 import org.eclipse.scout.rt.client.ui.desktop.DesktopEvent;
 import org.eclipse.scout.rt.client.ui.desktop.DesktopListener;
 import org.eclipse.scout.rt.client.ui.desktop.IDesktop;
+import org.eclipse.scout.rt.client.ui.desktop.IUrlTarget;
 import org.eclipse.scout.rt.client.ui.form.IForm;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.client.ui.messagebox.IMessageBox;
@@ -77,6 +77,7 @@ import org.eclipse.scout.rt.ui.rap.html.HtmlAdapter;
 import org.eclipse.scout.rt.ui.rap.keystroke.IRwtKeyStroke;
 import org.eclipse.scout.rt.ui.rap.keystroke.KeyStrokeManager;
 import org.eclipse.scout.rt.ui.rap.servletfilter.LogoutFilter;
+import org.eclipse.scout.rt.ui.rap.servletfilter.LogoutHandler;
 import org.eclipse.scout.rt.ui.rap.util.ColorFactory;
 import org.eclipse.scout.rt.ui.rap.util.DeviceUtility;
 import org.eclipse.scout.rt.ui.rap.util.FontRegistry;
@@ -119,8 +120,9 @@ import org.eclipse.ui.forms.widgets.FormToolkit;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.Version;
 
+@SuppressWarnings("deprecation")
 public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
-  private static IScoutLogger LOG = ScoutLogManager.getLogger(AbstractRwtEnvironment.class);
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractRwtEnvironment.class);
 
   private Subject m_subject;
 
@@ -169,7 +171,8 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
     m_clientSessionClazz = clientSessionClazz;
     m_environmentListeners = new EventListenerList();
     m_requestInterceptor = new P_RequestInterceptor();
-    m_openForms = new HashMap<IForm, IRwtScoutPart>();
+    //Linked hash map to preserve the order of the opening
+    m_openForms = new LinkedHashMap<IForm, IRwtScoutPart>();
     m_status = RwtEnvironmentEvent.INACTIVE;
     m_desktopKeyStrokes = new ArrayList<IRwtKeyStroke>();
     m_startDesktopCalled = false;
@@ -212,8 +215,11 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
       return;
     }
     List<IForm> openForms = new LinkedList<IForm>(m_openForms.keySet());
-    for (IForm form : openForms) {
-      //Close the gui part, the form itself may stay open
+    //Close the parts in reverse order as they were opened
+    //Mainly necessary for stacked dialogs to dispose them properly
+    for (int i = openForms.size() - 1; i >= 0; i--) {
+      IForm form = openForms.get(i);
+      //Close the gui part, the form itself may stay open.
       hideFormPart(form);
     }
   }
@@ -224,9 +230,6 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
    * environment instance.
    */
   protected synchronized void dispose() {
-    if (m_status == RwtEnvironmentEvent.STOPPED) {
-      return;
-    }
     try {
       closeFormParts();
       if (m_historySupport != null) {
@@ -270,10 +273,6 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
       fireEnvironmentChanged(new RwtEnvironmentEvent(this, RwtEnvironmentEvent.STOPPED));
     }
     finally {
-      if (m_status != RwtEnvironmentEvent.STOPPED) {
-        m_status = RwtEnvironmentEvent.STARTED;
-        fireEnvironmentChanged(new RwtEnvironmentEvent(this, RwtEnvironmentEvent.STARTED));
-      }
       notifyAll();
     }
   }
@@ -294,13 +293,11 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
   }
 
   public void logout() {
-    HttpServletResponse response = RWT.getResponse();
-    String logoutUri = response.encodeRedirectURL(getLogoutLocation());
-    String browserText = MessageFormat.format("parent.window.location.href = \"{0}\";", logoutUri);
-    JavaScriptExecutor executor = RWT.getClient().getService(JavaScriptExecutor.class);
-    if (executor != null) {
-      executor.execute(browserText);
-    }
+    createLogoutHandler().logout();
+  }
+
+  protected LogoutHandler createLogoutHandler() {
+    return new LogoutHandler();
   }
 
   @Override
@@ -451,7 +448,9 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
     HttpSession httpSession = RWT.getUISession().getHttpSession();
     IClientSession clientSession = (IClientSession) httpSession.getAttribute(IClientSession.class.getName());
     if (clientSession != null) {
-      if (!userAgent.equals(clientSession.getUserAgent())) {
+      //If the subject has changed always create a new clientSession
+      //Also create a new clientSession if the userAgent changed (f.e. switch from /web to /mobile)
+      if (!getSubject().equals(clientSession.getSubject()) || !userAgent.equals(clientSession.getUserAgent())) {
         //Force client session shutdown
         httpSession.setAttribute(P_HttpSessionInvalidationListener.class.getName(), null);
         //Make sure a new client session will be initialized
@@ -577,8 +576,8 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
   }
 
   @Override
-  public String convertLinksWithLocalUrlsInHtmlCell(IRwtScoutComposite<?> uiComposite, String rawHtml) {
-    return getHtmlAdapter().convertLinksWithLocalUrlsInHtmlCell(uiComposite, rawHtml);
+  public String convertLinksInHtmlCell(IRwtScoutComposite<?> uiComposite, String rawHtml) {
+    return getHtmlAdapter().convertLinksInHtmlCell(uiComposite, rawHtml);
   }
 
   @Override
@@ -628,7 +627,7 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
   public void addGlobalKeyStroke(IRwtKeyStroke stroke, boolean exclusive) {
     boolean internalExclusive = exclusive;
     //If F1-F12 is set we wan't to have this exclusive to the application, else the browser will reload the page
-    if (ListUtility.containsAny(fKeyList, stroke.getKeyCode())) {
+    if (CollectionUtility.containsAny(fKeyList, stroke.getKeyCode())) {
       internalExclusive = true;
     }
     m_keyStrokeManager.addGlobalKeyStroke(stroke, internalExclusive);
@@ -643,16 +642,16 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
   }
 
   @Override
-  public void addKeyStroke(Control control, IRwtKeyStroke stoke, boolean exclusive) {
-    m_keyStrokeManager.addKeyStroke(control, stoke, exclusive);
+  public void addKeyStroke(Control control, IRwtKeyStroke stroke, boolean exclusive) {
+    m_keyStrokeManager.addKeyStroke(control, stroke, exclusive);
   }
 
   @Override
-  public boolean removeKeyStroke(Control control, IRwtKeyStroke stoke) {
+  public boolean removeKeyStroke(Control control, IRwtKeyStroke stroke) {
     if (m_keyStrokeManager == null) {
       return false;
     }
-    return m_keyStrokeManager.removeKeyStroke(control, stoke);
+    return m_keyStrokeManager.removeKeyStroke(control, stroke);
   }
 
   @Override
@@ -661,6 +660,14 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
       return false;
     }
     return m_keyStrokeManager.removeKeyStrokes(control);
+  }
+
+  @Override
+  public boolean hasKeyStroke(Control control, IRwtKeyStroke stroke) {
+    if (m_keyStrokeManager == null) {
+      return false;
+    }
+    return m_keyStrokeManager.hasKeyStroke(control, stroke);
   }
 
   /**
@@ -741,10 +748,10 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
 
   protected void applyScoutState() {
     IDesktop desktop = getScoutDesktop();
-    final IForm[] viewStack = desktop.getViewStack();
-    final IForm[] dialogs = desktop.getDialogStack();
-    final IMessageBox[] messageBoxes = desktop.getMessageBoxStack();
-    if (viewStack.length == 0 && dialogs.length == 0 && messageBoxes.length == 0) {
+    final List<IForm> viewStack = desktop.getViewStack();
+    final List<IForm> dialogs = desktop.getDialogStack();
+    final List<IMessageBox> messageBoxes = desktop.getMessageBoxStack();
+    if (CollectionUtility.isEmpty(viewStack) && CollectionUtility.isEmpty(dialogs) && CollectionUtility.isEmpty(messageBoxes)) {
       return;
     }
 
@@ -793,13 +800,13 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
   }
 
   @Override
-  public void openBrowserWindowFromScout(String path) {
+  public void openBrowserWindowFromScout(String path, IUrlTarget urlTarget) {
     BrowserWindowHandler browserWindowHandler = createBrowserWindowHandler();
     if (browserWindowHandler == null) {
       return;
     }
 
-    browserWindowHandler.openLink(path);
+    browserWindowHandler.openLink(path, urlTarget);
   }
 
   protected BrowserWindowHandler createBrowserWindowHandler() {
@@ -1146,11 +1153,11 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
           invokeUiLater(t);
           break;
         }
-        case DesktopEvent.TYPE_OPEN_BROWSER_WINDOW: {
+        case DesktopEvent.TYPE_OPEN_URL_IN_BROWSER: {
           Runnable t = new Runnable() {
             @Override
             public void run() {
-              openBrowserWindowFromScout(e.getPath());
+              openBrowserWindowFromScout(e.getPath(), e.getUrlTarget());
             }
           };
           invokeUiLater(t);
@@ -1171,6 +1178,26 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
             @Override
             public void run() {
               handleScoutPrintInRwt(e);
+            }
+          };
+          invokeUiLater(t);
+          break;
+        }
+        case DesktopEvent.TYPE_TRAVERSE_FOCUS_NEXT: {
+          Runnable t = new Runnable() {
+            @Override
+            public void run() {
+              handleTraverseFocusFromScout(true);
+            }
+          };
+          invokeUiLater(t);
+          break;
+        }
+        case DesktopEvent.TYPE_TRAVERSE_FOCUS_PREVIOUS: {
+          Runnable t = new Runnable() {
+            @Override
+            public void run() {
+              handleTraverseFocusFromScout(false);
             }
           };
           invokeUiLater(t);
@@ -1324,6 +1351,10 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
     }
   }
 
+  protected void handleTraverseFocusFromScout(boolean forward) {
+    // not supported in RAP
+  }
+
   protected void handleScoutPrintInRwt(DesktopEvent e) {
     WidgetPrinter wp = new WidgetPrinter(getParentShellIgnoringPopups(SWT.SYSTEM_MODAL | SWT.APPLICATION_MODAL | SWT.MODELESS));
     try {
@@ -1424,7 +1455,8 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
 
   }
 
-  private static final class P_HttpSessionInvalidationListener implements HttpSessionBindingListener {
+  private static final class P_HttpSessionInvalidationListener implements HttpSessionBindingListener, Serializable {
+    private static final long serialVersionUID = 7099577980770179637L;
     private final IClientSession m_clientSession;
     private final AbstractRwtEnvironment m_environment;
 
@@ -1471,5 +1503,4 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
       }.runNow(new NullProgressMonitor());
     }
   }
-
 }

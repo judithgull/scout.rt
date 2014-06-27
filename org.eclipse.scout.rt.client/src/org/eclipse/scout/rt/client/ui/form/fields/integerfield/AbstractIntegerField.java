@@ -10,18 +10,18 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.form.fields.integerfield;
 
-import java.text.ParsePosition;
+import java.math.BigDecimal;
 
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.form.fields.numberfield.AbstractNumberField;
-import org.eclipse.scout.rt.shared.ScoutTexts;
 import org.eclipse.scout.rt.shared.data.form.ValidationRule;
 
+@ClassId("4418100d-db7c-40e7-84b4-29df65534671")
 public abstract class AbstractIntegerField extends AbstractNumberField<Integer> implements IIntegerField {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractIntegerField.class);
 
@@ -36,20 +36,47 @@ public abstract class AbstractIntegerField extends AbstractNumberField<Integer> 
   /*
    * Configuration
    */
-  @ConfigProperty(ConfigProperty.INTEGER)
-  @Order(250)
-  @ConfigPropertyValue("null")
-  @ValidationRule(ValidationRule.MIN_VALUE)
+  /**
+   * @deprecated Will be removed with scout 5.0, use {@link #getConfiguredMinValue()}.<br>
+   *             As long as this deprecated version is overridden in subclasses. This setting wins over
+   *             {@link #getConfiguredMinValue()} in {@link #initConfig()}.
+   */
+  @Deprecated
   protected Integer getConfiguredMinimumValue() {
-    return null;
+    return getConfiguredMinValue();
   }
 
+  /**
+   * @deprecated Will be removed with scout 5.0, use {@link #getConfiguredMaxValue()}.<br>
+   *             As long as this deprecated version is overridden in subclasses. This setting wins over
+   *             {@link #getConfiguredMaxValue()} in {@link #initConfig()}.
+   */
+  @Deprecated
+  protected Integer getConfiguredMaximumValue() {
+    return getConfiguredMaxValue();
+  }
+
+  @Override
+  @ConfigProperty(ConfigProperty.INTEGER)
+  @Order(250)
+  @ValidationRule(ValidationRule.MIN_VALUE)
+  protected Integer getConfiguredMinValue() {
+    return Integer.MIN_VALUE;
+  }
+
+  @Override
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(260)
-  @ConfigPropertyValue("null")
   @ValidationRule(ValidationRule.MAX_VALUE)
-  protected Integer getConfiguredMaximumValue() {
-    return null;
+  protected Integer getConfiguredMaxValue() {
+    return Integer.MAX_VALUE;
+  }
+
+  @Override
+  @Order(270)
+  @ConfigProperty(ConfigProperty.INTEGER)
+  protected int getConfiguredMaxIntegerDigits() {
+    return 10;
   }
 
   @Override
@@ -59,23 +86,31 @@ public abstract class AbstractIntegerField extends AbstractNumberField<Integer> 
     setMaxValue(getConfiguredMaximumValue());
   }
 
-  // convert string to a real int
+  /**
+   * Set the minimum value for this field. If value is <code>null</code>, it is replaced by Integer.MIN_VALUE.
+   */
+  @Override
+  public void setMinValue(Integer value) {
+    super.setMinValue(value == null ? Integer.MIN_VALUE : value);
+  }
+
+  /**
+   * Set the maximum value for this field. If value is <code>null</code>, it is replaced by Integer.MAX_VALUE.
+   */
+  @Override
+  public void setMaxValue(Integer value) {
+    super.setMaxValue(value == null ? Integer.MAX_VALUE : value);
+  }
+
+  /**
+   * uses {@link #parseToBigDecimalInternal(String)} to parse text and returns the result as Integer
+   */
   @Override
   protected Integer parseValueInternal(String text) throws ProcessingException {
     Integer retVal = null;
-    if (text == null) {
-      text = "";
-    }
-    else {
-      text = text.trim();
-    }
-    if (text.length() > 0) {
-      ParsePosition p = new ParsePosition(0);
-      Number n = createNumberFormat().parse(text, p);
-      if (p.getErrorIndex() >= 0 || p.getIndex() != text.length()) {
-        throw new ProcessingException(ScoutTexts.get("InvalidNumberMessageX", text));
-      }
-      retVal = new Integer(n.intValue());
+    BigDecimal parsedVal = parseToBigDecimalInternal(text);
+    if (parsedVal != null) {
+      retVal = Integer.valueOf(parsedVal.intValueExact());
     }
     return retVal;
   }

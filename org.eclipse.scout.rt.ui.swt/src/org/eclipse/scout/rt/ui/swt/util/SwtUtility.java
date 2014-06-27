@@ -13,16 +13,19 @@ package org.eclipse.scout.rt.ui.swt.util;
 import java.awt.event.KeyEvent;
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
 
+import org.eclipse.jface.action.LegacyActionTools;
 import org.eclipse.jface.dialogs.ProgressMonitorDialog;
 import org.eclipse.jface.viewers.StructuredSelection;
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.CompositeLong;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.dnd.FileListTransferObject;
@@ -33,9 +36,13 @@ import org.eclipse.scout.commons.dnd.TransferObject;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.IDNDSupport;
+import org.eclipse.scout.rt.client.ui.action.IAction;
 import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
+import org.eclipse.scout.rt.client.ui.action.keystroke.KeyStroke;
 import org.eclipse.scout.rt.shared.ScoutTexts;
 import org.eclipse.scout.rt.ui.swt.ISwtEnvironment;
+import org.eclipse.scout.rt.ui.swt.basic.ISwtScoutComposite;
+import org.eclipse.scout.rt.ui.swt.basic.SwtScoutComposite;
 import org.eclipse.scout.rt.ui.swt.keystroke.ISwtKeyStroke;
 import org.eclipse.scout.rt.ui.swt.keystroke.SwtScoutKeyStroke;
 import org.eclipse.swt.SWT;
@@ -66,7 +73,7 @@ import org.eclipse.ui.PlatformUI;
 
 public final class SwtUtility {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(SwtUtility.class);
-  private static final HashMap<String, Integer> SCOUT_SWT_KEY_MAP;
+  private static final Map<String, Integer> SCOUT_SWT_KEY_MAP;
 
   private SwtUtility() {
   }
@@ -159,49 +166,6 @@ public final class SwtUtility {
         }
       }
     }
-
-    // DataFlavor[] flavors=swtT.getTransferDataFlavors();
-    // if(swtT.type == FileTransfer)
-    // for(int i=0;i<flavors.length;i++){
-    // if(flavors[i].isFlavorJavaFileListType()){
-    // try{
-    // ArrayList<File> fileList=new ArrayList<File>();
-    // fileList.addAll((List)swtT.getTransferData(flavors[i]));
-    // return new FileListTransferObject(fileList);
-    // }
-    // catch(Exception e){
-    // if(ex==null) ex=e;
-    // }
-    // }
-    // else if(flavors[i].isFlavorTextType()){
-    // try{
-    // return new TextTransferObject((String)swtT.getTransferData(flavors[i]));
-    // }
-    // catch(Exception e){
-    // if(ex==null) ex=e;
-    // }
-    // }
-    // else if(flavors[i].isMimeTypeEqual(DataFlavor.imageFlavor)){
-    // try{
-    // return new TextTransferObject((String)swtT.getTransferData(flavors[i]));
-    // }
-    // catch(Exception e){
-    // if(ex==null) ex=e;
-    // }
-    // }
-    // else
-    // if(flavors[i].isMimeTypeEqual(DataFlavor.javaJVMLocalObjectMimeType)){
-    // try{
-    // return new JavaTransferObject(swtT.getTransferData(flavors[i]));
-    // }
-    // catch(Exception e){
-    // if(ex==null) ex=e;
-    // }
-    // }
-    // }
-    // if(ex!=null){
-    // LOG.warn("swt transferable="+swtT,ex);
-    // }
     return null;
   }
 
@@ -521,14 +485,16 @@ public final class SwtUtility {
   }
 
   @SuppressWarnings("unchecked")
-  public static <T> T[] getItemsOfSelection(Class<T> t, StructuredSelection selection) {
-    T[] result = (T[]) Array.newInstance(t, selection.size());
-    int i = 0;
-    for (Object o : selection.toArray()) {
-      result[i++] = (T) o;
+  public static <T> List<T> getItemsOfSelection(Class<T> t, StructuredSelection selection) {
+    if (selection != null) {
+      List<T> result = new ArrayList<T>(selection.size());
+      Iterator it = selection.iterator();
+      while (it.hasNext()) {
+        result.add((T) it.next());
+      }
+      return result;
     }
-    return result;
-
+    return CollectionUtility.emptyArrayList();
   }
 
   static {
@@ -1087,4 +1053,62 @@ public final class SwtUtility {
     return MNEMONIC_PATTERN.matcher(text).replaceAll("\\&$1");
   }
 
+  /**
+   * Pretty printed version of the key stroke
+   * <p>
+   * Example:
+   * <ul>
+   * <li>control-alternate-f1 --> Ctrl+Alt+F1
+   * </ul>
+   * 
+   * @since 3.10.0-M4
+   */
+  public static String getKeyStrokePrettyPrinted(IAction scoutAction) {
+    if (scoutAction == null) {
+      return "";
+    }
+    return SwtUtility.getKeyStrokePrettyPrinted(scoutAction.getKeyStroke());
+  }
+
+  /**
+   * Pretty printed version of the key stroke.
+   * See {@link RwtUtility#getKeyStrokePrettyPrinted(IAction)}
+   * 
+   * @since 3.10.0-M4
+   */
+  public static String getKeyStrokePrettyPrinted(String s) {
+    if (!StringUtility.hasText(s)) {
+      return "";
+    }
+    KeyStroke ks = new KeyStroke(s);
+    int stateMask = getSwtStateMask(ks);
+    int keyCode = getSwtKeyCode(ks);
+    return LegacyActionTools.convertAccelerator(stateMask | keyCode);
+  }
+
+  /**
+   * Run the inputVerifier on the currently focused control. See {@link #runSwtInputVerifier(Control)} for more details.
+   * 
+   * @since 3.10.0-M5
+   */
+  public static boolean runSwtInputVerifier() {
+    return runSwtInputVerifier(Display.getDefault().getFocusControl());
+  }
+
+  /**
+   * Force the control's inputVerifier to run
+   * 
+   * @since 3.10.0-M5
+   */
+  public static boolean runSwtInputVerifier(Control control) {
+    if (control == null || control.isDisposed()) {
+      return true; //continue, a tray menu can be selected for example
+    }
+
+    ISwtScoutComposite compositeOnWidget = SwtScoutComposite.getCompositeOnWidget(control);
+    if (compositeOnWidget instanceof SwtScoutComposite) {
+      return ((SwtScoutComposite) compositeOnWidget).runSwtInputVerifier();
+    }
+    return true; //continue always
+  }
 }

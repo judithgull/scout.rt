@@ -20,14 +20,10 @@ import org.eclipse.swt.widgets.Control;
  * 
  * @author Andreas Hoegger
  */
-public interface ISwtScoutComposite<T extends IPropertyObserver> {
+public interface ISwtScoutComposite<T extends IPropertyObserver> extends ISwtScoutPropertyObserver<T> {
   String PROP_SWT_SCOUT_COMPOSITE = "ISwtScoutComposite";
 
   void createField(Composite parent, T model, ISwtEnvironment environment);
-
-  T getScoutObject();
-
-  ISwtEnvironment getEnvironment();
 
   Control getSwtField();
 

@@ -11,10 +11,15 @@
 package org.eclipse.scout.rt.client.ui.form.fields.groupbox;
 
 import java.util.ArrayList;
+import java.util.List;
 
+import org.eclipse.scout.commons.CollectionUtility;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
+import org.eclipse.scout.commons.exception.ProcessingException;
+import org.eclipse.scout.commons.logger.IScoutLogger;
+import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.services.common.icon.IIconProviderService;
 import org.eclipse.scout.rt.client.ui.action.keystroke.DefaultFormEnterKeyStroke;
 import org.eclipse.scout.rt.client.ui.action.keystroke.DefaultFormEscapeKeyStroke;
@@ -24,20 +29,24 @@ import org.eclipse.scout.rt.client.ui.form.fields.AbstractFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.GridData;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.button.IButton;
-import org.eclipse.scout.rt.client.ui.form.fields.groupbox.internal.GroupBoxBodyGrid;
 import org.eclipse.scout.rt.client.ui.form.fields.groupbox.internal.GroupBoxProcessButtonGrid;
+import org.eclipse.scout.rt.client.ui.form.fields.groupbox.internal.VerticalSmartGroupBoxBodyGrid;
+import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
+import org.eclipse.scout.service.SERVICES;
 
+@ClassId("6a093505-c2b1-4df2-84d6-e799f91e6e7c")
 public abstract class AbstractGroupBox extends AbstractCompositeField implements IGroupBox {
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractGroupBox.class);
 
   private IGroupBoxUIFacade m_uiFacade;
   private boolean m_mainBoxFlag = false;
   private int m_gridColumnCountHint;
   private boolean m_scrollable;
-  private IFormField[] m_controlFields;
-  private IGroupBox[] m_groupBoxes;
-  private IButton[] m_customButtons;
-  private IButton[] m_systemButtons;
-  private GroupBoxBodyGrid m_bodyGrid;
+  private List<IFormField> m_controlFields;
+  private List<IGroupBox> m_groupBoxes;
+  private List<IButton> m_customButtons;
+  private List<IButton> m_systemButtons;
+  private IGroupBoxBodyGrid m_bodyGrid;
   private GroupBoxProcessButtonGrid m_customProcessButtonGrid;
   private GroupBoxProcessButtonGrid m_systemProcessButtonGrid;
 
@@ -52,7 +61,6 @@ public abstract class AbstractGroupBox extends AbstractCompositeField implements
   /**
    * {@inheritDoc} Default for group boxes is true.
    */
-  @ConfigPropertyValue("true")
   @Override
   protected boolean getConfiguredGridUseUiHeight() {
     return true;
@@ -69,9 +77,17 @@ public abstract class AbstractGroupBox extends AbstractCompositeField implements
    */
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(200)
-  @ConfigPropertyValue("-1")
   protected int getConfiguredGridColumnCount() {
     return -1;
+  }
+
+  /**
+   * @return the body grid responsible to set {@link GridData} to the fields in this group box.
+   */
+  @ConfigProperty(ConfigProperty.GROUP_BOX_BODY_GRID)
+  @Order(210)
+  protected Class<? extends IGroupBoxBodyGrid> getConfiguredBodyGrid() {
+    return VerticalSmartGroupBoxBodyGrid.class;
   }
 
   /**
@@ -92,7 +108,6 @@ public abstract class AbstractGroupBox extends AbstractCompositeField implements
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(230)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredBorderVisible() {
     return true;
   }
@@ -109,7 +124,6 @@ public abstract class AbstractGroupBox extends AbstractCompositeField implements
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(231)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredExpandable() {
     return false;
   }
@@ -125,7 +139,6 @@ public abstract class AbstractGroupBox extends AbstractCompositeField implements
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(232)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredExpanded() {
     return true;
   }
@@ -142,7 +155,6 @@ public abstract class AbstractGroupBox extends AbstractCompositeField implements
    */
   @ConfigProperty(ConfigProperty.BORDER_DECORATION)
   @Order(233)
-  @ConfigPropertyValue("BORDER_DECORATION_AUTO")
   protected String getConfiguredBorderDecoration() {
     return BORDER_DECORATION_AUTO;
   }
@@ -157,7 +169,6 @@ public abstract class AbstractGroupBox extends AbstractCompositeField implements
    */
   @ConfigProperty(ConfigProperty.ICON_ID)
   @Order(240)
-  @ConfigPropertyValue("null")
   protected String getConfiguredBackgroundImageName() {
     return null;
   }
@@ -173,7 +184,6 @@ public abstract class AbstractGroupBox extends AbstractCompositeField implements
    */
   @ConfigProperty(ConfigProperty.HORIZONTAL_ALIGNMENT)
   @Order(250)
-  @ConfigPropertyValue("0")
   protected int getConfiguredBackgroundImageHorizontalAlignment() {
     return 0;
   }
@@ -189,7 +199,6 @@ public abstract class AbstractGroupBox extends AbstractCompositeField implements
    */
   @ConfigProperty(ConfigProperty.VERTICAL_ALIGNMENT)
   @Order(260)
-  @ConfigPropertyValue("0")
   protected int getConfiguredBackgroundImageVerticalAlignment() {
     return 0;
   }
@@ -204,7 +213,6 @@ public abstract class AbstractGroupBox extends AbstractCompositeField implements
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(270)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredScrollable() {
     return false;
   }
@@ -224,7 +232,6 @@ public abstract class AbstractGroupBox extends AbstractCompositeField implements
    * @return the number of columns to span
    */
   @Override
-  @ConfigPropertyValue("FULL_WIDTH")
   protected int getConfiguredGridW() {
     return FULL_WIDTH;
   }
@@ -232,45 +239,53 @@ public abstract class AbstractGroupBox extends AbstractCompositeField implements
   @Override
   protected void initConfig() {
     m_uiFacade = new P_UIFacade();
-    m_bodyGrid = new GroupBoxBodyGrid(this);
+    Class<? extends IGroupBoxBodyGrid> bodyGridClazz = getConfiguredBodyGrid();
+    if (bodyGridClazz != null) {
+      IGroupBoxBodyGrid bodyGrid;
+      try {
+        bodyGrid = bodyGridClazz.newInstance();
+        setBodyGrid(bodyGrid);
+      }
+      catch (Exception e) {
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + bodyGridClazz.getName() + "'.", e));
+      }
+    }
     m_customProcessButtonGrid = new GroupBoxProcessButtonGrid(this, true, false);
     m_systemProcessButtonGrid = new GroupBoxProcessButtonGrid(this, false, true);
     super.initConfig();
-    IFormField[] a = getFields();
     // categorize items
-    ArrayList<IFormField> controlList = new ArrayList<IFormField>();
-    ArrayList<IGroupBox> groupList = new ArrayList<IGroupBox>();
-    ArrayList<IButton> customButtonList = new ArrayList<IButton>();
-    ArrayList<IButton> systemButtonList = new ArrayList<IButton>();
-    for (int i = 0; i < a.length; i++) {
-      IFormField f = a[i];
-      if (f instanceof IGroupBox) {
-        groupList.add((IGroupBox) f);
-        controlList.add(f);
+    List<IFormField> controlList = new ArrayList<IFormField>();
+    List<IGroupBox> groupList = new ArrayList<IGroupBox>();
+    List<IButton> customButtonList = new ArrayList<IButton>();
+    List<IButton> systemButtonList = new ArrayList<IButton>();
+    for (IFormField field : getFields()) {
+      if (field instanceof IGroupBox) {
+        groupList.add((IGroupBox) field);
+        controlList.add(field);
       }
-      else if (f instanceof IButton) {
-        IButton b = (IButton) f;
+      else if (field instanceof IButton) {
+        IButton b = (IButton) field;
         if (b.isProcessButton()) {
           if (b.getSystemType() != IButton.SYSTEM_TYPE_NONE) {
-            systemButtonList.add((IButton) f);
+            systemButtonList.add((IButton) field);
           }
           else {
-            customButtonList.add((IButton) f);
+            customButtonList.add((IButton) field);
           }
         }
         else {
-          controlList.add(f);
+          controlList.add(field);
         }
       }
       else {
-        controlList.add(f);
+        controlList.add(field);
       }
     }
-    m_controlFields = controlList.toArray(new IFormField[controlList.size()]);
-    m_groupBoxes = groupList.toArray(new IGroupBox[groupList.size()]);
-    m_customButtons = customButtonList.toArray(new IButton[customButtonList.size()]);
-    m_systemButtons = systemButtonList.toArray(new IButton[systemButtonList.size()]);
-    //
+    m_controlFields = controlList;
+    m_groupBoxes = groupList;
+    m_customButtons = customButtonList;
+    m_systemButtons = systemButtonList;
+
     setExpandable(getConfiguredExpandable());
     setExpanded(getConfiguredExpanded());
     setBorderVisible(getConfiguredBorderVisible());
@@ -283,8 +298,8 @@ public abstract class AbstractGroupBox extends AbstractCompositeField implements
   }
 
   @Override
-  public IKeyStroke[] getContributedKeyStrokes() {
-    ArrayList<IKeyStroke> list = new ArrayList<IKeyStroke>(2);
+  public List<IKeyStroke> getContributedKeyStrokes() {
+    List<IKeyStroke> list = new ArrayList<IKeyStroke>(2);
     if (isMainBox() && (getForm() != null && getForm().getOuterForm() == null)) {
       // add default escape and enter key stroke only if no similar key stroke
       // is defined on the mainbox
@@ -299,18 +314,32 @@ public abstract class AbstractGroupBox extends AbstractCompositeField implements
         }
       }
       if (!hasEnter) {
-        list.add(new DefaultFormEnterKeyStroke(getForm()));
+        try {
+          DefaultFormEnterKeyStroke enterKeyStroke = new DefaultFormEnterKeyStroke(getForm());
+          enterKeyStroke.initAction();
+          list.add(enterKeyStroke);
+        }
+        catch (ProcessingException e) {
+          LOG.error("could not initialize enter key stroke.", e);
+        }
       }
       if (!hasEscape) {
-        list.add(new DefaultFormEscapeKeyStroke(getForm()));
+        try {
+          DefaultFormEscapeKeyStroke escKeyStroke = new DefaultFormEscapeKeyStroke(getForm());
+          escKeyStroke.initAction();
+          list.add(escKeyStroke);
+        }
+        catch (ProcessingException e) {
+          LOG.error("could not initialize esc key stroke.", e);
+        }
       }
     }
-    return list.toArray(new IKeyStroke[list.size()]);
+    return list;
   }
 
   @Override
   public void rebuildFieldGrid() {
-    m_bodyGrid.validate();
+    m_bodyGrid.validate(this);
     m_customProcessButtonGrid.validate();
     m_systemProcessButtonGrid.validate();
     if (isInitialized()) {
@@ -332,55 +361,51 @@ public abstract class AbstractGroupBox extends AbstractCompositeField implements
 
   @Override
   public int getGroupBoxIndex(IGroupBox groupBox) {
-    for (int i = 0; i < m_groupBoxes.length; i++) {
-      if (m_groupBoxes[i] == groupBox) {
-        return i;
-      }
-    }
-    return -1;
+    return m_groupBoxes.indexOf(groupBox);
   }
 
   @Override
   public int getCustomProcessButtonCount() {
-    return m_customButtons.length;
+    return m_customButtons.size();
   }
 
   @Override
   public int getGroupBoxCount() {
-    return m_groupBoxes.length;
+    return m_groupBoxes.size();
   }
 
   @Override
   public int getSystemProcessButtonCount() {
-    return m_systemButtons.length;
+    return m_systemButtons.size();
   }
 
   @Override
-  public IGroupBox[] getGroupBoxes() {
-    IGroupBox[] a = new IGroupBox[m_groupBoxes.length];
-    System.arraycopy(m_groupBoxes, 0, a, 0, a.length);
-    return a;
+  public List<IGroupBox> getGroupBoxes() {
+    return CollectionUtility.arrayList(m_groupBoxes);
   }
 
   @Override
-  public IFormField[] getControlFields() {
-    IFormField[] a = new IFormField[m_controlFields.length];
-    System.arraycopy(m_controlFields, 0, a, 0, a.length);
-    return a;
+  public List<IFormField> getControlFields() {
+    return CollectionUtility.arrayList(m_controlFields);
   }
 
   @Override
-  public IButton[] getCustomProcessButtons() {
-    IButton[] a = new IButton[m_customButtons.length];
-    System.arraycopy(m_customButtons, 0, a, 0, a.length);
-    return a;
+  public List<IButton> getCustomProcessButtons() {
+    return CollectionUtility.arrayList(m_customButtons);
   }
 
   @Override
-  public IButton[] getSystemProcessButtons() {
-    IButton[] a = new IButton[m_systemButtons.length];
-    System.arraycopy(m_systemButtons, 0, a, 0, a.length);
-    return a;
+  public List<IButton> getSystemProcessButtons() {
+    return CollectionUtility.arrayList(m_systemButtons);
+  }
+
+  public void setBodyGrid(IGroupBoxBodyGrid bodyGrid) {
+    m_bodyGrid = bodyGrid;
+  }
+
+  @Override
+  public IGroupBoxBodyGrid getBodyGrid() {
+    return m_bodyGrid;
   }
 
   @Override

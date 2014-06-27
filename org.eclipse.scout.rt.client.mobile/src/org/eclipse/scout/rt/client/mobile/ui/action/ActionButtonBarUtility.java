@@ -10,14 +10,16 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.mobile.ui.action;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.mobile.ui.form.IMobileAction;
 import org.eclipse.scout.rt.client.mobile.ui.form.outline.AutoLeafPageWithNodes;
+import org.eclipse.scout.rt.client.ui.action.ActionUtility;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
-import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
+import org.eclipse.scout.rt.client.ui.action.menu.root.ITreeContextMenu;
 import org.eclipse.scout.rt.client.ui.desktop.outline.pages.IPage;
 import org.eclipse.scout.rt.client.ui.form.fields.button.IButton;
 
@@ -26,8 +28,8 @@ import org.eclipse.scout.rt.client.ui.form.fields.button.IButton;
  */
 public class ActionButtonBarUtility {
 
-  public static List<IMobileAction> convertButtonsToActions(IButton[] buttons) {
-    List<IMobileAction> menuList = new LinkedList<IMobileAction>();
+  public static List<IMobileAction> convertButtonsToActions(List<IButton> buttons) throws ProcessingException {
+    List<IMobileAction> menuList = new ArrayList<IMobileAction>(buttons.size());
     for (IButton button : buttons) {
       IMobileAction action = convertButtonToAction(button);
       if (action != null) {
@@ -38,19 +40,21 @@ public class ActionButtonBarUtility {
     return menuList;
   }
 
-  public static IMobileAction convertButtonToAction(IButton button) {
+  public static IMobileAction convertButtonToAction(IButton button) throws ProcessingException {
     if (button == null) {
       return null;
     }
 
-    return new ButtonWrappingAction(button);
+    ButtonWrappingAction mAction = new ButtonWrappingAction(button);
+    mAction.initAction();
+    return mAction;
   }
 
   /**
    * If there are empty space menus distribute the row menus so that the menus alternate and the most important are on
    * top, starting with a empty space menu
    */
-  public static void distributeRowActions(List<IMenu> menuList, IMenu[] emptySpaceMenus, List<IMenu> rowMenuList) {
+  public static void distributeRowActions(List<IMenu> menuList, List<IMenu> emptySpaceMenus, List<IMenu> rowMenuList) {
     if (emptySpaceMenus == null) {
       return;
     }
@@ -73,16 +77,15 @@ public class ActionButtonBarUtility {
   public static List<IMenu> fetchPageActions(IPage page) {
     List<IMenu> pageActions = new LinkedList<IMenu>();
     if (page.getTree() != null) {
-      //Fetch the menus of the given page (getUIFacade().fireNodePopupFromUI() is not possible since the selected node may not the same as the given page)
-      pageActions.addAll(Arrays.asList(page.getTree().fetchMenusForNodesInternal(new ITreeNode[]{page})));
+      ITreeContextMenu contextMenu = page.getTree().getContextMenu();
+      pageActions.addAll(ActionUtility.getActions(contextMenu.getChildActions(), contextMenu.getActiveFilter()));
       if (page instanceof AutoLeafPageWithNodes) {
         //AutoLeafPage has no parent so the table row actions are not fetched by the regular way (see AbstractOutline#P_OutlineListener).
         //Instead we directly fetch the table row actions
-        pageActions.addAll(Arrays.asList(((AutoLeafPageWithNodes) page).getTableRow().getTable().getUIFacade().fireRowPopupFromUI()));
+        pageActions.addAll(ActionUtility.getActions(((AutoLeafPageWithNodes) page).getTableRow().getTable().getMenus(), contextMenu.getActiveFilter()));
       }
     }
 
     return pageActions;
   }
-
 }

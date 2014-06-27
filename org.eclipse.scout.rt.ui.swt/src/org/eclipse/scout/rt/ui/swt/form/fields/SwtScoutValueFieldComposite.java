@@ -10,6 +10,8 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.ui.swt.form.fields;
 
+import java.beans.PropertyChangeListener;
+
 import org.eclipse.scout.rt.client.ui.form.fields.IValueField;
 
 /**
@@ -20,14 +22,16 @@ import org.eclipse.scout.rt.client.ui.form.fields.IValueField;
  */
 public abstract class SwtScoutValueFieldComposite<T extends IValueField<?>> extends SwtScoutFieldComposite<T> {
 
+  private PropertyChangeListener m_contextMenuPropertyListener;
+
   @Override
   protected void attachScout() {
     super.attachScout();
-    setValueFromScout();
+    updateValueFromScout();
     setDisplayTextFromScout(getScoutObject().getDisplayText());
   }
 
-  protected void setValueFromScout() {
+  protected void updateValueFromScout() {
   }
 
   protected void setDisplayTextFromScout(String s) {
@@ -40,7 +44,7 @@ public abstract class SwtScoutValueFieldComposite<T extends IValueField<?>> exte
       setDisplayTextFromScout((String) newValue);
     }
     else if (name.equals(IValueField.PROP_VALUE)) {
-      setValueFromScout();
+      updateValueFromScout();
     }
   }
 

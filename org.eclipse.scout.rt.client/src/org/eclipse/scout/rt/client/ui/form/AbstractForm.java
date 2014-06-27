@@ -21,6 +21,7 @@ import java.io.Serializable;
 import java.nio.charset.Charset;
 import java.security.Permission;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EventListener;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -31,12 +32,13 @@ import java.util.Map;
 
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.scout.commons.BeanUtility;
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.ConfigurationUtility;
 import org.eclipse.scout.commons.EventListenerList;
 import org.eclipse.scout.commons.StoppableThread;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.FormData;
 import org.eclipse.scout.commons.annotations.FormData.SdkCommand;
 import org.eclipse.scout.commons.annotations.Order;
@@ -57,7 +59,9 @@ import org.eclipse.scout.rt.client.services.common.search.ISearchFilterService;
 import org.eclipse.scout.rt.client.ui.DataChangeListener;
 import org.eclipse.scout.rt.client.ui.IEventHistory;
 import org.eclipse.scout.rt.client.ui.WeakDataChangeListener;
+import org.eclipse.scout.rt.client.ui.action.ActionUtility;
 import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
+import org.eclipse.scout.rt.client.ui.action.tool.IToolButton;
 import org.eclipse.scout.rt.client.ui.basic.filechooser.FileChooser;
 import org.eclipse.scout.rt.client.ui.desktop.AbstractDesktop;
 import org.eclipse.scout.rt.client.ui.desktop.IDesktop;
@@ -121,6 +125,7 @@ public abstract class AbstractForm extends AbstractPropertyObserver implements I
   private IGroupBox m_mainBox;
   private IWrappedFormField m_wrappedFormField;
   private P_SystemButtonListener m_systemButtonListener;
+  private List<IToolButton> m_toolbuttons;
 
   private IFormHandler m_handler;
   // access control
@@ -140,6 +145,10 @@ public abstract class AbstractForm extends AbstractPropertyObserver implements I
 
   // field replacement support
   private Map<Class<?>, Class<? extends IFormField>> m_fieldReplacements;
+
+  private String m_classId;
+
+  private int m_toolbarLocation;
 
   public AbstractForm() throws ProcessingException {
     this(true);
@@ -172,114 +181,114 @@ public abstract class AbstractForm extends AbstractPropertyObserver implements I
    */
   @ConfigProperty(ConfigProperty.TEXT)
   @Order(10)
-  @ConfigPropertyValue("null")
   protected String getConfiguredTitle() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.TEXT)
   @Order(11)
-  @ConfigPropertyValue("null")
   protected String getConfiguredSubTitle() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(20)
-  @ConfigPropertyValue("0")
   protected int/* seconds */getConfiguredCloseTimer() {
     return 0;
   }
 
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(40)
-  @ConfigPropertyValue("0")
   protected int/* seconds */getConfiguredCustomTimer() {
     return 0;
   }
 
-  @ConfigProperty(ConfigProperty.DOC)
+  /**
+   * @deprecated: Use a {@link ClassId} annotation as key for Doc-Text. Will be removed in the 5.0 Release.
+   */
+  @Deprecated
   @Order(60)
-  @ConfigPropertyValue("null")
   protected String getConfiguredDoc() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.TEXT)
   @Order(90)
-  @ConfigPropertyValue("ScoutTexts.get(\"FormSaveChangesQuestion\")")
   protected String getConfiguredCancelVerificationText() {
     return ScoutTexts.get("FormSaveChangesQuestion");
   }
 
   @ConfigProperty(ConfigProperty.FORM_DISPLAY_HINT)
   @Order(100)
-  @ConfigPropertyValue("DISPLAY_HINT_DIALOG")
   protected int getConfiguredDisplayHint() {
     return DISPLAY_HINT_DIALOG;
   }
 
   @ConfigProperty(ConfigProperty.FORM_VIEW_ID)
   @Order(105)
-  @ConfigPropertyValue("null")
   protected String getConfiguredDisplayViewId() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(108)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredMinimizeEnabled() {
     return false;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(109)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredMaximizeEnabled() {
     return false;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(110)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredMinimized() {
     return false;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(112)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredMaximized() {
     return false;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(120)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredModal() {
     return true;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(140)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredCacheBounds() {
     return false;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(150)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredAskIfNeedSave() {
     return true;
   }
 
   @ConfigProperty(ConfigProperty.ICON_ID)
   @Order(160)
-  @ConfigPropertyValue("null")
   protected String getConfiguredIconId() {
     return null;
+  }
+
+  /**
+   * one of {@link IForm#TOOLBAR_FORM_HEADER} or {@link IForm#TOOLBAR_VIEW_PART}. The {@link IForm#TOOLBAR_VIEW_PART} is
+   * only considered if the form is displayed as a view (display hint {@link IForm#DISPLAY_HINT_VIEW} and SWT
+   * representation. In all other cases the fallback {@link IForm#TOOLBAR_FORM_HEADER} is taken.
+   * 
+   * @return {@link IForm#TOOLBAR_FORM_HEADER} | {@link IForm#TOOLBAR_VIEW_PART}
+   */
+  @ConfigProperty(ConfigProperty.TOOLBAR_LOCATION)
+  @Order(170)
+  protected int getConfiguredToolbarLocation() {
+    return TOOLBAR_FORM_HEADER;
   }
 
   /**
@@ -442,7 +451,7 @@ public abstract class AbstractForm extends AbstractPropertyObserver implements I
   protected void execAddSearchTerms(SearchFilter search) {
   }
 
-  private Class<? extends IKeyStroke>[] getConfiguredKeyStrokes() {
+  private List<Class<IKeyStroke>> getConfiguredKeyStrokes() {
     Class[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
     return ConfigurationUtility.filterClasses(dca, IKeyStroke.class);
   }
@@ -457,10 +466,29 @@ public abstract class AbstractForm extends AbstractPropertyObserver implements I
     return ConfigurationUtility.filterClassesWithInjectFieldAnnotation(dca, IFormField.class);
   }
 
+  protected List<Class<? extends IToolButton>> getConfiguredToolButtons() {
+    Class<?>[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
+    List<Class<IToolButton>> filtered = ConfigurationUtility.filterClasses(dca, IToolButton.class);
+    return ConfigurationUtility.sortFilteredClassesByOrderAnnotation(filtered, IToolButton.class);
+  }
+
   protected void initConfig() throws ProcessingException {
     m_uiFacade = new P_UIFacade();
     m_scoutTimerMap = new HashMap<String, P_Timer>();
     m_autoRegisterInDesktopOnStart = true;
+    setToolbarLocation(getConfiguredToolbarLocation());
+    // toolbuttons
+    List<IToolButton> toolButtonList = new ArrayList<IToolButton>();
+    for (Class<? extends IToolButton> clazz : getConfiguredToolButtons()) {
+      try {
+        IToolButton b = ConfigurationUtility.newInnerInstance(this, clazz);
+        toolButtonList.add(b);
+      }// end try
+      catch (Throwable t) {
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("toobutton: " + clazz.getName(), t));
+      }
+    }
+    m_toolbuttons = toolButtonList;
     // prepare injected fields
     Class<? extends IFormField>[] fieldArray = getConfiguredInjectedFields();
     DefaultFormFieldInjection injectedFields = null;
@@ -479,7 +507,14 @@ public abstract class AbstractForm extends AbstractPropertyObserver implements I
           m_mainBox = ConfigurationUtility.newInnerInstance(this, mainBoxClass);
         }
         catch (Throwable t) {
-          throw new ProcessingException("mainBox: " + ((mainBoxClass == null) ? "not defined." : mainBoxClass.getName()), t);
+          String mainBoxName = null;
+          if (mainBoxClass == null) {
+            mainBoxName = "null";
+          }
+          else {
+            mainBoxName = mainBoxClass.getName();
+          }
+          SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + mainBoxName + "'.", t));
         }
         rootBox = getRootGroupBox();
       }
@@ -608,6 +643,35 @@ public abstract class AbstractForm extends AbstractPropertyObserver implements I
   @Override
   public void setPerspectiveId(String perspectiveId) {
     propertySupport.setPropertyString(PROP_PERSPECTIVE_ID, perspectiveId);
+  }
+
+  @Override
+  public List<IToolButton> getToolButtons() {
+    return CollectionUtility.arrayList(m_toolbuttons);
+  }
+
+  /**
+   * @param configuredToolbuttonLocation
+   */
+  private void setToolbarLocation(int toolbarLocation) {
+    m_toolbarLocation = toolbarLocation;
+  }
+
+  @Override
+  public int getToolbarLocation() {
+    return m_toolbarLocation;
+  }
+
+  @Override
+  public <T extends IToolButton> T getToolButtonByClass(Class<T> clazz) {
+    for (IToolButton b : m_toolbuttons) {
+      if (b.getClass() == clazz) {
+        @SuppressWarnings("unchecked")
+        T button = (T) b;
+        return button;
+      }
+    }
+    return null;
   }
 
   /**
@@ -744,7 +808,7 @@ public abstract class AbstractForm extends AbstractPropertyObserver implements I
         formHandler = ConfigurationUtility.newInnerInstance(this, handlerType);
       }
       catch (Exception e) {
-        throw new ProcessingException("" + handlerType + " is not an internal form handler", e);
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + handlerType.getName() + "'.", e));
       }
     }
     m_wizardStep = wizardStep;
@@ -937,6 +1001,29 @@ public abstract class AbstractForm extends AbstractPropertyObserver implements I
     return parseFormId(getClass().getName());
   }
 
+  /**
+   * <p>
+   * <li>If a classId was set with {@link #setClassId(String)} this value is returned.
+   * <li>Else if the class is annotated with {@link ClassId}, the annotation value is returned.
+   * <li>Otherwise the class name is returned.
+   */
+  @Override
+  public String classId() {
+    if (m_classId != null) {
+      return m_classId;
+    }
+    String simpleClassId = ConfigurationUtility.getAnnotatedClassIdWithFallback(getClass());
+    if (getOuterFormField() != null) {
+      return simpleClassId + ID_CONCAT_SYMBOL + getOuterFormField().classId();
+    }
+    return simpleClassId;
+  }
+
+  @Override
+  public void setClassId(String classId) {
+    m_classId = classId;
+  }
+
   @Override
   public IFormHandler getHandler() {
     return m_handler;
@@ -985,7 +1072,7 @@ public abstract class AbstractForm extends AbstractPropertyObserver implements I
   }
 
   @Override
-  public IFormField[] getAllFields() {
+  public List<IFormField> getAllFields() {
     P_AbstractCollectingFieldVisitor<IFormField> v = new P_AbstractCollectingFieldVisitor<IFormField>() {
       @Override
       public boolean visitField(IFormField field, int level, int fieldIndex) {
@@ -994,7 +1081,7 @@ public abstract class AbstractForm extends AbstractPropertyObserver implements I
       }
     };
     visitFields(v);
-    return v.getCollection().toArray(new IFormField[0]);
+    return v.getCollection();
   }
 
   @Override
@@ -1177,6 +1264,7 @@ public abstract class AbstractForm extends AbstractPropertyObserver implements I
     initFormInternal();
     // fields
     FormUtility.initFormFields(this);
+    ActionUtility.initActions(getToolButtons());
     // custom
     execInitForm();
   }
@@ -1804,18 +1892,6 @@ public abstract class AbstractForm extends AbstractPropertyObserver implements I
     return m_blockingCondition.isBlocking();
   }
 
-  @SuppressWarnings("deprecation")
-  @Override
-  public Object getCustomProperty(String propName) {
-    return getProperty(propName);
-  }
-
-  @SuppressWarnings("deprecation")
-  @Override
-  public void setCustomProperty(String propName, Object o) {
-    setProperty(propName, o);
-  }
-
   @Override
   public Object getProperty(String name) {
     return propertySupport.getProperty(name);
@@ -2007,12 +2083,12 @@ public abstract class AbstractForm extends AbstractPropertyObserver implements I
         if (dir != null) {
           dir = dir.getParentFile();
         }
-        File[] a = new FileChooser(dir, new String[]{"xml"}, false).startChooser();
-        if (a.length == 0) {
+        List<File> a = new FileChooser(dir, Collections.singletonList("xml"), false).startChooser();
+        if (a.isEmpty()) {
           break;
         }
         else {
-          path = a[0];
+          path = a.get(0);
         }
       }
       // export search parameters
@@ -2036,9 +2112,9 @@ public abstract class AbstractForm extends AbstractPropertyObserver implements I
     if (dir != null) {
       dir = dir.getParentFile();
     }
-    File[] a = new FileChooser(dir, new String[]{"xml"}, true).startChooser();
-    if (a.length == 1) {
-      File newPath = a[0];
+    List<File> a = new FileChooser(dir, Collections.singletonList("xml"), true).startChooser();
+    if (a.size() == 1) {
+      File newPath = a.get(0);
       String text = null;
       try {
         SimpleXmlElement e = new SimpleXmlElement();
@@ -2099,8 +2175,8 @@ public abstract class AbstractForm extends AbstractPropertyObserver implements I
   }
 
   /**
-   * @return Returns a map having old field classes as keys and replacement field classes as values. <code>null</code> is
-   *         returned if no form fields are replaced. Do not use this internal method.
+   * @return Returns a map having old field classes as keys and replacement field classes as values. <code>null</code>
+   *         is returned if no form fields are replaced. Do not use this internal method.
    * @since 3.8.2
    */
   public Map<Class<?>, Class<? extends IFormField>> getFormFieldReplacementsInternal() {
@@ -2218,7 +2294,7 @@ public abstract class AbstractForm extends AbstractPropertyObserver implements I
     }
   }
 
-  private void fireFormEvent(FormEvent e) throws ProcessingException {
+  protected void fireFormEvent(FormEvent e) throws ProcessingException {
     EventListener[] listeners = m_listenerList.getListeners(FormListener.class);
     if (listeners != null && listeners.length > 0) {
       ProcessingException pe = null;

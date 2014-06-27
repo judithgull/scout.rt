@@ -12,8 +12,10 @@ package org.eclipse.scout.rt.client.ui.action;
 
 import java.security.Permission;
 
+import org.eclipse.scout.commons.ITypeWithClassId;
 import org.eclipse.scout.commons.beans.IPropertyObserver;
 import org.eclipse.scout.commons.exception.ProcessingException;
+import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 
 /**
  * Actions have a trigger scope that is a combination of the "locations" {@link #isSingleSelectionAction()},
@@ -24,20 +26,23 @@ import org.eclipse.scout.commons.exception.ProcessingException;
  * A typical NEW menu on a table that is only visible on the empty space of the table and only when the table field is
  * enabled would have emptySpaceAction=false;
  */
-public interface IAction extends IPropertyObserver {
+public interface IAction extends IPropertyObserver, ITypeWithClassId {
 
+  String PROP_CONTAINER = "container";
   String PROP_ICON_ID = "iconId";
   String PROP_TEXT = "text";
+  String PROP_TEXT_WITH_MNEMONIC = "&text";
   String PROP_TOOLTIP_TEXT = "tooltipText";
   String PROP_ENABLED = "enabled";
   String PROP_SELECTED = "selected";
   String PROP_VISIBLE = "visible";
   String PROP_MNEMONIC = "mnemonic";
   String PROP_KEYSTROKE = "keystroke";
+
   /**
-   * property-type: String
+   * @throws ProcessingException
    */
-  String PROP_SEPARATOR = "separator";
+  void initAction() throws ProcessingException;
 
   /**
    * called to perform action
@@ -65,13 +70,15 @@ public interface IAction extends IPropertyObserver {
 
   void setIconId(String iconId);
 
-  boolean isSeparator();
-
-  void setSeparator(boolean b);
-
   String getText();
 
   void setText(String text);
+
+  /**
+   * @return returns the text with mnemonic, e.g. "&File";
+   * @since 3.10.0-M3
+   */
+  String getTextWithMnemonic();
 
   /**
    * Key stroke with format lowercase [shift-] [control-] [alternate-] key
@@ -91,6 +98,10 @@ public interface IAction extends IPropertyObserver {
   String getTooltipText();
 
   void setTooltipText(String text);
+
+  boolean isSeparator();
+
+  void setSeparator(boolean b);
 
   boolean isSelected();
 
@@ -163,27 +174,6 @@ public interface IAction extends IPropertyObserver {
    */
   void setVisibleGranted(boolean b);
 
-  /**
-   * action is chosen on a single selected item
-   */
-  boolean isSingleSelectionAction();
-
-  void setSingleSelectionAction(boolean b);
-
-  /**
-   * action is chosen on any of multiple (>=2) selected items
-   */
-  boolean isMultiSelectionAction();
-
-  void setMultiSelectionAction(boolean b);
-
-  /**
-   * action is chosen on empty space (not on items)
-   */
-  boolean isEmptySpaceAction();
-
-  void setEmptySpaceAction(boolean b);
-
   boolean isToggleAction();
 
   void setToggleAction(boolean b);
@@ -192,7 +182,11 @@ public interface IAction extends IPropertyObserver {
 
   /**
    * called before this action is used
+   * 
+   * @deprecated will be removed with V 5.0 use prepare on {@link IMenu} instead (for all not menus prepare does not
+   *             make any sense).
    */
+  @Deprecated
   void prepareAction();
 
   /**
@@ -215,4 +209,16 @@ public interface IAction extends IPropertyObserver {
    * @since 3.8.1
    */
   boolean isThisAndParentsVisible();
+
+  /**
+   * The container of the action, e.g. {@link org.eclipse.scout.rt.client.ui.basic.table.ITable ITable}
+   **/
+  ITypeWithClassId getContainer();
+
+  /**
+   * The container of the action node, e.g. a {@link org.eclipse.scout.rt.client.ui.basic.table.ITable ITable} or
+   * {@link org.eclipse.scout.rt.client.ui.form.fields.smartfield.ISmartField ISmartField}
+   **/
+  void setContainerInternal(ITypeWithClassId container);
+
 }

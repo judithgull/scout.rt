@@ -10,12 +10,13 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.shared.services.common.calendar;
 
+import java.io.Serializable;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.HashMap;
 import java.util.Map;
 
-public abstract class AbstractCalendarItem implements ICalendarItem, java.io.Serializable {
+public abstract class AbstractCalendarItem implements ICalendarItem, Serializable {
   private static final long serialVersionUID = 1L;
 
   public static final DateFormat getDumpDateFormat() {
@@ -90,23 +91,6 @@ public abstract class AbstractCalendarItem implements ICalendarItem, java.io.Ser
   @Override
   public void setLastModified(long b) {
     m_lastModified = b;
-  }
-
-  @Override
-  @SuppressWarnings("deprecation")
-  public long getId() {
-    if (m_itemId instanceof Number) {
-      return ((Number) m_itemId).longValue();
-    }
-    else {
-      throw new UnsupportedOperationException("Id is not a number.");
-    }
-  }
-
-  @Override
-  @SuppressWarnings("deprecation")
-  public void setId(long newId) {
-    m_itemId = Long.valueOf(newId);
   }
 
   @Override
@@ -191,5 +175,4 @@ public abstract class AbstractCalendarItem implements ICalendarItem, java.io.Ser
     b.append("]");
     return b.toString();
   }
-
 }

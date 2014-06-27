@@ -17,9 +17,10 @@ import org.eclipse.scout.rt.shared.data.form.fields.composer.ComposerEntityNodeD
 import org.eclipse.scout.rt.shared.data.model.IDataModelEntity;
 
 /**
- * @deprecated use {@link DataModelEntityPartDefinition}
+ * @deprecated use {@link DataModelEntityPartDefinition}. Will be removed in the M-Release
  */
 @Deprecated
+@SuppressWarnings("deprecation")
 public class ComposerEntityPartDefinition extends DataModelEntityPartDefinition {
 
   public ComposerEntityPartDefinition(Class<? extends IDataModelEntity> entityType, String whereClause) {

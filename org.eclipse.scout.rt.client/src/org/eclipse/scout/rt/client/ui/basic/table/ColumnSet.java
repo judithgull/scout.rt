@@ -16,9 +16,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.CompareUtility;
 import org.eclipse.scout.commons.CompositeObject;
 import org.eclipse.scout.commons.ConfigurationUtility;
@@ -35,10 +37,10 @@ public class ColumnSet {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(ColumnSet.class);
 
   private final AbstractTable m_table;
-  private final IColumn[] m_columns;
-  private final ArrayList<IColumn> m_userSortColumns;
-  private final ArrayList<IColumn> m_permanentHeadSortColumns;
-  private final ArrayList<IColumn> m_permanentTailSortColumns;
+  private final List<IColumn<?>> m_columns;
+  private final List<IColumn<?>> m_userSortColumns;
+  private final List<IColumn<?>> m_permanentHeadSortColumns;
+  private final List<IColumn<?>> m_permanentTailSortColumns;
   /**
    * key index to model index
    */
@@ -63,14 +65,11 @@ public class ColumnSet {
 
   private final Map<Class<?>, Class<? extends IColumn>> m_columnReplacements;
 
-  public ColumnSet(AbstractTable table, Collection<IColumn> columns) {
+  public ColumnSet(AbstractTable table, List<IColumn<?>> columns) {
     // process @Replace annotations
-    @SuppressWarnings("unchecked")
-    Class<? extends IColumn>[] columnArray = new Class[columns.size()];
-    int i = 0;
+    List<Class<? extends IColumn>> columnArray = new ArrayList<Class<? extends IColumn>>(columns.size());
     for (IColumn c : columns) {
-      columnArray[i] = c.getClass();
-      i++;
+      columnArray.add(c.getClass());
     }
     Map<Class<?>, Class<? extends IColumn>> replacements = ConfigurationUtility.getReplacementMapping(columnArray);
     if (replacements.isEmpty()) {
@@ -79,10 +78,10 @@ public class ColumnSet {
     m_columnReplacements = replacements;
     //
     m_table = table;
-    m_columns = new IColumn[columns.size()];
-    m_userSortColumns = new ArrayList<IColumn>();
-    m_permanentHeadSortColumns = new ArrayList<IColumn>();
-    m_permanentTailSortColumns = new ArrayList<IColumn>();
+    m_columns = new ArrayList<IColumn<?>>(columns.size());
+    m_userSortColumns = new ArrayList<IColumn<?>>();
+    m_permanentHeadSortColumns = new ArrayList<IColumn<?>>();
+    m_permanentTailSortColumns = new ArrayList<IColumn<?>>();
     PropertyChangeListener columnListener = new PropertyChangeListener() {
       @Override
       public void propertyChange(PropertyChangeEvent e) {
@@ -105,7 +104,7 @@ public class ColumnSet {
         ((AbstractColumn) col).setTableInternal(m_table);
       }
       rebuildHeaderCell(col);
-      m_columns[index] = col;
+      m_columns.add(col);
       m_classIndexes.put(col.getClass(), col);
       m_idIndexes.put(col.getColumnId(), col);
       col.addPropertyChangeListener(columnListener);
@@ -215,7 +214,7 @@ public class ColumnSet {
   }
 
   public int getColumnCount() {
-    return m_columns.length;
+    return m_columns.size();
   }
 
   public int getKeyColumnCount() {
@@ -237,23 +236,23 @@ public class ColumnSet {
   }
 
   public int[] getAllColumnIndexes() {
-    int[] a = new int[m_columns.length];
+    int[] a = new int[m_columns.size()];
     for (int i = 0; i < a.length; i++) {
       a[i] = i;
     }
     return a;
   }
 
-  public IColumn[] getAllColumnsInUserOrder() {
-    IColumn[] visibleCols = getVisibleColumns();
-    //
+  public List<IColumn<?>> getAllColumnsInUserOrder() {
+    List<IColumn<?>> visibleCols = getVisibleColumns();
+
     int counter = 0;
-    TreeMap<CompositeObject, IColumn> sortMap = new TreeMap<CompositeObject, IColumn>();
-    for (int i = 0; i < visibleCols.length; i++) {
-      sortMap.put(new CompositeObject(visibleCols[i].getVisibleColumnIndexHint(), counter++), visibleCols[i]);
+    TreeMap<CompositeObject, IColumn<?>> sortMap = new TreeMap<CompositeObject, IColumn<?>>();
+    for (IColumn col : visibleCols) {
+      sortMap.put(new CompositeObject(col.getVisibleColumnIndexHint(), counter++), col);
     }
-    //
-    for (IColumn column : getColumns()) {
+
+    for (IColumn<?> column : getColumns()) {
       if (column.isDisplayable() && column.isVisible()) {
         //already in map
       }
@@ -261,7 +260,7 @@ public class ColumnSet {
         sortMap.put(new CompositeObject(column.getVisibleColumnIndexHint(), counter++), column);
       }
     }
-    return sortMap.values().toArray(new IColumn[sortMap.size()]);
+    return CollectionUtility.arrayList(sortMap.values());
   }
 
   public int[] getDisplayableColumnIndexes() {
@@ -289,8 +288,8 @@ public class ColumnSet {
   }
 
   public IColumn getColumn(int index) {
-    if (index >= 0 && index < m_columns.length) {
-      return m_columns[index];
+    if (index >= 0 && index < m_columns.size()) {
+      return m_columns.get(index);
     }
     else {
       return null;
@@ -331,7 +330,7 @@ public class ColumnSet {
 
   public IColumn getDisplayableColumn(int index) {
     if (index >= 0 && index < m_displayableIndexes.length) {
-      return m_columns[m_displayableIndexes[index]];
+      return m_columns.get(m_displayableIndexes[index]);
     }
     else {
       return null;
@@ -340,46 +339,44 @@ public class ColumnSet {
 
   public IColumn getVisibleColumn(int index) {
     if (index >= 0 && index < m_visibleIndexes.length) {
-      return m_columns[m_visibleIndexes[index]];
+      return m_columns.get(m_visibleIndexes[index]);
     }
     else {
       return null;
     }
   }
 
-  public IColumn[] getColumns() {
-    IColumn[] a = new IColumn[m_columns.length];
-    System.arraycopy(m_columns, 0, a, 0, m_columns.length);
-    return a;
+  public List<IColumn<?>> getColumns() {
+    return CollectionUtility.arrayList(m_columns);
   }
 
-  public IColumn[] getKeyColumns() {
-    IColumn[] a = new IColumn[m_keyIndexes.length];
+  public List<IColumn<?>> getKeyColumns() {
+    List<IColumn<?>> keyColumns = new ArrayList<IColumn<?>>(m_keyIndexes.length);
     for (int i = 0; i < m_keyIndexes.length; i++) {
-      a[i] = getColumn(m_keyIndexes[i]);
+      keyColumns.add(getColumn(m_keyIndexes[i]));
     }
-    return a;
+    return keyColumns;
   }
 
-  public IColumn[] getDisplayableColumns() {
-    IColumn[] a = new IColumn[m_displayableIndexes.length];
+  public List<IColumn<?>> getDisplayableColumns() {
+    List<IColumn<?>> a = new ArrayList<IColumn<?>>(m_displayableIndexes.length);
     for (int i = 0; i < m_displayableIndexes.length; i++) {
-      a[i] = getColumn(m_displayableIndexes[i]);
+      a.add(getColumn(m_displayableIndexes[i]));
     }
     return a;
   }
 
-  public IColumn[] getVisibleColumns() {
-    IColumn[] a = new IColumn[m_visibleIndexes.length];
+  public List<IColumn<?>> getVisibleColumns() {
+    List<IColumn<?>> a = new ArrayList<IColumn<?>>(m_visibleIndexes.length);
     for (int i = 0; i < m_visibleIndexes.length; i++) {
-      a[i] = getColumn(m_visibleIndexes[i]);
+      a.add(getColumn(m_visibleIndexes[i]));
     }
     return a;
   }
 
   public IColumn getFirstVisibleColumn() {
     if (m_visibleIndexes.length > 0) {
-      return m_columns[m_visibleIndexes[0]];
+      return m_columns.get(m_visibleIndexes[0]);
     }
     else {
       return null;
@@ -387,37 +384,32 @@ public class ColumnSet {
   }
 
   public IColumn getFirstDefinedVisibileColumn() {
-    int colIdx = m_columns.length;
+    int colIdx = m_columns.size();
     for (int i = 0; i < m_visibleIndexes.length; i++) {
       if (CompareUtility.compareTo(m_visibleIndexes[i], colIdx) < 0) {
         colIdx = m_visibleIndexes[i];
       }
     }
-    if (colIdx != m_columns.length) {
-      return m_columns[colIdx];
+    if (colIdx != m_columns.size()) {
+      return m_columns.get(colIdx);
     }
     else {
       return null;
     }
   }
 
-  public IColumn[] getSummaryColumns() {
-    ArrayList<IColumn> list = new ArrayList<IColumn>();
+  public List<IColumn<?>> getSummaryColumns() {
+    List<IColumn<?>> summaryColumns = new ArrayList<IColumn<?>>();
     for (IColumn c : getColumns()) {
       if (c.isSummary()) {
-        list.add(c);
+        summaryColumns.add(c);
       }
     }
-    return list.toArray(new IColumn[0]);
+    return summaryColumns;
   }
 
   public int getIndexFor(IColumn column) {
-    for (int i = 0; i < m_columns.length; i++) {
-      if (m_columns[i] == column) {
-        return i;
-      }
-    }
-    return -1;
+    return m_columns.indexOf(column);
   }
 
   public void moveColumnToVisibleIndex(int fromIndex, int toVisibleIndex) {
@@ -434,7 +426,7 @@ public class ColumnSet {
       IColumn toCol = getVisibleColumn(toVisibleIndex);
       if (fromCol != null && toCol != null) {
         boolean traversedFrom = false;
-        ArrayList<IColumn> list = new ArrayList<IColumn>();
+        ArrayList<IColumn<?>> list = new ArrayList<IColumn<?>>();
         for (IColumn c : getAllColumnsInUserOrder()) {
           if (c == fromCol) {
             traversedFrom = true;
@@ -468,16 +460,16 @@ public class ColumnSet {
   /**
    * set visible columns and put them in specific order
    */
-  public void setVisibleColumns(IColumn[] columns) {
+  public void setVisibleColumns(Collection<? extends IColumn> columns) {
     try {
       m_table.setTableChanging(true);
       //
-      IColumn[] resolvedColumns = resolveColumns(columns);
+      List<IColumn<?>> resolvedColumns = resolveColumns(columns);
       if (columns == null) {
-        columns = new IColumn[0];
+        columns = CollectionUtility.hashSet();
       }
-      if (resolvedColumns.length > 0 || columns.length == 0) {
-        ArrayList<IColumn> newColumns = new ArrayList<IColumn>();
+      if (resolvedColumns.size() > 0 || columns.size() == 0) {
+        List<IColumn<?>> newColumns = new ArrayList<IColumn<?>>();
         for (IColumn col : columns) {
           if (col.isDisplayable()) {
             // sanity check
@@ -505,11 +497,11 @@ public class ColumnSet {
           viewHint++;
         }
         reorganizeIndexes();
-        IColumn[] a = getDisplayableColumns();
-        for (IColumn col : a) {
+        List<IColumn<?>> displayableColumns = getDisplayableColumns();
+        for (IColumn col : displayableColumns) {
           rebuildHeaderCell(col);
         }
-        fireColumnHeadersUpdated(a);
+        fireColumnHeadersUpdated(displayableColumns);
         fireColumnStructureChanged();
         checkMultiline();
       }
@@ -553,17 +545,18 @@ public class ColumnSet {
     }
   }
 
-  public IColumn[] resolveColumns(IColumn[] a) {
-    ArrayList<IColumn> list = new ArrayList<IColumn>();
-    if (a != null) {
-      for (IColumn col : a) {
+  public List<IColumn<?>> resolveColumns(Collection<? extends IColumn> columns) {
+    if (columns != null) {
+      List<IColumn<?>> result = new ArrayList<IColumn<?>>(columns.size());
+      for (IColumn col : columns) {
         IColumn resolvedCol = resolveColumn(col);
         if (resolvedCol != null) {
-          list.add(resolvedCol);
+          result.add(resolvedCol);
         }
       }
+      return result;
     }
-    return list.toArray(new IColumn[0]);
+    return CollectionUtility.emptyArrayList();
   }
 
   /*
@@ -623,37 +616,37 @@ public class ColumnSet {
   /**
    * @return all sort columns including permanent-head, user, permanent-tail
    */
-  public IColumn[] getSortColumns() {
-    ArrayList<IColumn> list = new ArrayList<IColumn>(getSortColumnCount());
+  public List<IColumn<?>> getSortColumns() {
+    List<IColumn<?>> list = new ArrayList<IColumn<?>>(getSortColumnCount());
     list.addAll(m_permanentHeadSortColumns);
     list.addAll(m_userSortColumns);
     list.addAll(m_permanentTailSortColumns);
-    return list.toArray(new IColumn[list.size()]);
+    return list;
   }
 
   /**
    * @return only user sort columns
    */
-  public IColumn<?>[] getUserSortColumns() {
-    return m_userSortColumns.toArray(new IColumn[m_userSortColumns.size()]);
+  public List<IColumn<?>> getUserSortColumns() {
+    return CollectionUtility.arrayList(m_userSortColumns);
   }
 
   /**
    * @return only permanent head sort columns
    */
-  public IColumn<?>[] getPermanentHeadSortColumns() {
-    return m_permanentHeadSortColumns.toArray(new IColumn[m_permanentHeadSortColumns.size()]);
+  public List<IColumn<?>> getPermanentHeadSortColumns() {
+    return CollectionUtility.arrayList(m_permanentHeadSortColumns);
   }
 
   /**
    * @return only permanent tail sort columns
    */
-  public IColumn<?>[] getPermanentTailSortColumns() {
-    return m_permanentTailSortColumns.toArray(new IColumn[m_permanentTailSortColumns.size()]);
+  public List<IColumn<?>> getPermanentTailSortColumns() {
+    return CollectionUtility.arrayList(m_permanentTailSortColumns);
   }
 
   public SortSpec getSortSpec() {
-    ArrayList<IColumn> sortColumns = new ArrayList<IColumn>();
+    ArrayList<IColumn<?>> sortColumns = new ArrayList<IColumn<?>>();
     for (IColumn c : getSortColumns()) {
       if (c.isSortExplicit()) {
         sortColumns.add(c);
@@ -682,7 +675,7 @@ public class ColumnSet {
         cell.setSortExplicit(false);
       }
       m_userSortColumns.clear();
-      ArrayList<IColumn> colList = new ArrayList<IColumn>();
+      List<IColumn<?>> colList = new ArrayList<IColumn<?>>();
       for (int i = 0; i < spec.size(); i++) {
         IColumn col = getColumn(spec.getColumnIndex(i));
         if (col != null && (!isSortColumn(col))) {
@@ -697,7 +690,7 @@ public class ColumnSet {
       for (IColumn col : colList) {
         rebuildHeaderCell(col);
       }
-      fireColumnHeadersUpdated(colList.toArray(new IColumn[0]));
+      fireColumnHeadersUpdated(colList);
     }
     else {
       clearSortColumns();
@@ -714,21 +707,21 @@ public class ColumnSet {
   /**
    * @return true if the column is a user sort column
    */
-  public boolean isUserSortColumn(IColumn<?> col) {
+  public boolean isUserSortColumn(IColumn col) {
     return m_userSortColumns.contains(col);
   }
 
   /**
    * @return true if the column is a permanent-head sort column
    */
-  public boolean isPermanentHeadSortColumn(IColumn<?> col) {
+  public boolean isPermanentHeadSortColumn(IColumn col) {
     return m_permanentHeadSortColumns.contains(col);
   }
 
   /**
    * @return true if the column is a permanent-tail sort column
    */
-  public boolean isPermanentTailSortColumn(IColumn<?> col) {
+  public boolean isPermanentTailSortColumn(IColumn col) {
     return m_permanentTailSortColumns.contains(col);
   }
 
@@ -754,7 +747,7 @@ public class ColumnSet {
    * <p>
    * The column is added as a user sort column
    */
-  public void setSortColumn(IColumn col, boolean ascending, int keepHistoryCount) {
+  public void setSortColumn(IColumn<?> col, boolean ascending, int keepHistoryCount) {
     col = resolveColumn(col);
     if (col != null) {
       m_userSortColumns.remove(col);
@@ -778,7 +771,7 @@ public class ColumnSet {
         cell.setSortAscending(ascending);
         m_userSortColumns.add(0, col);
         rebuildHeaderCell(col);
-        fireColumnHeadersUpdated(new IColumn[]{col});
+        fireColumnHeadersUpdated(CollectionUtility.hashSet(col));
       }
     }
   }
@@ -789,12 +782,12 @@ public class ColumnSet {
    * see also {@link #addPermanentHeadSortColumn(IColumn, boolean)} and
    * {@link #addPermanentTailSortColumn(IColumn, boolean)}
    */
-  public void addSortColumn(IColumn col, boolean ascending) {
+  public void addSortColumn(IColumn<?> col, boolean ascending) {
     col = resolveColumn(col);
     if (col != null) {
       m_userSortColumns.remove(col);
       if (!isSortColumn(col)) {
-        for (Iterator<IColumn> it = m_userSortColumns.iterator(); it.hasNext();) {
+        for (Iterator<IColumn<?>> it = m_userSortColumns.iterator(); it.hasNext();) {
           IColumn c = it.next();
           if (!c.isSortExplicit()) {
             it.remove();
@@ -811,18 +804,18 @@ public class ColumnSet {
         cell.setSortAscending(ascending);
         m_userSortColumns.add(col);
         rebuildHeaderCell(col);
-        fireColumnHeadersUpdated(new IColumn[]{col});
+        fireColumnHeadersUpdated(CollectionUtility.hashSet(col));
       }
     }
   }
 
-  public void toggleSortColumn(IColumn col) {
+  public void toggleSortColumn(IColumn<?> col) {
     col = resolveColumn(col);
     if (col != null && isSortColumn(col) && !col.isSortPermanent()) {
       HeaderCell cell = (HeaderCell) col.getHeaderCell();
       cell.setSortAscending(!cell.isSortAscending());
       rebuildHeaderCell(col);
-      fireColumnHeadersUpdated(new IColumn[]{col});
+      fireColumnHeadersUpdated(CollectionUtility.hashSet(col));
     }
   }
 
@@ -840,12 +833,12 @@ public class ColumnSet {
     fireColumnOrderChanged();
   }
 
-  public void updateColumn(IColumn column) {
+  public void updateColumn(IColumn<?> column) {
     checkMultiline();
-    fireColumnHeadersUpdated(new IColumn[]{column});
+    fireColumnHeadersUpdated(CollectionUtility.hashSet(column));
   }
 
-  public void removeSortColumn(IColumn col) {
+  public void removeSortColumn(IColumn<?> col) {
     col = resolveColumn(col);
     if (col != null) {
       m_userSortColumns.remove(col);
@@ -854,7 +847,7 @@ public class ColumnSet {
         cell.setSortActive(false);
         cell.setSortExplicit(false);
         rebuildHeaderCell(col);
-        fireColumnHeadersUpdated(new IColumn[]{col});
+        fireColumnHeadersUpdated(CollectionUtility.hashSet(col));
       }
     }
   }
@@ -868,56 +861,56 @@ public class ColumnSet {
     if (m_userSortColumns.size() == 0) {
       return;
     }
-    IColumn[] a = m_userSortColumns.toArray(new IColumn[m_userSortColumns.size()]);
+    List<IColumn<?>> userSortColumnsBackup = new ArrayList<IColumn<?>>(m_userSortColumns);
     m_userSortColumns.clear();
-    for (IColumn col : a) {
+    for (IColumn col : userSortColumnsBackup) {
       HeaderCell cell = (HeaderCell) col.getHeaderCell();
       cell.setSortActive(false);
       cell.setSortExplicit(false);
     }
-    for (IColumn c : a) {
+    for (IColumn c : userSortColumnsBackup) {
       rebuildHeaderCell(c);
     }
-    fireColumnHeadersUpdated(a);
+    fireColumnHeadersUpdated(userSortColumnsBackup);
   }
 
   public void clearPermanentHeadSortColumns() {
     if (m_permanentHeadSortColumns.size() == 0) {
       return;
     }
-    IColumn[] a = m_permanentHeadSortColumns.toArray(new IColumn[m_permanentHeadSortColumns.size()]);
+    List<IColumn<?>> currentColumnList = new ArrayList<IColumn<?>>(m_permanentHeadSortColumns);
     m_permanentHeadSortColumns.clear();
-    for (IColumn col : a) {
+    for (IColumn col : currentColumnList) {
       HeaderCell cell = (HeaderCell) col.getHeaderCell();
       cell.setSortActive(false);
       cell.setSortExplicit(false);
       cell.setSortPermanent(false);
     }
-    for (int i = 0; i < a.length; i++) {
-      rebuildHeaderCell(a[i]);
+    for (IColumn col : currentColumnList) {
+      rebuildHeaderCell(col);
     }
-    fireColumnHeadersUpdated(a);
+    fireColumnHeadersUpdated(currentColumnList);
   }
 
   public void clearPermanentTailSortColumns() {
     if (m_permanentTailSortColumns.size() == 0) {
       return;
     }
-    IColumn[] a = m_permanentTailSortColumns.toArray(new IColumn[m_permanentTailSortColumns.size()]);
+    List<IColumn<?>> currentColumnList = new ArrayList<IColumn<?>>(m_permanentTailSortColumns);
     m_permanentTailSortColumns.clear();
-    for (IColumn col : a) {
+    for (IColumn col : currentColumnList) {
       HeaderCell cell = (HeaderCell) col.getHeaderCell();
       cell.setSortActive(false);
       cell.setSortExplicit(false);
       cell.setSortPermanent(false);
     }
-    for (int i = 0; i < a.length; i++) {
-      rebuildHeaderCell(a[i]);
+    for (IColumn col : currentColumnList) {
+      rebuildHeaderCell(col);
     }
-    fireColumnHeadersUpdated(a);
+    fireColumnHeadersUpdated(currentColumnList);
   }
 
-  public void addPermanentHeadSortColumn(IColumn col, boolean ascending) {
+  public void addPermanentHeadSortColumn(IColumn<?> col, boolean ascending) {
     col = resolveColumn(col);
     if (col != null) {
       m_permanentHeadSortColumns.remove(col);
@@ -929,11 +922,11 @@ public class ColumnSet {
       cell.setSortAscending(ascending);
       m_permanentHeadSortColumns.add(col);
       rebuildHeaderCell(col);
-      fireColumnHeadersUpdated(new IColumn[]{col});
+      fireColumnHeadersUpdated(CollectionUtility.hashSet(col));
     }
   }
 
-  public void addPermanentTailSortColumn(IColumn col, boolean ascending) {
+  public void addPermanentTailSortColumn(IColumn<?> col, boolean ascending) {
     col = resolveColumn(col);
     if (col != null) {
       m_permanentTailSortColumns.remove(col);
@@ -945,7 +938,7 @@ public class ColumnSet {
       cell.setSortAscending(ascending);
       m_permanentTailSortColumns.add(col);
       rebuildHeaderCell(col);
-      fireColumnHeadersUpdated(new IColumn[]{col});
+      fireColumnHeadersUpdated(CollectionUtility.hashSet(col));
     }
   }
 
@@ -953,27 +946,31 @@ public class ColumnSet {
    * mapping int array functions
    */
   private void reorganizeIndexes() {
-    int n = getColumnCount();
-    int viewIndex;
-    TreeMap<CompositeObject, Integer> sortMap;
-    // displayable map
-    viewIndex = 0;
-    sortMap = new TreeMap<CompositeObject, Integer>();
-    for (int modelIndex = 0; modelIndex < n; modelIndex++) {
+    calculateDisplayableIndexes();
+    calculateVisibleIndexes();
+    calculateKeyIndexes();
+  }
+
+  private void calculateDisplayableIndexes() {
+    int viewIndex = 0;
+    Map<CompositeObject, Integer> displayableMap = new TreeMap<CompositeObject, Integer>();
+    for (int modelIndex = 0; modelIndex < getColumnCount(); modelIndex++) {
       IColumn col = getColumn(modelIndex);
       if (col.isDisplayable()) {
-        sortMap.put(new CompositeObject(modelIndex), modelIndex);
+        displayableMap.put(new CompositeObject(modelIndex), modelIndex);
       }
     }
-    m_displayableIndexes = new int[sortMap.size()];
+    m_displayableIndexes = new int[displayableMap.size()];
     viewIndex = 0;
-    for (int modelIndex : sortMap.values()) {
+    for (int modelIndex : displayableMap.values()) {
       m_displayableIndexes[viewIndex++] = modelIndex;
     }
-    // visible map
-    viewIndex = 0;
-    sortMap = new TreeMap<CompositeObject, Integer>();
-    for (int modelIndex = 0; modelIndex < n; modelIndex++) {
+  }
+
+  private void calculateVisibleIndexes() {
+    int viewIndex = 0;
+    Map<CompositeObject, Integer> visibleMap = new TreeMap<CompositeObject, Integer>();
+    for (int modelIndex = 0; modelIndex < getColumnCount(); modelIndex++) {
       IColumn col = getColumn(modelIndex);
       if (col.isDisplayable() && col.isVisible()) {
         double viewHint = col.getVisibleColumnIndexHint();
@@ -983,27 +980,27 @@ public class ColumnSet {
         if (viewHint < 0) {
           viewHint = viewIndex;
         }
-        sortMap.put(new CompositeObject(viewHint, viewIndex), modelIndex);
-        // next
+        visibleMap.put(new CompositeObject(viewHint, viewIndex), modelIndex);
         viewIndex++;
       }
     }
-    m_visibleIndexes = new int[sortMap.size()];
+    m_visibleIndexes = new int[visibleMap.size()];
     viewIndex = 0;
-    for (int modelIndex : sortMap.values()) {
+    for (int modelIndex : visibleMap.values()) {
       m_visibleIndexes[viewIndex++] = modelIndex;
     }
-    // key map
-    n = getColumnCount();
-    ArrayList<Integer> keyIndexes = new ArrayList<Integer>();
-    for (int modelIndex = 0; modelIndex < n; modelIndex++) {
+  }
+
+  private void calculateKeyIndexes() {
+    List<Integer> keyIndexes = new ArrayList<Integer>();
+    for (int modelIndex = 0; modelIndex < getColumnCount(); modelIndex++) {
       IColumn col = getColumn(modelIndex);
       if (col.isPrimaryKey()) {
         keyIndexes.add(modelIndex);
       }
     }
     m_keyIndexes = new int[keyIndexes.size()];
-    viewIndex = 0;
+    int viewIndex = 0;
     for (int modelIndex : keyIndexes) {
       m_keyIndexes[viewIndex++] = modelIndex;
     }
@@ -1013,9 +1010,9 @@ public class ColumnSet {
     col.decorateHeaderCell();
   }
 
-  private void fireColumnHeadersUpdated(IColumn[] a) {
+  private void fireColumnHeadersUpdated(Collection<? extends IColumn<?>> columns) {
     TableEvent e = new TableEvent(m_table, TableEvent.TYPE_COLUMN_HEADERS_UPDATED);
-    e.setColumns(a);
+    e.setColumns(columns);
     m_table.fireTableEventInternal(e);
   }
 
@@ -1031,10 +1028,10 @@ public class ColumnSet {
 
   private void checkMultiline() {
     if (m_table != null) {
-      if (!m_table.isInitialMultilineText() && !ConfigurationUtility.isMethodOverwrite(AbstractTable.class, "getConfiguredMultilineText", null, this.getClass())) {
+      if (!m_table.isInitialMultilineText() && !ConfigurationUtility.isMethodOverwrite(AbstractTable.class, "getConfiguredMultilineText", null, m_table.getClass())) {
         //do automatic check for wrapping columns
         boolean m = false;
-        for (IColumn<?> col : getVisibleColumns()) {
+        for (IColumn col : getVisibleColumns()) {
           if (col instanceof IStringColumn && ((IStringColumn) col).isTextWrap()) {
             m = true;
             break;

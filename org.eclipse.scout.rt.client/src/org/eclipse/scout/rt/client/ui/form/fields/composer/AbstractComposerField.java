@@ -13,11 +13,15 @@ package org.eclipse.scout.rt.client.ui.form.fields.composer;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.ConfigurationUtility;
 import org.eclipse.scout.commons.StringUtility;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.FormData;
 import org.eclipse.scout.commons.annotations.FormData.DefaultSubtypeSdkCommand;
@@ -27,8 +31,6 @@ import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.commons.xmlparser.SimpleXmlElement;
-import org.eclipse.scout.rt.client.ui.action.keystroke.AbstractKeyStroke;
-import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 import org.eclipse.scout.rt.client.ui.basic.cell.Cell;
 import org.eclipse.scout.rt.client.ui.basic.tree.AbstractTree;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITree;
@@ -60,7 +62,10 @@ import org.eclipse.scout.rt.shared.data.model.IDataModel;
 import org.eclipse.scout.rt.shared.data.model.IDataModelAttribute;
 import org.eclipse.scout.rt.shared.data.model.IDataModelAttributeOp;
 import org.eclipse.scout.rt.shared.data.model.IDataModelEntity;
+import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
+import org.eclipse.scout.service.SERVICES;
 
+@ClassId("8e7f7eb8-be18-48e5-9efe-8a5b3459e247")
 @SuppressWarnings("deprecation")
 @FormData(value = AbstractComposerData.class, sdkCommand = SdkCommand.USE, defaultSubtypeSdkCommand = DefaultSubtypeSdkCommand.CREATE)
 public abstract class AbstractComposerField extends AbstractFormField implements IComposerField {
@@ -193,9 +198,9 @@ public abstract class AbstractComposerField extends AbstractFormField implements
    */
   private Class<? extends ITree> getConfiguredTree() {
     Class<?>[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
-    Class<? extends ITree>[] f = ConfigurationUtility.filterClasses(dca, ITree.class);
-    if (f.length == 1) {
-      return f[0];
+    List<Class<ITree>> f = ConfigurationUtility.filterClasses(dca, ITree.class);
+    if (f.size() == 1) {
+      return CollectionUtility.firstElement(f);
     }
     else {
       for (Class<? extends ITree> c : f) {
@@ -225,12 +230,12 @@ public abstract class AbstractComposerField extends AbstractFormField implements
    * 
    * @return the new node or null to ignore the add of a new node of this type
    *         <p>
-   *         Normally overrides call super.
-   *         {@link #execCreateEntityNode(ITreeNode, IDataModelEntity, boolean, Object[], String[])}
+   *         Normally overrides call super. {@link #execCreateEntityNode(ITreeNode, IDataModelEntity, boolean, Object[],
+   *         List<String>)}
    */
   @ConfigOperation
   @Order(110)
-  protected EntityNode execCreateEntityNode(ITreeNode parentNode, IDataModelEntity e, boolean negated, Object[] values, String[] texts) {
+  protected EntityNode execCreateEntityNode(ITreeNode parentNode, IDataModelEntity e, boolean negated, List<? extends Object> values, List<String> texts) {
     EntityNode node = new EntityNode(this, e);
     node.setValues(values);
     node.setTexts(texts);
@@ -244,12 +249,12 @@ public abstract class AbstractComposerField extends AbstractFormField implements
    * 
    * @return the new node or null to ignore the add of a new node of this type
    *         <p>
-   *         Normally overrides call super.
-   *         {@link #execCreateAttributeNode(ITreeNode, IDataModelAttribute, Integer, IComposerOp, Object[], String[])}
+   *         Normally overrides call super. {@link #execCreateAttributeNode(ITreeNode, IDataModelAttribute, Integer,
+   *         IComposerOp, Object[], List<String>)}
    */
   @ConfigOperation
   @Order(120)
-  protected AttributeNode execCreateAttributeNode(ITreeNode parentNode, IDataModelAttribute a, Integer aggregationType, IDataModelAttributeOp op, Object[] values, String[] texts) {
+  protected AttributeNode execCreateAttributeNode(ITreeNode parentNode, IDataModelAttribute a, Integer aggregationType, IDataModelAttributeOp op, List<? extends Object> values, List<String> texts) {
     if (aggregationType != null && aggregationType == DataModelConstants.AGGREGATION_NONE) {
       aggregationType = null;
     }
@@ -326,7 +331,7 @@ public abstract class AbstractComposerField extends AbstractFormField implements
             );
       }
       catch (Exception e) {
-        throw new RuntimeException(e);
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + getConfiguredTree().getName() + "'.", e));
       }
     }
     else {
@@ -393,29 +398,43 @@ public abstract class AbstractComposerField extends AbstractFormField implements
   }
 
   @Override
-  public IDataModelAttribute[] getAttributes() {
+  public List<IDataModelAttribute> getAttributes() {
     return m_dataModel.getAttributes();
   }
 
   @Override
-  public IDataModelEntity[] getEntities() {
+  public List<IDataModelEntity> getEntities() {
     return m_dataModel.getEntities();
   }
 
   /**
-   * @deprecated use {@link #getEntities()} instead
+   * @deprecated use {@link #getEntities()} instead. Will be removed in the 5.0 Release.
    */
   @Deprecated
-  public IComposerEntity[] getComposerEntities() {
-    return (IComposerEntity[]) m_dataModel.getEntities();
+  public List<IComposerEntity> getComposerEntities() {
+    List<IDataModelEntity> entities = m_dataModel.getEntities();
+    List<IComposerEntity> result = new ArrayList<IComposerEntity>(entities.size());
+    for (IDataModelEntity e : entities) {
+      if (e instanceof IComposerEntity) {
+        result.add((IComposerEntity) e);
+      }
+    }
+    return result;
   }
 
   /**
-   * @deprecated use {@link #getAttributes()} instead
+   * @deprecated use {@link #getAttributes()} instead. Will be removed in the 5.0 Release.
    */
   @Deprecated
-  public IComposerAttribute[] getComposerAttributes() {
-    return (IComposerAttribute[]) m_dataModel.getAttributes();
+  public List<IComposerAttribute> getComposerAttributes() {
+    List<IDataModelAttribute> attributes = m_dataModel.getAttributes();
+    List<IComposerAttribute> result = new ArrayList<IComposerAttribute>(attributes.size());
+    for (IDataModelAttribute attribute : attributes) {
+      if (attribute instanceof IComposerAttribute) {
+        result.add((IComposerAttribute) attribute);
+      }
+    }
+    return result;
   }
 
   @Override
@@ -478,7 +497,7 @@ public abstract class AbstractComposerField extends AbstractFormField implements
           LOG.warn("cannot find attribute with id=" + id);
           continue;
         }
-        ITreeNode node = addAttributeNode(parent, foundAtt, aggregationType, op, valueList.toArray(), displayValueList.toArray(new String[1]));
+        ITreeNode node = addAttributeNode(parent, foundAtt, aggregationType, op, valueList, displayValueList);
         if (node != null) {
           // add children recursive
           loadXMLRec(xmlElem, node);
@@ -495,7 +514,7 @@ public abstract class AbstractComposerField extends AbstractFormField implements
           LOG.warn("cannot find entity with id=" + id);
           continue;
         }
-        ITreeNode node = addEntityNode(parent, foundEntity, negated, null, text != null ? new String[]{text} : null);
+        ITreeNode node = addEntityNode(parent, foundEntity, negated, null, text != null ? Collections.singletonList(text) : null);
         if (node != null) {
           // add children recursive
           loadXMLRec(xmlElem, node);
@@ -545,8 +564,8 @@ public abstract class AbstractComposerField extends AbstractFormField implements
         SimpleXmlElement xEntity = new SimpleXmlElement("entity");
         xEntity.setAttribute("id", DataModelUtility.entityPathToExternalId(getDataModel(), execResolveEntityPath(entityNode)));
         xEntity.setAttribute("negated", (entityNode.isNegative() ? "true" : "false"));
-        String[] texts = entityNode.getTexts();
-        xEntity.setAttribute("displayValues", texts != null && texts.length > 0 ? StringUtility.emptyIfNull(texts[0]) : null);
+        List<String> texts = entityNode.getTexts();
+        xEntity.setAttribute("displayValues", CollectionUtility.hasElements(texts) ? StringUtility.emptyIfNull(CollectionUtility.firstElement(texts)) : null);
         x.addChild(xEntity);
         // recursion
         storeXMLRec(xEntity, node);
@@ -565,23 +584,28 @@ public abstract class AbstractComposerField extends AbstractFormField implements
         catch (Exception e) {
           LOG.warn("write op " + op, e);
         }
-        String[] texts = attNode.getTexts();
-        if (texts != null) {
-          for (int i = 0; i < texts.length; i++) {
-            String displayValueName = (i == 0 ? "displayValue" : "displayValue" + (i + 1));
-            xAtt.setAttribute(displayValueName, StringUtility.emptyIfNull(texts[i]));
+        List<String> texts = attNode.getTexts();
+        if (CollectionUtility.hasElements(texts)) {
+          Iterator<String> it = texts.iterator();
+          xAtt.setAttribute("displayValue", StringUtility.emptyIfNull(it.next()));
+          int i = 2;
+          while (it.hasNext()) {
+            xAtt.setAttribute(("displayValue" + i), StringUtility.emptyIfNull(it.next()));
+            i++;
           }
         }
-        Object[] values = attNode.getValues();
+        List<Object> values = attNode.getValues();
         if (values != null) {
-          for (int i = 0; i < values.length; i++) {
+          int i = 0;
+          for (Object value : values) {
             String valueName = (i == 0 ? "value" : "value" + (i + 1));
             try {
-              xAtt.setObjectAttribute(valueName, values[i]);
+              xAtt.setObjectAttribute(valueName, value);
             }
             catch (Exception e) {
-              LOG.warn("write value[" + i + "] for attribute " + attNode.getAttribute() + ": " + values[i], e);
+              LOG.warn("write value[" + i + "] for attribute " + attNode.getAttribute() + ": " + value, e);
             }
+            i++;
           }
         }
         x.addChild(xAtt);
@@ -618,7 +642,7 @@ public abstract class AbstractComposerField extends AbstractFormField implements
   }
 
   @Override
-  public EntityNode addEntityNode(ITreeNode parentNode, IDataModelEntity e, boolean negated, Object[] values, String[] texts) {
+  public EntityNode addEntityNode(ITreeNode parentNode, IDataModelEntity e, boolean negated, List<? extends Object> values, List<String> texts) {
     EntityNode node = execCreateEntityNode(parentNode, e, negated, values, texts);
     if (node != null) {
       getTree().addChildNode(parentNode, node);
@@ -648,7 +672,7 @@ public abstract class AbstractComposerField extends AbstractFormField implements
   }
 
   @Override
-  public AttributeNode addAttributeNode(ITreeNode parentNode, IDataModelAttribute a, Integer aggregationType, IDataModelAttributeOp op, Object[] values, String[] texts) {
+  public AttributeNode addAttributeNode(ITreeNode parentNode, IDataModelAttribute a, Integer aggregationType, IDataModelAttributeOp op, List<? extends Object> values, List<String> texts) {
     AttributeNode node = execCreateAttributeNode(parentNode, a, aggregationType, op, values, texts);
     if (node != null) {
       getTree().addChildNode(parentNode, node);
@@ -858,42 +882,5 @@ public abstract class AbstractComposerField extends AbstractFormField implements
         }
       }
     }
-
-    @Order(10)
-    public class DeleteKeyStroke extends AbstractKeyStroke {
-
-      @Override
-      protected String getConfiguredKeyStroke() {
-        return "delete";
-      }
-
-      @Override
-      protected void execAction() throws ProcessingException {
-        ITree tree = getTree();
-        if (tree != null) {
-          ITreeNode node = tree.getSelectedNode();
-          //check if already deleted
-          if (node != null && node.getTree() == tree) {
-            IMenu menu = null;
-            if (node instanceof AttributeNode) {
-              menu = node.getMenu(AttributeNode.DeleteAttributeMenu.class);
-            }
-            else if (node instanceof EntityNode) {
-              menu = node.getMenu(EntityNode.DeleteEntityMenu.class);
-            }
-            else if (node instanceof EitherOrNode) {
-              menu = node.getMenu(EitherOrNode.DeleteEitherOrMenu.class);
-            }
-            if (menu != null) {
-              menu.prepareAction();
-              if (menu.isVisible() && menu.isEnabled()) {
-                menu.doAction();
-              }
-            }
-          }
-        }
-      }
-    }
   }
-
 }

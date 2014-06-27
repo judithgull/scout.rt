@@ -4,7 +4,7 @@
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- * 
+ *
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
@@ -19,7 +19,7 @@ import org.eclipse.swt.widgets.Control;
  * 
  * @since 1.0.0 10.03.2008
  */
-public interface ISwtScoutButton extends ISwtScoutFormField<IButton> {
+public interface ISwtScoutButton<T extends IButton> extends ISwtScoutFormField<T> {
 
   @Override
   Control getSwtField();

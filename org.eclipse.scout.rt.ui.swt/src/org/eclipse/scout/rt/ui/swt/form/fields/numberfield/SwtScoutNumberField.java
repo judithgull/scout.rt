@@ -10,105 +10,143 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.ui.swt.form.fields.numberfield;
 
-import org.eclipse.scout.commons.CompareUtility;
-import org.eclipse.scout.commons.holders.Holder;
-import org.eclipse.scout.commons.job.JobEx;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
+
+import org.eclipse.scout.commons.StringUtility;
+import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
+import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.numberfield.INumberField;
 import org.eclipse.scout.rt.ui.swt.LogicalGridLayout;
+import org.eclipse.scout.rt.ui.swt.action.menu.SwtContextMenuMarkerComposite;
+import org.eclipse.scout.rt.ui.swt.action.menu.SwtScoutContextMenu;
+import org.eclipse.scout.rt.ui.swt.action.menu.text.StyledTextAccess;
 import org.eclipse.scout.rt.ui.swt.ext.StatusLabelEx;
-import org.eclipse.scout.rt.ui.swt.form.fields.SwtScoutValueFieldComposite;
+import org.eclipse.scout.rt.ui.swt.form.fields.LogicalGridDataBuilder;
+import org.eclipse.scout.rt.ui.swt.form.fields.SwtScoutBasicFieldComposite;
 import org.eclipse.scout.rt.ui.swt.internal.TextFieldEditableSupport;
 import org.eclipse.scout.rt.ui.swt.util.SwtUtility;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.custom.StyledText;
+import org.eclipse.swt.events.SelectionAdapter;
+import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.VerifyEvent;
+import org.eclipse.swt.events.VerifyListener;
+import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.widgets.Composite;
-import org.eclipse.swt.widgets.Control;
-import org.eclipse.swt.widgets.Text;
 
 /**
- * <h3>SwtScoutLongField</h3> ...
+ * <h3>SwtScoutNumberField</h3>
  * 
  * @since 1.0.0 14.04.2008
  */
-public class SwtScoutNumberField extends SwtScoutValueFieldComposite<INumberField<?>> implements ISwtScoutNumberField {
+public class SwtScoutNumberField extends SwtScoutBasicFieldComposite<INumberField<?>> implements ISwtScoutNumberField {
 
-  private TextFieldEditableSupport m_editableSupport;
+  private SwtContextMenuMarkerComposite m_menuMarkerComposite;
+  private SwtScoutContextMenu m_contextMenu;
 
   @Override
   protected void initializeSwt(Composite parent) {
     Composite container = getEnvironment().getFormToolkit().createComposite(parent);
     StatusLabelEx label = getEnvironment().getFormToolkit().createStatusLabel(container, getEnvironment(), getScoutObject());
 
-    int style = SWT.BORDER;
-    style |= SwtUtility.getVerticalAlignment(getScoutObject().getGridData().verticalAlignment);
-    style |= SwtUtility.getHorizontalAlignment(getScoutObject().getGridData().horizontalAlignment);
-    Text text = getEnvironment().getFormToolkit().createText(container, style);
-    text.setTextLimit(32);
-    //
+    m_menuMarkerComposite = new SwtContextMenuMarkerComposite(container, getEnvironment());
+    getEnvironment().getFormToolkit().adapt(m_menuMarkerComposite);
+    m_menuMarkerComposite.addSelectionListener(new SelectionAdapter() {
+      @Override
+      public void widgetSelected(SelectionEvent e) {
+        getSwtField().setFocus();
+        m_contextMenu.getSwtMenu().setVisible(true);
+      }
+    });
+
+    int style = SWT.SINGLE;
+    StyledText textField = getEnvironment().getFormToolkit().createStyledText(m_menuMarkerComposite, style);
+    textField.setAlignment(SwtUtility.getHorizontalAlignment(getScoutObject().getGridData().horizontalAlignment));
+    textField.setMargins(2, 2, 2, 2);
+    textField.setWrapIndent(textField.getIndent());
+    textField.addVerifyListener(new P_VerifyListener());
+
     setSwtContainer(container);
     setSwtLabel(label);
-    setSwtField(text);
+    setSwtField(textField);
+    //listeners
+    addModifyListenerForBasicField(textField);
     // layout
     getSwtContainer().setLayout(new LogicalGridLayout(1, 0));
+    m_menuMarkerComposite.setLayoutData(LogicalGridDataBuilder.createField(((IFormField) getScoutObject()).getGridData()));
   }
 
   @Override
-  public Text getSwtField() {
-    return (Text) super.getSwtField();
-  }
-
-  @Override
-  protected void setFieldEnabled(Control swtField, boolean enabled) {
-    if (m_editableSupport == null) {
-      m_editableSupport = new TextFieldEditableSupport(getSwtField());
-    }
-    m_editableSupport.setEditable(enabled);
-  }
-
-  @Override
-  protected void setDisplayTextFromScout(String s) {
-    if (s == null) {
-      s = "";
-    }
-    getSwtField().setText(s);
-  }
-
-  @Override
-  protected boolean handleSwtInputVerifier() {
-    final String text = getSwtField().getText();
-    // only handle if text has changed
-    if (CompareUtility.equals(text, getScoutObject().getDisplayText()) && getScoutObject().getErrorStatus() == null) {
-      return true;
-    }
-    final Holder<Boolean> result = new Holder<Boolean>(Boolean.class, false);
-    // notify Scout
-    Runnable t = new Runnable() {
+  protected void installContextMenu() {
+    m_menuMarkerComposite.setMarkerVisible(getScoutObject().getContextMenu().isVisible());
+    getScoutObject().getContextMenu().addPropertyChangeListener(new PropertyChangeListener() {
       @Override
-      public void run() {
-        boolean b = getScoutObject().getUIFacade().setTextFromUI(text);
-        result.setValue(b);
+      public void propertyChange(PropertyChangeEvent evt) {
+        if (IMenu.PROP_VISIBLE.equals(evt.getPropertyName())) {
+          final boolean markerVisible = getScoutObject().getContextMenu().isVisible();
+          getEnvironment().invokeSwtLater(new Runnable() {
+            @Override
+            public void run() {
+              m_menuMarkerComposite.setMarkerVisible(markerVisible);
+            }
+          });
+        }
       }
-    };
-    JobEx job = getEnvironment().invokeScoutLater(t, 0);
-    try {
-      job.join(2345);
-    }
-    catch (InterruptedException e) {
-      //nop
-    }
-    getEnvironment().dispatchImmediateSwtJobs();
-    // end notify
-    return true;// continue always
+    });
+
+    m_contextMenu = new SwtScoutContextMenu(getSwtField().getShell(), getScoutObject().getContextMenu(), getEnvironment());
+
+    SwtScoutContextMenu fieldMenu = new SwtScoutContextMenu(getSwtField().getShell(), getScoutObject().getContextMenu(), getEnvironment(),
+        getScoutObject().isAutoAddDefaultMenus() ? new StyledTextAccess(getSwtField()) : null, getScoutObject().isAutoAddDefaultMenus() ? getSwtField() : null);
+    getSwtField().setMenu(fieldMenu.getSwtMenu());
   }
 
   @Override
-  protected void handleSwtFocusGained() {
-    super.handleSwtFocusGained();
-    getSwtField().setSelection(0, getSwtField().getText().length());
+  public StyledText getSwtField() {
+    return (StyledText) super.getSwtField();
   }
 
   @Override
-  protected void handleSwtFocusLost() {
-    getSwtField().setSelection(0, 0);
+  protected String getText() {
+    return getSwtField().getText();
   }
 
+  @Override
+  protected void setText(String text) {
+    getSwtField().setText(text);
+  }
+
+  @Override
+  protected Point getSelection() {
+    return getSwtField().getSelection();
+  }
+
+  @Override
+  protected void setSelection(int startIndex, int endIndex) {
+    getSwtField().setSelection(startIndex, endIndex);
+  }
+
+  @Override
+  protected TextFieldEditableSupport createEditableSupport() {
+    return new TextFieldEditableSupport(getSwtField());
+  }
+
+  @Override
+  protected int getCaretOffset() {
+    return getSwtField().getCaretOffset();
+  }
+
+  @Override
+  protected void setCaretOffset(int caretPosition) {
+    //nothing to do: SWT sets the caret itself. If startIndex > endIndex it is placed at the beginning.
+  }
+
+  private final class P_VerifyListener implements VerifyListener {
+    @Override
+    public void verifyText(VerifyEvent e) {
+      String curText = ((StyledText) e.widget).getText();
+      e.doit = StringUtility.isWithinNumberFormatLimits(getScoutObject().getFormat(), curText, e.start, e.end - e.start, e.text);
+    }
+  }
 }

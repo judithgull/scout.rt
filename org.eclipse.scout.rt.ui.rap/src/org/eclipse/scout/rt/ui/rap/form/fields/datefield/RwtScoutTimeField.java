@@ -10,6 +10,8 @@
  *******************************************************************************/
 package org.eclipse.scout.rt.ui.rap.form.fields.datefield;
 
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.text.DateFormat;
 import java.util.Date;
 import java.util.HashSet;
@@ -19,16 +21,19 @@ import org.eclipse.rap.rwt.RWT;
 import org.eclipse.scout.commons.CompareUtility;
 import org.eclipse.scout.commons.holders.Holder;
 import org.eclipse.scout.commons.job.JobEx;
+import org.eclipse.scout.rt.client.ui.action.menu.root.IContextMenu;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.datefield.IDateField;
 import org.eclipse.scout.rt.ui.rap.LogicalGridLayout;
-import org.eclipse.scout.rt.ui.rap.ext.ButtonEx;
+import org.eclipse.scout.rt.ui.rap.RwtMenuUtility;
+import org.eclipse.scout.rt.ui.rap.action.menu.RwtContextMenuMarkerComposite;
+import org.eclipse.scout.rt.ui.rap.action.menu.RwtScoutContextMenu;
 import org.eclipse.scout.rt.ui.rap.ext.StatusLabelEx;
 import org.eclipse.scout.rt.ui.rap.ext.StyledTextEx;
 import org.eclipse.scout.rt.ui.rap.ext.custom.StyledText;
 import org.eclipse.scout.rt.ui.rap.form.fields.IPopupSupport;
 import org.eclipse.scout.rt.ui.rap.form.fields.LogicalGridDataBuilder;
-import org.eclipse.scout.rt.ui.rap.form.fields.RwtScoutValueFieldComposite;
+import org.eclipse.scout.rt.ui.rap.form.fields.RwtScoutBasicFieldComposite;
 import org.eclipse.scout.rt.ui.rap.form.fields.datefield.chooser.TimeChooserDialog;
 import org.eclipse.scout.rt.ui.rap.internal.TextFieldEditableSupport;
 import org.eclipse.scout.rt.ui.rap.keystroke.RwtKeyStroke;
@@ -41,15 +46,17 @@ import org.eclipse.swt.events.FocusAdapter;
 import org.eclipse.swt.events.FocusEvent;
 import org.eclipse.swt.events.MouseAdapter;
 import org.eclipse.swt.events.MouseEvent;
+import org.eclipse.swt.events.SelectionAdapter;
+import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Event;
-import org.eclipse.swt.widgets.Listener;
-import org.eclipse.swt.widgets.Shell;
+import org.eclipse.swt.widgets.Menu;
 
-public class RwtScoutTimeField extends RwtScoutValueFieldComposite<IDateField> implements IRwtScoutTimeField, IPopupSupport {
+public class RwtScoutTimeField extends RwtScoutBasicFieldComposite<IDateField> implements IRwtScoutTimeField, IPopupSupport {
 
   private Button m_dropDownButton;
   private TextFieldEditableSupport m_editableSupport;
@@ -63,6 +70,10 @@ public class RwtScoutTimeField extends RwtScoutValueFieldComposite<IDateField> i
   private String m_displayTextToVerify;
   private TimeChooserDialog m_timeChooserDialog = null;
   private FocusAdapter m_textFieldFocusAdapter = null;
+
+  private RwtContextMenuMarkerComposite m_menuMarkerComposite;
+  private RwtScoutContextMenu m_uiContextMenu;
+  private P_ContextMenuPropertyListener m_contextMenuPropertyListener;
 
   @Override
   public void setIgnoreLabel(boolean ignoreLabel) {
@@ -97,38 +108,57 @@ public class RwtScoutTimeField extends RwtScoutValueFieldComposite<IDateField> i
     StatusLabelEx label = getUiEnvironment().getFormToolkit().createStatusLabel(container, getScoutObject());
 
     m_timeContainer = getUiEnvironment().getFormToolkit().createComposite(container, SWT.BORDER);
-    m_timeContainer.setData(RWT.CUSTOM_VARIANT, VARIANT_TIMEFIELD);
+    m_timeContainer.setData(RWT.CUSTOM_VARIANT, RwtUtility.VARIANT_COMPOSITE_INPUT_FIELD_BORDER);
 
-    StyledText textField = new StyledTextEx(m_timeContainer, SWT.SINGLE);
+    m_menuMarkerComposite = new RwtContextMenuMarkerComposite(m_timeContainer, getUiEnvironment(), SWT.NONE);
+    getUiEnvironment().getFormToolkit().adapt(m_menuMarkerComposite);
+    m_menuMarkerComposite.addSelectionListener(new SelectionAdapter() {
+      private static final long serialVersionUID = 1L;
+
+      @Override
+      public void widgetSelected(SelectionEvent e) {
+        if (getUiContextMenu() != null) {
+          Menu uiMenu = getUiContextMenu().getUiMenu();
+          if (e.widget instanceof Control) {
+            Point loc = ((Control) e.widget).toDisplay(e.x, e.y);
+            uiMenu.setLocation(RwtMenuUtility.getMenuLocation(getScoutObject().getContextMenu().getChildActions(), uiMenu, loc, getUiEnvironment()));
+          }
+          uiMenu.setVisible(true);
+        }
+      }
+    });
+
+    StyledText textField = new StyledTextEx(m_menuMarkerComposite, SWT.SINGLE);
     getUiEnvironment().getFormToolkit().adapt(textField, false, false);
     textField.setData(RWT.CUSTOM_VARIANT, VARIANT_TIMEFIELD);
 
-    ButtonEx timeChooserButton = getUiEnvironment().getFormToolkit().createButtonEx(m_timeContainer, SWT.PUSH | SWT.NO_FOCUS);
+    Button timeChooserButton = getUiEnvironment().getFormToolkit().createButton(m_timeContainer, "", SWT.PUSH | SWT.NO_FOCUS);
     timeChooserButton.setData(RWT.CUSTOM_VARIANT, VARIANT_TIMEFIELD);
 
-    m_timeContainer.setTabList(new Control[]{textField});
     container.setTabList(new Control[]{m_timeContainer});
 
-    // key strokes on container
-    getUiEnvironment().addKeyStroke(container, new P_TimeChooserOpenKeyStroke(), false);
-
-    // key strokes on field
+    // key strokes
+    getUiEnvironment().addKeyStroke(textField, new P_TimeChooserOpenKeyStroke(), false);
+    getUiEnvironment().addKeyStroke(textField, new P_TimeChooserCloseKeyStroke(), true);
     getUiEnvironment().addKeyStroke(textField, new P_ShiftNextQuarterHourKeyStroke(), false);
     getUiEnvironment().addKeyStroke(textField, new P_ShiftPreviousQuarterHourKeyStroke(), false);
     getUiEnvironment().addKeyStroke(textField, new P_ShiftNextHourKeyStroke(), false);
     getUiEnvironment().addKeyStroke(textField, new P_ShiftPreviousHourKeyStroke(), false);
 
     // listener
-    timeChooserButton.addListener(ButtonEx.SELECTION_ACTION, new P_RwtBrowseButtonListener());
+    timeChooserButton.addSelectionListener(new P_RwtBrowseButtonListener());
     attachFocusListener(textField, true);
     textField.addMouseListener(new MouseAdapter() {
       private static final long serialVersionUID = 1L;
 
       @Override
       public void mouseUp(MouseEvent e) {
-        handleUiTimeChooserAction();
+        if (e.button == 1) {
+          handleUiTimeChooserAction();
+        }
       }
     });
+
     //
     setUiContainer(container);
     setUiLabel(label);
@@ -142,7 +172,7 @@ public class RwtScoutTimeField extends RwtScoutValueFieldComposite<IDateField> i
     m_timeContainer.setLayout(RwtLayoutUtility.createGridLayoutNoSpacing(2, false));
 
     GridData textLayoutData = new GridData(SWT.FILL, SWT.FILL, true, true);
-    textField.setLayoutData(textLayoutData);
+    m_menuMarkerComposite.setLayoutData(textLayoutData);
 
     GridData buttonLayoutData = new GridData(SWT.CENTER, SWT.CENTER, false, false);
     buttonLayoutData.heightHint = 20;
@@ -155,13 +185,38 @@ public class RwtScoutTimeField extends RwtScoutValueFieldComposite<IDateField> i
     return m_dropDownButton;
   }
 
-  public void setDropDownButton(ButtonEx b) {
+  public void setDropDownButton(Button b) {
     m_dropDownButton = b;
   }
 
   @Override
   public StyledTextEx getUiField() {
     return (StyledTextEx) super.getUiField();
+  }
+
+  public RwtScoutContextMenu getUiContextMenu() {
+    return m_uiContextMenu;
+  }
+
+  @Override
+  protected void attachScout() {
+    super.attachScout();
+    // context menu
+    updateContextMenuVisibilityFromScout();
+    if (getScoutObject().getContextMenu() != null && m_contextMenuPropertyListener == null) {
+      m_contextMenuPropertyListener = new P_ContextMenuPropertyListener();
+      getScoutObject().getContextMenu().addPropertyChangeListener(IContextMenu.PROP_VISIBLE, m_contextMenuPropertyListener);
+    }
+  }
+
+  @Override
+  protected void detachScout() {
+    // context menu listener
+    if (m_contextMenuPropertyListener != null) {
+      getScoutObject().getContextMenu().removePropertyChangeListener(IContextMenu.PROP_VISIBLE, m_contextMenuPropertyListener);
+      m_contextMenuPropertyListener = null;
+    }
+    super.detachScout();
   }
 
   public boolean isFocusInTimePicker() {
@@ -232,10 +287,10 @@ public class RwtScoutTimeField extends RwtScoutValueFieldComposite<IDateField> i
     m_dropDownButton.setEnabled(b);
     getUiField().setEnabled(b);
     if (b) {
-      m_timeContainer.setData(RWT.CUSTOM_VARIANT, VARIANT_TIMEFIELD);
+      m_timeContainer.setData(RWT.CUSTOM_VARIANT, RwtUtility.VARIANT_COMPOSITE_INPUT_FIELD_BORDER);
     }
     else {
-      m_timeContainer.setData(RWT.CUSTOM_VARIANT, VARIANT_TIMEFIELD_DISABLED);
+      m_timeContainer.setData(RWT.CUSTOM_VARIANT, RwtUtility.VARIANT_COMPOSITE_INPUT_FIELD_BORDER_READONLY);
     }
   }
 
@@ -277,6 +332,27 @@ public class RwtScoutTimeField extends RwtScoutValueFieldComposite<IDateField> i
     setBackgroundFromScout(scoutColor, m_timeContainer);
   }
 
+  protected void updateContextMenuVisibilityFromScout() {
+    m_menuMarkerComposite.setMarkerVisible(getScoutObject().getContextMenu().isVisible());
+    if (getScoutObject().getContextMenu().isVisible()) {
+      if (m_uiContextMenu == null) {
+        m_uiContextMenu = new RwtScoutContextMenu(getUiField().getShell(), getScoutObject().getContextMenu(), getUiEnvironment());
+        if (getDropDownButton() != null) {
+          getDropDownButton().setMenu(m_uiContextMenu.getUiMenu());
+        }
+      }
+    }
+    else {
+      if (getDropDownButton() != null) {
+        getDropDownButton().setMenu(null);
+      }
+      if (m_uiContextMenu != null) {
+        m_uiContextMenu.dispose();
+      }
+      m_uiContextMenu = null;
+    }
+  }
+
   @Override
   protected void handleUiInputVerifier(boolean doit) {
     if (!doit) {
@@ -315,10 +391,8 @@ public class RwtScoutTimeField extends RwtScoutValueFieldComposite<IDateField> i
   }
 
   protected void makeSureTimeChooserIsClosed() {
-    if (m_timeChooserDialog != null
-        && m_timeChooserDialog.getShell() != null
-        && !m_timeChooserDialog.getShell().isDisposed()) {
-      m_timeChooserDialog.getShell().close();
+    if (m_timeChooserDialog != null) {
+      m_timeChooserDialog.close();
     }
 
     uninstallFocusListenerOnTextField();
@@ -336,17 +410,17 @@ public class RwtScoutTimeField extends RwtScoutValueFieldComposite<IDateField> i
     notifyPopupEventListeners(IPopupSupportListener.TYPE_OPENING);
 
     makeSureTimeChooserIsClosed();
-    m_timeChooserDialog = createTimeChooserDialog(getUiField().getShell(), oldTime);
+    m_timeChooserDialog = createTimeChooserDialog(oldTime);
     if (m_timeChooserDialog != null) {
       m_timeChooserDialog.getShell().addDisposeListener(new P_TimeChooserDisposeListener());
 
-      m_timeChooserDialog.openTimeChooser(getUiField());
+      m_timeChooserDialog.open();
       installFocusListenerOnTextField();
     }
   }
 
-  protected TimeChooserDialog createTimeChooserDialog(Shell parentShell, Date currentTime) {
-    return new TimeChooserDialog(parentShell, currentTime);
+  protected TimeChooserDialog createTimeChooserDialog(Date currentTime) {
+    return new TimeChooserDialog(getUiField().getShell(), getUiField(), currentTime);
   }
 
   private void getTimeFromClosedDateChooserDialog() {
@@ -410,22 +484,13 @@ public class RwtScoutTimeField extends RwtScoutValueFieldComposite<IDateField> i
     }
   }
 
-  private class P_RwtBrowseButtonListener implements Listener {
+  private class P_RwtBrowseButtonListener extends SelectionAdapter {
     private static final long serialVersionUID = 1L;
 
-    public P_RwtBrowseButtonListener() {
-    }
-
     @Override
-    public void handleEvent(Event event) {
-      switch (event.type) {
-        case ButtonEx.SELECTION_ACTION:
-          getUiField().forceFocus();
-          handleUiTimeChooserAction();
-          break;
-        default:
-          break;
-      }
+    public void widgetSelected(SelectionEvent e) {
+      getUiField().forceFocus();
+      handleUiTimeChooserAction();
     }
   } // end class P_RwtBrowseButtonListener
 
@@ -500,4 +565,32 @@ public class RwtScoutTimeField extends RwtScoutValueFieldComposite<IDateField> i
     }
   }
 
+  private class P_TimeChooserCloseKeyStroke extends RwtKeyStroke {
+    public P_TimeChooserCloseKeyStroke() {
+      super(SWT.ESC);
+    }
+
+    @Override
+    public void handleUiAction(Event e) {
+      if (m_timeChooserDialog != null) {
+        makeSureTimeChooserIsClosed();
+        e.doit = false;
+      }
+    }
+  }
+
+  private class P_ContextMenuPropertyListener implements PropertyChangeListener {
+    @Override
+    public void propertyChange(PropertyChangeEvent evt) {
+      if (IContextMenu.PROP_VISIBLE.equals(evt.getPropertyName())) {
+        // synchronize
+        getUiEnvironment().invokeUiLater(new Runnable() {
+          @Override
+          public void run() {
+            updateContextMenuVisibilityFromScout();
+          }
+        });
+      }
+    }
+  }
 }

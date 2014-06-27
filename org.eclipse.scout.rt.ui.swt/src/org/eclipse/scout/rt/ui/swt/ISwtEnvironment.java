@@ -16,14 +16,15 @@ import java.util.Collection;
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.scout.commons.job.JobEx;
 import org.eclipse.scout.rt.client.IClientSession;
+import org.eclipse.scout.rt.client.ui.action.IActionFilter;
+import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 import org.eclipse.scout.rt.client.ui.basic.filechooser.IFileChooser;
 import org.eclipse.scout.rt.client.ui.desktop.IDesktop;
-import org.eclipse.scout.rt.client.ui.form.FormEvent;
 import org.eclipse.scout.rt.client.ui.form.IForm;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.client.ui.messagebox.IMessageBox;
 import org.eclipse.scout.rt.shared.data.basic.FontSpec;
-import org.eclipse.scout.rt.ui.swt.busy.SwtBusyHandler;
+import org.eclipse.scout.rt.ui.swt.action.menu.ISwtScoutMenuItem;
 import org.eclipse.scout.rt.ui.swt.form.ISwtScoutForm;
 import org.eclipse.scout.rt.ui.swt.form.fields.ISwtScoutFormField;
 import org.eclipse.scout.rt.ui.swt.keystroke.ISwtKeyStroke;
@@ -41,6 +42,7 @@ import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Widget;
 import org.eclipse.ui.IEditorInput;
@@ -67,15 +69,6 @@ public interface ISwtEnvironment {
   String PROP_GROUP_BOX_LAYOUT_FIELD_MIN_WIDTH = "GroupBoxLayout.FieldMinWidth";
   String PROP_DISABLED_FOREGROUND_COLOR = "FormField.diabledForegroundColor";
 
-  /**
-   * {@link Boolean} busy/idle handling Use positive edge from swt 0->1 and
-   * negative edge from scout 1->0
-   * 
-   * @deprecated replaced by {@link SwtBusyHandler}. Will be removed in Release 3.10.
-   */
-  @Deprecated
-  String PROP_BUSY = "busy";
-
   Display getDisplay();
 
   /**
@@ -94,12 +87,6 @@ public interface ISwtEnvironment {
    * Must be called in display thread
    */
   void ensureInitialized();
-
-  /**
-   * @deprecated replaced by {@link SwtBusyHandler}. Will be removed in Release 3.10.
-   */
-  @Deprecated
-  boolean isBusy();
 
   void addPropertyChangeListener(PropertyChangeListener listener);
 
@@ -204,15 +191,6 @@ public interface ISwtEnvironment {
    */
   Font getFont(Font templateFont, String newName, Integer newStyle, Integer newSize);
 
-  // properties
-  // int getPropertyInt(String propertyName);
-  //
-  // String getPropertyString(String propertyName);
-  //
-  // Object getProperty(String propertyName);
-  //
-  // boolean getPropertyBool(String propertyName);
-
   IDesktop getScoutDesktop();
 
   void showStandaloneForm(IForm form);
@@ -234,6 +212,8 @@ public interface ISwtEnvironment {
 
   ISwtScoutFormField createFormField(Composite parent, IFormField model);
 
+  ISwtScoutMenuItem createMenuItem(Menu uiMenu, IMenu scoutMenu, IActionFilter filter);
+
   ISwtScoutTray getTrayComposite();
 
   void checkThread();
@@ -253,12 +233,6 @@ public interface ISwtEnvironment {
   void setClipboardText(String text);
 
   String getPerspectiveId();
-
-  /**
-   * @deprecated replaced by {@link SwtBusyHandler}. Will be removed in Release 3.10.
-   */
-  @Deprecated
-  void setBusyFromSwt(boolean b);
 
   /**
    * @return the popupOwner for the (next) popup that is displayed
@@ -288,11 +262,4 @@ public interface ISwtEnvironment {
    * sheet settings based on a {@link Control}s font and color
    */
   String styleHtmlText(ISwtScoutFormField<?> uiComposite, String rawHtml);
-
-  /**
-   * @deprecated use {@link IForm#getEventHistory()} Will be removed in Release 3.10.
-   */
-  @Deprecated
-  FormEvent[] fetchPendingPrintEvents(IForm form);
-
 }

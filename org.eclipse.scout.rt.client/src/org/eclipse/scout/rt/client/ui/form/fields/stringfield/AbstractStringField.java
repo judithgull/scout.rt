@@ -14,9 +14,9 @@ import java.net.URL;
 
 import org.eclipse.scout.commons.IOUtility;
 import org.eclipse.scout.commons.StringUtility;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.dnd.TransferObject;
 import org.eclipse.scout.commons.exception.ProcessingException;
@@ -24,10 +24,11 @@ import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.IDNDSupport;
 import org.eclipse.scout.rt.client.ui.desktop.outline.pages.ISearchForm;
-import org.eclipse.scout.rt.client.ui.form.fields.AbstractValueField;
+import org.eclipse.scout.rt.client.ui.form.fields.AbstractBasicField;
 import org.eclipse.scout.rt.shared.data.form.ValidationRule;
 
-public abstract class AbstractStringField extends AbstractValueField<String> implements IStringField {
+@ClassId("d8b1f73a-4415-4477-8408-e6ada9e69551")
+public abstract class AbstractStringField extends AbstractBasicField<String> implements IStringField {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractStringField.class);
 
   private IStringFieldUIFacade m_uiFacade;
@@ -48,35 +49,38 @@ public abstract class AbstractStringField extends AbstractValueField<String> imp
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(260)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredDecorationLink() {
     return false;
   }
 
   @ConfigProperty(ConfigProperty.STRING)
   @Order(240)
-  @ConfigPropertyValue("null")
   protected String getConfiguredFormat() {
     return null;
   }
 
+  /**
+   * @return true if all characters should be masked (e.g. for a password field). default
+   *         is false.
+   */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(250)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredInputMasked() {
     return false;
   }
 
+  /**
+   * @return true if all characters should be transformed to lower case when typing text into the string field. default
+   *         is false.
+   */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(280)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredFormatLower() {
     return false;
   }
 
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(290)
-  @ConfigPropertyValue("4000")
   @ValidationRule(ValidationRule.MAX_LENGTH)
   protected int getConfiguredMaxLength() {
     return 4000;
@@ -84,61 +88,46 @@ public abstract class AbstractStringField extends AbstractValueField<String> imp
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(230)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredMultilineText() {
     return false;
   }
 
-  @ConfigProperty(ConfigProperty.BOOLEAN)
-  @Order(300)
-  @ConfigPropertyValue("false")
-  protected boolean getConfiguredFormatUpper() {
-    return false;
-  }
-
   /**
-   * Causes the ui to send a validate event every time the text field content is changed.
-   * <p>
-   * Be careful when using this property since this can influence performance and the charateristics of text input.
+   * @return true if all characters should be transformed to upper case when typing text into the string field. default
+   *         is false.
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
-  @Order(310)
-  @ConfigPropertyValue("false")
-  protected boolean getConfiguredValidateOnAnyKey() {
+  @Order(300)
+  protected boolean getConfiguredFormatUpper() {
     return false;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(320)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredWrapText() {
     return false;
   }
 
   @ConfigProperty(ConfigProperty.STRING)
   @Order(330)
-  @ConfigPropertyValue("null")
   protected String getConfiguredValueFormat() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(340)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredSelectAllOnFocus() {
     return true;
   }
 
   @ConfigProperty(ConfigProperty.DRAG_AND_DROP_TYPE)
   @Order(400)
-  @ConfigPropertyValue("0")
   protected int getConfiguredDropType() {
     return 0;
   }
 
   @ConfigProperty(ConfigProperty.DRAG_AND_DROP_TYPE)
   @Order(410)
-  @ConfigPropertyValue("0")
   protected int getConfiguredDragType() {
     return 0;
   }
@@ -166,9 +155,9 @@ public abstract class AbstractStringField extends AbstractValueField<String> imp
   @Override
   protected void initConfig() {
     m_uiFacade = new P_UIFacade();
-    super.initConfig();
     setMaxLength(getConfiguredMaxLength());
     setInputMasked(getConfiguredInputMasked());
+    super.initConfig();
     if (getConfiguredFormatLower()) {
       setFormatLower();
     }
@@ -182,7 +171,6 @@ public abstract class AbstractStringField extends AbstractValueField<String> imp
     setWrapText(getConfiguredWrapText());
     setMultilineText(getConfiguredMultilineText());
     setSelectAllOnFocus(getConfiguredSelectAllOnFocus() && !getConfiguredMultilineText());
-    setValidateOnAnyKey(getConfiguredValidateOnAnyKey());
     int configuredDragType = getConfiguredDragType();
     if (IDNDSupport.TYPE_TEXT_TRANSFER == configuredDragType) {
       LOG.warn("Drag and drop TextTransfer is default behaviour (Configuration will not be considered).");
@@ -323,16 +311,6 @@ public abstract class AbstractStringField extends AbstractValueField<String> imp
   }
 
   @Override
-  public void setValidateOnAnyKey(boolean b) {
-    propertySupport.setPropertyBool(PROP_VALIDATE_ON_ANY_KEY, b);
-  }
-
-  @Override
-  public boolean isValidateOnAnyKey() {
-    return propertySupport.getPropertyBool(PROP_VALIDATE_ON_ANY_KEY);
-  }
-
-  @Override
   public void select(int startIndex, int endIndex) {
     try {
       propertySupport.setPropertiesChanging(true);
@@ -364,7 +342,7 @@ public abstract class AbstractStringField extends AbstractValueField<String> imp
   public void setFormat(String s) {
     propertySupport.setPropertyString(PROP_FORMAT, s);
     if (isInitialized()) {
-      if (isAutoDisplayText()) {
+      if (shouldUpdateDisplayText(false)) {
         String t = execFormatValue(getValue());
         setDisplayText(t);
       }
@@ -418,11 +396,12 @@ public abstract class AbstractStringField extends AbstractValueField<String> imp
   private class P_UIFacade implements IStringFieldUIFacade {
 
     @Override
-    public boolean setTextFromUI(String newText) {
+    public boolean setTextFromUI(String newText, boolean whileTyping) {
       if (newText != null && newText.length() == 0) {
         newText = null;
       }
       // parse always, validity might change even if text is same
+      setWhileTyping(whileTyping);
       return parseValue(newText);
     }
 

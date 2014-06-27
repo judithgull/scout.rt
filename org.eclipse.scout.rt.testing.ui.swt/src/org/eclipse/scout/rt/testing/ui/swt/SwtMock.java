@@ -33,11 +33,12 @@ import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
 import org.eclipse.scout.rt.testing.commons.OsUtility;
 import org.eclipse.scout.rt.testing.shared.TestingUtility;
 import org.eclipse.scout.rt.testing.shared.WaitCondition;
+import org.eclipse.scout.rt.ui.swt.basic.ColorUtility;
 import org.eclipse.scout.rt.ui.swt.basic.ISwtScoutComposite;
 import org.eclipse.scout.rt.ui.swt.basic.SwtScoutComposite;
 import org.eclipse.scout.rt.ui.swt.ext.DropDownButton;
 import org.eclipse.scout.rt.ui.swt.util.SwtUtility;
-import org.eclipse.scout.testing.client.IGuiMock;
+import org.eclipse.scout.testing.client.AbstractGuiMock;
 import org.eclipse.scout.testing.client.robot.JavaRobot;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.CTabFolder;
@@ -45,6 +46,7 @@ import org.eclipse.swt.custom.CTabItem;
 import org.eclipse.swt.custom.StyledText;
 import org.eclipse.swt.dnd.Clipboard;
 import org.eclipse.swt.dnd.TextTransfer;
+import org.eclipse.swt.dnd.Transfer;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.widgets.Button;
@@ -67,18 +69,14 @@ import org.eclipse.ui.PlatformUI;
 /**
  * Uses awt {@link Robot} and not SWTBot since SWTBot is not really a gui emulator.
  */
-public class SwtMock implements IGuiMock {
+public class SwtMock extends AbstractGuiMock {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(SwtMock.class);
 
-  static interface MockRunnable<T> extends WaitCondition<T> {
-  }
-
-  private final IClientSession m_session;
   private final JavaRobot m_bot;
   private int m_treeNodeToExpandIconGap;
 
   public SwtMock(IClientSession session) {
-    m_session = session;
+    super(session);
     m_bot = new JavaRobot();
   }
 
@@ -128,14 +126,14 @@ public class SwtMock implements IGuiMock {
     for (int pass = 0; pass < 2; pass++) {
       m_bot.sleep(80);
       //wait until gui queue is empty
-      syncExec(new MockRunnable<Object>() {
+      syncExec(new WaitCondition<Object>() {
         @Override
         public Object run() throws Throwable {
           return null;
         }
       });
       //wait until model queue is empty
-      ClientSyncJob idleJob = new ClientSyncJob("Check for idle", m_session) {
+      ClientSyncJob idleJob = new ClientSyncJob("Check for idle", getClientSession()) {
         @Override
         protected void runVoid(IProgressMonitor m) throws Throwable {
         }
@@ -226,7 +224,7 @@ public class SwtMock implements IGuiMock {
 
   @Override
   public boolean isWindowActive(final String title) {
-    return syncExec(new MockRunnable<Boolean>() {
+    return syncExec(new WaitCondition<Boolean>() {
       @Override
       public Boolean run() throws Throwable {
         CTabItem view = findWorkbenchView(title);
@@ -244,7 +242,7 @@ public class SwtMock implements IGuiMock {
 
   @Override
   public boolean isWindowOpen(final String title) {
-    return syncExec(new MockRunnable<Boolean>() {
+    return syncExec(new WaitCondition<Boolean>() {
       @Override
       public Boolean run() throws Throwable {
         CTabItem view = findWorkbenchView(title);
@@ -263,7 +261,7 @@ public class SwtMock implements IGuiMock {
   @Override
   public void activateWindow(final String title) {
     waitForOpenWindow(title);
-    syncExec(new MockRunnable<Object>() {
+    syncExec(new WaitCondition<Object>() {
       @Override
       public Object run() throws Throwable {
         CTabItem view = findWorkbenchView(title);
@@ -285,7 +283,7 @@ public class SwtMock implements IGuiMock {
   @Override
   public FieldState getFieldState(FieldType type, int index) {
     final Control c = waitForIndexedField(type, index);
-    return syncExec(new MockRunnable<FieldState>() {
+    return syncExec(new WaitCondition<FieldState>() {
       @Override
       public FieldState run() throws Throwable {
         return getFieldStateInternal(c);
@@ -296,7 +294,7 @@ public class SwtMock implements IGuiMock {
   @Override
   public FieldState getScoutFieldState(String name) {
     final Control c = waitForScoutField(name);
-    return syncExec(new MockRunnable<FieldState>() {
+    return syncExec(new WaitCondition<FieldState>() {
       @Override
       public FieldState run() throws Throwable {
         return getFieldStateInternal(c);
@@ -307,7 +305,7 @@ public class SwtMock implements IGuiMock {
   @Override
   public FieldState getScoutFieldContainerState(String name) {
     final Control c = waitForScoutField(name);
-    return syncExec(new MockRunnable<FieldState>() {
+    return syncExec(new WaitCondition<FieldState>() {
       @Override
       public FieldState run() throws Throwable {
         ISwtScoutComposite swtScoutComposite = SwtScoutComposite.getCompositeOnWidget(c);
@@ -322,7 +320,7 @@ public class SwtMock implements IGuiMock {
 
   @Override
   public List<FieldState> getFieldStates(final FieldType type) {
-    return syncExec(new MockRunnable<List<FieldState>>() {
+    return syncExec(new WaitCondition<List<FieldState>>() {
       @Override
       public List<FieldState> run() throws Throwable {
         List<FieldState> list = new ArrayList<FieldState>();
@@ -341,7 +339,7 @@ public class SwtMock implements IGuiMock {
 
   @Override
   public FieldState getFocusFieldState() {
-    return syncExec(new MockRunnable<FieldState>() {
+    return syncExec(new WaitCondition<FieldState>() {
       @Override
       public FieldState run() throws Throwable {
         Control c = getDisplay().getFocusControl();
@@ -356,7 +354,7 @@ public class SwtMock implements IGuiMock {
   @Override
   public void clickOnPushButton(String text) {
     final Control c = waitForPushButtonWithLabel(text);
-    syncExec(new MockRunnable<Object>() {
+    syncExec(new WaitCondition<Object>() {
       @Override
       public Object run() throws Throwable {
         Point p = c.toDisplay(5, 5);
@@ -371,7 +369,7 @@ public class SwtMock implements IGuiMock {
   @Override
   public void gotoField(FieldType type, int index) {
     final Control c = waitForIndexedField(type, index);
-    syncExec(new MockRunnable<Object>() {
+    syncExec(new WaitCondition<Object>() {
       @Override
       public Object run() throws Throwable {
         Point p = c.toDisplay(c.getSize().x / 2, c.getSize().y / 2);
@@ -383,11 +381,22 @@ public class SwtMock implements IGuiMock {
 
   @Override
   public void gotoScoutField(String name) {
+    gotoScoutField(name, 0.5, 0.5);
+  }
+
+  @Override
+  public void gotoScoutField(String name, final double x, final double y) {
+    if (x < 0 || x > 1) {
+      throw new IllegalArgumentException("x should be in [0, 1] range.");
+    }
+    if (y < 0 || y > 1) {
+      throw new IllegalArgumentException("y should be in [0, 1] range.");
+    }
     final Control c = waitForScoutField(name);
-    syncExec(new MockRunnable<Object>() {
+    syncExec(new WaitCondition<Object>() {
       @Override
       public Object run() throws Throwable {
-        Point p = c.toDisplay(c.getSize().x / 2, c.getSize().y / 2);
+        Point p = c.toDisplay((int) (x * c.getSize().x), (int) (y * c.getSize().y));
         gotoPoint(p.x, p.y);
         return null;
       }
@@ -397,7 +406,7 @@ public class SwtMock implements IGuiMock {
   @Override
   public void gotoTable(int tableIndex, final int rowIndex, final int columnIndex) {
     final Table table = (Table) waitForIndexedField(FieldType.Table, tableIndex);
-    syncExec(new MockRunnable<Object>() {
+    syncExec(new WaitCondition<Object>() {
       @Override
       public Object run() throws Throwable {
         TableItem item = table.getItem(rowIndex);
@@ -416,7 +425,7 @@ public class SwtMock implements IGuiMock {
   @Override
   public void gotoTableHeader(int tableIndex, final int columnIndex) {
     final Table table = (Table) waitForIndexedField(FieldType.Table, tableIndex);
-    syncExec(new MockRunnable<Object>() {
+    syncExec(new WaitCondition<Object>() {
       @SuppressWarnings("null")
       @Override
       public Object run() throws Throwable {
@@ -446,7 +455,7 @@ public class SwtMock implements IGuiMock {
   @Override
   public void gotoTree(int treeIndex, final String nodeText) {
     final Tree tree = (Tree) waitForIndexedField(FieldType.Tree, treeIndex);
-    syncExec(new MockRunnable<Object>() {
+    syncExec(new WaitCondition<Object>() {
       @Override
       public Object run() throws Throwable {
         TreeItem item = findTreeItemRec(tree.getItems(), nodeText);
@@ -467,7 +476,7 @@ public class SwtMock implements IGuiMock {
   @Override
   public void gotoTreeExpandIcon(int treeIndex, final String nodeText) {
     final Tree tree = (Tree) waitForIndexedField(FieldType.Tree, treeIndex);
-    syncExec(new MockRunnable<Object>() {
+    syncExec(new WaitCondition<Object>() {
       @Override
       public Object run() throws Throwable {
         TreeItem item = findTreeItemRec(tree.getItems(), nodeText);
@@ -489,7 +498,7 @@ public class SwtMock implements IGuiMock {
   public void contextMenu(final String... names) {
     final ArrayList<Integer> indexOfList = new ArrayList<Integer>();
     final MenuItem mi = waitForMenuItem(names[0]);
-    syncExec(new MockRunnable<Boolean>() {
+    syncExec(new WaitCondition<Boolean>() {
       @Override
       public Boolean run() throws Throwable {
         indexOfList.add(accessibleMenuIndex(mi));
@@ -554,7 +563,7 @@ public class SwtMock implements IGuiMock {
   @Override
   public List<String> getTableCells(int tableIndex, final int columnIndex) {
     final Table table = (Table) waitForIndexedField(FieldType.Table, tableIndex);
-    return syncExec(new MockRunnable<List<String>>() {
+    return syncExec(new WaitCondition<List<String>>() {
       @Override
       public List<String> run() throws Throwable {
         ArrayList<String> list = new ArrayList<String>();
@@ -570,7 +579,7 @@ public class SwtMock implements IGuiMock {
   @Override
   public List<String> getTreeNodes(final int treeIndex) {
     final Tree tree = (Tree) waitForIndexedField(FieldType.Tree, treeIndex);
-    return syncExec(new MockRunnable<List<String>>() {
+    return syncExec(new WaitCondition<List<String>>() {
       @Override
       public List<String> run() throws Throwable {
         ArrayList<String> list = new ArrayList<String>();
@@ -583,7 +592,7 @@ public class SwtMock implements IGuiMock {
   @Override
   public Set<String> getSelectedTableCells(int tableIndex, final int columnIndex) {
     final Table table = (Table) waitForIndexedField(FieldType.Table, tableIndex);
-    return syncExec(new MockRunnable<Set<String>>() {
+    return syncExec(new WaitCondition<Set<String>>() {
       @Override
       public Set<String> run() throws Throwable {
         TreeSet<String> set = new TreeSet<String>();
@@ -602,7 +611,7 @@ public class SwtMock implements IGuiMock {
   @Override
   public Set<String> getSelectedTreeNodes(int treeIndex) {
     final Tree tree = (Tree) waitForIndexedField(FieldType.Tree, treeIndex);
-    return syncExec(new MockRunnable<Set<String>>() {
+    return syncExec(new WaitCondition<Set<String>>() {
       @Override
       public Set<String> run() throws Throwable {
         TreeSet<String> set = new TreeSet<String>();
@@ -620,7 +629,7 @@ public class SwtMock implements IGuiMock {
   @Override
   public Set<String> getCheckedTableCells(int tableIndex, final int columnIndex) {
     final Table table = (Table) waitForIndexedField(FieldType.Table, tableIndex);
-    return syncExec(new MockRunnable<Set<String>>() {
+    return syncExec(new WaitCondition<Set<String>>() {
       @Override
       public Set<String> run() throws Throwable {
         TreeSet<String> check = new TreeSet<String>();
@@ -724,7 +733,7 @@ public class SwtMock implements IGuiMock {
 
   @Override
   public WindowState getWindowState(final String title) {
-    return syncExec(new MockRunnable<WindowState>() {
+    return syncExec(new WaitCondition<WindowState>() {
       @Override
       public WindowState run() throws Throwable {
         checkActiveShell();
@@ -757,7 +766,7 @@ public class SwtMock implements IGuiMock {
   @Override
   public String getClipboardText() {
     waitForIdle();
-    return syncExec(new MockRunnable<String>() {
+    return syncExec(new WaitCondition<String>() {
       @Override
       public String run() throws Throwable {
         Clipboard b = new Clipboard(getDisplay());
@@ -767,8 +776,27 @@ public class SwtMock implements IGuiMock {
   }
 
   @Override
+  public void setClipboardText(final String value) {
+    waitForIdle();
+    syncExec(new WaitCondition<Object>() {
+
+      @Override
+      public Object run() throws Throwable {
+        Clipboard b = new Clipboard(getDisplay());
+        if (StringUtility.isNullOrEmpty(value)) {
+          b.clearContents();
+        }
+        else {
+          b.setContents(new Object[]{value}, new Transfer[]{TextTransfer.getInstance()});
+        }
+        return null;
+      }
+    });
+  }
+
+  @Override
   public Object internal0(final Object o) {
-    return syncExec(new MockRunnable<String>() {
+    return syncExec(new WaitCondition<String>() {
       @Override
       public String run() throws Throwable {
         return null;
@@ -797,6 +825,9 @@ public class SwtMock implements IGuiMock {
     state.y = p.y;
     state.width = c.getBounds().width;
     state.height = c.getBounds().height;
+
+    state.foregroundColor = ColorUtility.createStringFromColor(c.getForeground());
+    state.backgroundColor = ColorUtility.createStringFromColor(c.getBackground());
     //text
     if (c instanceof Label) {
       state.text = ((Label) c).getText();
@@ -808,8 +839,15 @@ public class SwtMock implements IGuiMock {
       state.text = ((StyledText) c).getText();
     }
     if (c instanceof Button) {
-      state.text = ((Button) c).getText();
+      Button button = (Button) c;
+      state.text = button.getText();
+      // selection
+      state.selected = button.getSelection();
     }
+    // visibility
+    state.visible = c.isVisible();
+    state.widget = c;
+
     return state;
   }
 
@@ -914,7 +952,7 @@ public class SwtMock implements IGuiMock {
   }
 
   protected List<Composite> enumerateParentContainers() {
-    return syncExec(new MockRunnable<ArrayList<Composite>>() {
+    return syncExec(new WaitCondition<ArrayList<Composite>>() {
       @Override
       public ArrayList<Composite> run() throws Throwable {
         ArrayList<Composite> list = new ArrayList<Composite>();
@@ -944,7 +982,7 @@ public class SwtMock implements IGuiMock {
         if (f.getItemCount() > 0) {
           for (CTabItem item : f.getItems()) {
             if (item.isShowing()) {
-              if (title.equals(cleanButtonLabel(item.getText()))) {
+              if (title.equals(cleanCTabItemTitle(item.getText()))) {
                 return item;
               }
             }
@@ -955,11 +993,19 @@ public class SwtMock implements IGuiMock {
     return null;
   }
 
+  /**
+   * Removes mnemonics and the '*' character that indicates dirty state
+   */
+  protected String cleanCTabItemTitle(String title) {
+    String result = StringUtility.removeMnemonic(title);
+    return StringUtility.removePrefixes(result, "*").trim();
+  }
+
   protected Control waitForPushButtonWithLabel(final String label) {
     return waitUntil(new WaitCondition<Control>() {
       @Override
       public Control run() {
-        return syncExec(new MockRunnable<Control>() {
+        return syncExec(new WaitCondition<Control>() {
           @Override
           public Control run() throws Throwable {
             for (Shell shell : getDisplay().getShells()) {
@@ -983,7 +1029,7 @@ public class SwtMock implements IGuiMock {
     return waitUntil(new WaitCondition<Control>() {
       @Override
       public Control run() {
-        return syncExec(new MockRunnable<Control>() {
+        return syncExec(new WaitCondition<Control>() {
           @Override
           public Control run() throws Throwable {
             Control lastSecondaryCandidate = null;
@@ -1010,7 +1056,7 @@ public class SwtMock implements IGuiMock {
     return waitUntil(new WaitCondition<Control>() {
       @Override
       public Control run() {
-        return syncExec(new MockRunnable<Control>() {
+        return syncExec(new WaitCondition<Control>() {
           @Override
           public Control run() throws Throwable {
             List<Composite> parents = enumerateParentContainers();
@@ -1036,7 +1082,7 @@ public class SwtMock implements IGuiMock {
     return waitUntil(new WaitCondition<MenuItem>() {
       @Override
       public MenuItem run() {
-        return syncExec(new MockRunnable<MenuItem>() {
+        return syncExec(new WaitCondition<MenuItem>() {
           @Override
           public MenuItem run() throws Throwable {
             String label = cleanButtonLabel(name);
@@ -1084,7 +1130,7 @@ public class SwtMock implements IGuiMock {
 
   }
 
-  protected <T> T syncExec(final MockRunnable<T> r) {
+  protected <T> T syncExec(final WaitCondition<T> r) {
     if (getDisplay().getThread() != Thread.currentThread()) {
       final AtomicReference<T> ret = new AtomicReference<T>();
       final AtomicReference<Throwable> ex = new AtomicReference<Throwable>();
@@ -1132,13 +1178,106 @@ public class SwtMock implements IGuiMock {
 
   @Override
   public void clickLeftOnSmartFieldMagnifier(FieldState fieldState) {
-    gotoPoint(fieldState.x + fieldState.width + 10, fieldState.y + 10);
-    clickLeft();
+    final Control c = (Control) fieldState.widget;
+    if (c != null) {
+      try {
+        final AtomicReference<Point> buttonLocation = new AtomicReference<Point>();
+        final AtomicReference<Throwable> ex = new AtomicReference<Throwable>();
+        getDisplay().syncExec(new Runnable() {
+          @Override
+          public void run() {
+            try {
+              Button button = getNextButton(c);
+              Point p = button.toDisplay(5, 5);
+              buttonLocation.set(p);
+            }
+            catch (Throwable t) {
+              ex.set(t);
+            }
+          }
+        });
+        if (ex.get() != null) {
+          throw ex.get();
+        }
+        Point p = buttonLocation.get();
+        gotoPoint(p.x, p.y);
+        clickLeft();
+      }
+      catch (Throwable t) {
+        throw new RuntimeException(t);
+      }
+    }
+    else {
+      gotoPoint(fieldState.x + fieldState.width + 10, fieldState.y + 10);
+      clickLeft();
+    }
   }
 
   @Override
   public void clickRightOnSmartFieldMagnifier(FieldState fieldState) {
-    gotoPoint(fieldState.x + fieldState.width + 10, fieldState.y + 10);
-    clickRight();
+    final Control c = (Control) fieldState.widget;
+    if (c != null) {
+      try {
+        final AtomicReference<Point> buttonLocation = new AtomicReference<Point>();
+        final AtomicReference<Throwable> ex = new AtomicReference<Throwable>();
+        getDisplay().syncExec(new Runnable() {
+          @Override
+          public void run() {
+            try {
+              Button button = getNextButton(c);
+              Point p = button.toDisplay(5, 5);
+              buttonLocation.set(p);
+            }
+            catch (Throwable t) {
+              ex.set(t);
+            }
+          }
+        });
+        if (ex.get() != null) {
+          throw ex.get();
+        }
+        Point p = buttonLocation.get();
+        gotoPoint(p.x, p.y);
+        clickRight();
+      }
+      catch (Throwable t) {
+        throw new RuntimeException(t);
+      }
+    }
+    else {
+      gotoPoint(fieldState.x + fieldState.width + 10, fieldState.y + 10);
+      clickRight();
+    }
+  }
+
+  private Button getNextButton(Control c) {
+    if (c instanceof Button) {
+      return (Button) c;
+    }
+    if (c instanceof Composite) {
+      Button b = findButtonInComposite((Composite) c);
+      if (b != null) {
+        return b;
+      }
+      if (c.getParent() != null) {
+        return getNextButton(c.getParent());
+      }
+    }
+    return null;
+  }
+
+  private Button findButtonInComposite(Composite comp) {
+    for (Control c : comp.getChildren()) {
+      if (c instanceof Button) {
+        return (Button) c;
+      }
+      if (c instanceof Composite) {
+        Button b = findButtonInComposite((Composite) c);
+        if (b != null) {
+          return b;
+        }
+      }
+    }
+    return null;
   }
 }

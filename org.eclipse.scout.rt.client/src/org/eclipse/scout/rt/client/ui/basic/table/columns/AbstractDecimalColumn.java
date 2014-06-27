@@ -10,33 +10,24 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.basic.table.columns;
 
+import java.math.RoundingMode;
 import java.text.DecimalFormat;
-import java.text.NumberFormat;
 
+import org.eclipse.scout.commons.LocaleThreadLocal;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
-import org.eclipse.scout.rt.client.ui.form.fields.decimalfield.AbstractDecimalField;
+import org.eclipse.scout.rt.client.ui.form.fields.decimalfield.IDecimalField;
+import org.eclipse.scout.rt.client.ui.valuecontainer.IDecimalValueContainer;
 
 /**
  * Column holding Decimal number
  */
-public abstract class AbstractDecimalColumn<T extends Number> extends AbstractColumn<T> implements IDecimalColumn<T> {
-  // DO NOT init members, this has the same effect as if they were set AFTER
-  // initConfig()
-  private String m_format;
-  private boolean m_groupingUsed;
-  private NumberFormat m_fmt;
-  private int m_maxFractionDigits;
-  private int m_minFractionDigits;
-  private int m_fractionDigits;
-  private boolean m_percent;
-  private int m_multiplier;
-  private T m_minValue;
-  private T m_maxValue;
+@ClassId("961989bf-d585-40a2-ab9f-b7e545baaac9")
+public abstract class AbstractDecimalColumn<T extends Number> extends AbstractNumberColumn<T> implements IDecimalColumn<T> {
 
   public AbstractDecimalColumn() {
     super();
@@ -47,40 +38,14 @@ public abstract class AbstractDecimalColumn<T extends Number> extends AbstractCo
     return 1;
   }
 
+  @Override
+  protected RoundingMode getConfiguredRoundingMode() {
+    return RoundingMode.HALF_UP;
+  }
+
   /*
    * Configuration
    */
-
-  /**
-   * Configures the format used to render the value. See {@link DecimalFormat#applyPattern(String)} for more information
-   * about the expected format.
-   * <p>
-   * Subclasses can override this method. Default is {@code null}.
-   * 
-   * @return Format of this column.
-   */
-  @ConfigProperty(ConfigProperty.STRING)
-  @Order(140)
-  @ConfigPropertyValue("null")
-  protected String getConfiguredFormat() {
-    return null;
-  }
-
-  /**
-   * Configures whether grouping is used for this column. If grouping is used, the values may be displayed with a digit
-   * group separator.
-   * <p>
-   * Subclasses can override this method. Default is {@code true}.
-   * 
-   * @return {@code true} if grouping is used for this column, {@code false} otherwise.
-   */
-  @ConfigProperty(ConfigProperty.BOOLEAN)
-  @Order(150)
-  @ConfigPropertyValue("true")
-  protected boolean getConfiguredGroupingUsed() {
-    return true;
-  }
-
   /**
    * Configures the minimum number of fraction digits used to display the value. To use an exact number of fraction
    * digits, the same number as for {@link #getConfiguredMaxFractionDigits()} must be returned.
@@ -93,7 +58,6 @@ public abstract class AbstractDecimalColumn<T extends Number> extends AbstractCo
    */
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(160)
-  @ConfigPropertyValue("2")
   protected int getConfiguredMinFractionDigits() {
     return 2;
   }
@@ -110,7 +74,6 @@ public abstract class AbstractDecimalColumn<T extends Number> extends AbstractCo
    */
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(170)
-  @ConfigPropertyValue("2")
   protected int getConfiguredMaxFractionDigits() {
     return 2;
   }
@@ -126,7 +89,6 @@ public abstract class AbstractDecimalColumn<T extends Number> extends AbstractCo
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(180)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredPercent() {
     return false;
   }
@@ -141,162 +103,115 @@ public abstract class AbstractDecimalColumn<T extends Number> extends AbstractCo
    */
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(190)
-  @ConfigPropertyValue("1")
   protected int getConfiguredMultiplier() {
     return 1;
   }
 
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(200)
-  @ConfigPropertyValue("2")
   protected int getConfiguredFractionDigits() {
     return 2;
   }
 
+  @SuppressWarnings("deprecation")
   @Override
   protected void initConfig() {
     super.initConfig();
-    setFormat(getConfiguredFormat());
-    setGroupingUsed(getConfiguredGroupingUsed());
     setMinFractionDigits(getConfiguredMinFractionDigits());
     setMaxFractionDigits(getConfiguredMaxFractionDigits());
     setPercent(getConfiguredPercent());
     setFractionDigits(getConfiguredFractionDigits());
     setMultiplier(getConfiguredMultiplier());
+    if (getConfiguredFormat() != null) {
+      getFormatInternal().applyPattern(getConfiguredFormat());
+    }
   }
 
   /*
    * Runtime
    */
   @Override
-  public void setFormat(String s) {
-    m_format = s;
-    setNumberFormat(null);
-  }
-
-  protected final void setNumberFormat(NumberFormat fmt) {
-    m_fmt = fmt;
-    validateColumnValues();
-  }
-
-  @Override
-  public NumberFormat getNumberFormat() {
-    return m_fmt;
-  }
-
-  @Override
-  public String getFormat() {
-    return m_format;
-  }
-
-  @Override
-  public void setGroupingUsed(boolean b) {
-    m_groupingUsed = b;
-    setNumberFormat(null);
-  }
-
-  @Override
-  public boolean isGroupingUsed() {
-    return m_groupingUsed;
-  }
-
-  @Override
   public void setMinFractionDigits(int i) {
-    if (i > getMaxFractionDigits()) {
-      m_maxFractionDigits = i;
-    }
-    m_minFractionDigits = i;
-    setNumberFormat(null);
+    DecimalFormat format = getFormat();
+    format.setMinimumFractionDigits(i);
+    setFormat(format);
   }
 
   @Override
   public int getMinFractionDigits() {
-    return m_minFractionDigits;
+    return getFormatInternal().getMinimumFractionDigits();
   }
 
   @Override
   public void setMaxFractionDigits(int i) {
-    if (i < getMinFractionDigits()) {
-      m_minFractionDigits = i;
-    }
-    m_maxFractionDigits = i;
-    setNumberFormat(null);
+    DecimalFormat format = getFormat();
+    format.setMaximumFractionDigits(i);
+    setFormat(format);
   }
 
   @Override
   public int getMaxFractionDigits() {
-    return m_maxFractionDigits;
+    return getFormatInternal().getMaximumFractionDigits();
   }
 
   @Override
   public void setPercent(boolean b) {
-    m_percent = b;
-    setNumberFormat(null);
+    DecimalFormat percentDF = (DecimalFormat) DecimalFormat.getPercentInstance(LocaleThreadLocal.get());
+    DecimalFormat format = getFormat();
+    if (b) {
+      format.setPositiveSuffix(percentDF.getPositiveSuffix());
+      format.setNegativeSuffix(percentDF.getNegativeSuffix());
+    }
+    else {
+      if (isPercent()) {
+        format.setPositiveSuffix("");
+        format.setNegativeSuffix("");
+      }
+    }
+    setFormat(format);
   }
 
   @Override
   public boolean isPercent() {
-    return m_percent;
+    DecimalFormat percentDF = (DecimalFormat) DecimalFormat.getPercentInstance(LocaleThreadLocal.get());
+    DecimalFormat internalDF = getFormatInternal();
+    return internalDF.getPositiveSuffix().equals(percentDF.getPositiveSuffix()) && internalDF.getNegativeSuffix().equals(percentDF.getNegativeSuffix());
   }
 
   @Override
   public void setFractionDigits(int i) {
-    m_fractionDigits = i;
+    propertySupport.setPropertyInt(IDecimalValueContainer.PROP_PARSING_FRACTION_DIGITS, i);
   }
 
   @Override
   public int getFractionDigits() {
-    return m_fractionDigits;
+    return propertySupport.getPropertyInt(IDecimalValueContainer.PROP_PARSING_FRACTION_DIGITS);
   }
 
   @Override
   public void setMultiplier(int i) {
-    m_multiplier = i;
-    setNumberFormat(null);
+    DecimalFormat format = getFormat();
+    format.setMultiplier(i);
+    setFormat(format);
   }
 
   @Override
   public int getMultiplier() {
-    return m_multiplier;
+    return getFormatInternal().getMultiplier();
   }
 
   @Override
-  public void setMaxValue(T value) {
-    m_maxValue = value;
-    validateColumnValues();
-  }
-
-  @Override
-  public T getMaxValue() {
-    return m_maxValue;
-  }
-
-  @Override
-  public void setMinValue(T value) {
-    m_minValue = value;
-    validateColumnValues();
-  }
-
-  @Override
-  public T getMinValue() {
-    return m_minValue;
-  }
-
-  protected abstract AbstractDecimalField<T> getEditorField();
+  protected abstract IDecimalField<T> getEditorField();
 
   @Override
   protected IFormField prepareEditInternal(ITableRow row) throws ProcessingException {
-    AbstractDecimalField<T> f = getEditorField();
-    f.setFormat(getFormat());
-    f.setMaxFractionDigits(getMaxFractionDigits());
-    f.setMinFractionDigits(getMinFractionDigits());
-    f.setFractionDigits(getNumberFormat().getMaximumFractionDigits());
-    f.setMultiplier(getMultiplier());
-    f.setGroupingUsed(isGroupingUsed());
-    f.setPercent(isPercent());
-    f.setMinValue(getMinValue());
-    f.setMaxValue(getMaxValue());
+    IDecimalField<T> f = getEditorField();
+    mapEditorFieldProperties(f);
     return f;
   }
 
+  protected void mapEditorFieldProperties(IDecimalField<T> f) {
+    super.mapEditorFieldProperties(f);
+    f.setFractionDigits(getFractionDigits());
+  }
 }

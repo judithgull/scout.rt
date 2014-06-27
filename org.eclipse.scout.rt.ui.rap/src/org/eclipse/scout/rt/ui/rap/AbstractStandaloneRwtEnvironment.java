@@ -19,15 +19,18 @@ import javax.security.auth.Subject;
 import org.eclipse.jface.dialogs.ProgressMonitorDialog;
 import org.eclipse.rap.rwt.service.ServerPushSession;
 import org.eclipse.scout.commons.CompositeLong;
+import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.IClientSession;
-import org.eclipse.scout.rt.client.servicetunnel.IServiceTunnel;
+import org.eclipse.scout.rt.client.servicetunnel.http.IClientServiceTunnel;
 import org.eclipse.scout.rt.client.ui.form.IForm;
+import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.rt.ui.rap.util.RwtUtility;
 import org.eclipse.scout.rt.ui.rap.window.IRwtScoutPart;
 import org.eclipse.scout.rt.ui.rap.window.desktop.RwtScoutDesktop;
 import org.eclipse.scout.rt.ui.rap.window.desktop.nonmodalFormBar.RwtScoutFormButtonBar;
+import org.eclipse.scout.service.SERVICES;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
@@ -123,11 +126,29 @@ public abstract class AbstractStandaloneRwtEnvironment extends AbstractRwtEnviro
     }
 
     while (!shell.isDisposed()) {
-      if (!m_display.readAndDispatch()) {
-        m_display.sleep();
+      try {
+        if (!m_display.readAndDispatch()) {
+          m_display.sleep();
+        }
+      }
+      //Catch only exception instead of throwable to allow proper uithread shutdown (see UIThread.UIThreadTerminationError
+      catch (Exception e) {
+        handleEventLoopException(e);
       }
     }
     return 0;
+  }
+
+  protected void handleEventLoopException(final Exception e) {
+    invokeScoutLater(new Runnable() {
+
+      @Override
+      public void run() {
+        ProcessingException p = new ProcessingException("", e);
+        SERVICES.getService(IExceptionHandlerService.class).handleException(p);
+      }
+
+    }, 0);
   }
 
   protected void createApplicationContent(final Composite parent) {
@@ -158,7 +179,7 @@ public abstract class AbstractStandaloneRwtEnvironment extends AbstractRwtEnviro
    *         established.
    */
   protected boolean needsClientNotificationServerPushSession() {
-    IServiceTunnel serviceTunnel = getClientSession().getServiceTunnel();
+    IClientServiceTunnel serviceTunnel = getClientSession().getServiceTunnel();
     if (serviceTunnel != null) {
       // necessary if client notification polling is enabled
       return serviceTunnel.getClientNotificationPollInterval() > -1;

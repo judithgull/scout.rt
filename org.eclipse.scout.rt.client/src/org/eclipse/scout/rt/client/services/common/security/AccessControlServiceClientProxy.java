@@ -10,10 +10,10 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.services.common.security;
 
-import java.lang.reflect.Method;
 import java.security.AllPermission;
 import java.security.Permission;
 import java.security.Permissions;
+import java.util.Collection;
 import java.util.Enumeration;
 import java.util.List;
 
@@ -27,7 +27,7 @@ import org.eclipse.scout.rt.client.IClientSession;
 import org.eclipse.scout.rt.client.services.common.clientnotification.ClientNotificationConsumerEvent;
 import org.eclipse.scout.rt.client.services.common.clientnotification.IClientNotificationConsumerListener;
 import org.eclipse.scout.rt.client.services.common.clientnotification.IClientNotificationConsumerService;
-import org.eclipse.scout.rt.client.servicetunnel.ServiceTunnelUtility;
+import org.eclipse.scout.rt.servicetunnel.ServiceTunnelUtility;
 import org.eclipse.scout.rt.shared.security.BasicHierarchyPermission;
 import org.eclipse.scout.rt.shared.security.FineGrainedAccessCheckRequiredException;
 import org.eclipse.scout.rt.shared.services.common.security.AccessControlChangedNotification;
@@ -35,6 +35,7 @@ import org.eclipse.scout.rt.shared.services.common.security.IAccessControlServic
 import org.eclipse.scout.rt.shared.services.common.security.ResetAccessControlChangedNotification;
 import org.eclipse.scout.service.AbstractService;
 import org.eclipse.scout.service.SERVICES;
+import org.osgi.framework.ServiceRegistration;
 
 /**
  * Access control permissions received from backend (JAAS permissions), cached for convenience and performance.
@@ -63,10 +64,9 @@ public class AccessControlServiceClientProxy extends AbstractService implements 
     return data;
   }
 
-  @SuppressWarnings("deprecation")
   @Override
-  public void initializeService() {
-    super.initializeService();
+  public void initializeService(ServiceRegistration registration) {
+    super.initializeService(registration);
     // add client notification listener
     SERVICES.getService(IClientNotificationConsumerService.class).addGlobalClientNotificationConsumerListener(new IClientNotificationConsumerListener() {
       @Override
@@ -193,31 +193,12 @@ public class AccessControlServiceClientProxy extends AbstractService implements 
   }
 
   @Override
-  public void clearCacheOfUserIds(String... userIds) {
-    //nop
-  }
-
-  /**
-   * @deprecated Use {@link #clearCacheOfUserIds(String...)} instead. Will be removed in Release 3.10.
-   */
-  @SuppressWarnings("deprecation")
-  @Deprecated
-  @Override
-  public void clearCacheOfPrincipals(String... userIds) {
+  public void clearCacheOfUserIds(Collection<String> userIds) {
     //nop
   }
 
   private IAccessControlService getRemoteService() {
     return ServiceTunnelUtility.createProxy(IAccessControlService.class, ClientSyncJob.getCurrentSession().getServiceTunnel());
-  }
-
-  /**
-   * no service tunnel access on client side
-   */
-  @Override
-  @SuppressWarnings("deprecation")
-  public boolean checkServiceTunnelAccess(Class serviceInterface, Method method, Object[] args) {
-    return false;
   }
 
   private static class ServiceState {

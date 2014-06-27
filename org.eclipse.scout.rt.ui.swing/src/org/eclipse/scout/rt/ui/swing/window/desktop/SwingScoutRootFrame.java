@@ -21,6 +21,7 @@ import java.awt.TrayIcon.MessageType;
 import java.awt.event.ActionEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.util.Set;
 
 import javax.swing.AbstractAction;
 import javax.swing.ActionMap;
@@ -37,6 +38,7 @@ import javax.swing.RootPaneContainer;
 import javax.swing.UIManager;
 import javax.swing.border.EmptyBorder;
 
+import org.eclipse.core.runtime.Platform;
 import org.eclipse.scout.commons.exception.IProcessingStatus;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
@@ -58,6 +60,7 @@ import org.eclipse.scout.rt.ui.swing.ext.JFrameEx;
 import org.eclipse.scout.rt.ui.swing.ext.JPanelEx;
 import org.eclipse.scout.rt.ui.swing.ext.JRootPaneEx;
 import org.eclipse.scout.rt.ui.swing.ext.busy.SwingBusyIndicator;
+import org.eclipse.scout.rt.ui.swing.ext.internal.LogicalGridLayoutSpyAction;
 import org.eclipse.scout.rt.ui.swing.focus.SwingScoutFocusTraversalPolicy;
 import org.eclipse.scout.rt.ui.swing.window.desktop.layout.MultiSplitDesktopManager;
 import org.eclipse.scout.rt.ui.swing.window.desktop.menubar.SwingScoutMenuBar;
@@ -82,7 +85,7 @@ public class SwingScoutRootFrame extends SwingScoutComposite<IDesktop> implement
   private SwingScoutStatusBar m_statusBarComposite;
   // cache
   private String m_title;
-  private IKeyStroke[] m_installedScoutKs;
+  private Set<IKeyStroke> m_installedScoutKs;
 
   public SwingScoutRootFrame(Frame frame) {
     super();
@@ -196,6 +199,11 @@ public class SwingScoutRootFrame extends SwingScoutComposite<IDesktop> implement
     if (contentPane instanceof JComponent) {
       ((JComponent) contentPane).getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(SwingUtility.createKeystroke("shift alt F1"), "componentSpy");
       ((JComponent) contentPane).getActionMap().put("componentSpy", new ComponentSpyAction());
+      // register layout spy
+      if (Platform.inDevelopmentMode()) {
+        ((JComponent) contentPane).getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(SwingUtility.createKeystroke("shift alt F2"), "layoutSpy");
+        ((JComponent) contentPane).getActionMap().put("layoutSpy", new LogicalGridLayoutSpyAction());
+      }
     }
   }
 
@@ -273,8 +281,7 @@ public class SwingScoutRootFrame extends SwingScoutComposite<IDesktop> implement
     if (component != null) {
       // remove old key strokes
       if (m_installedScoutKs != null) {
-        for (int i = 0; i < m_installedScoutKs.length; i++) {
-          IKeyStroke scoutKs = m_installedScoutKs[i];
+        for (IKeyStroke scoutKs : m_installedScoutKs) {
           KeyStroke swingKs = SwingUtility.createKeystroke(scoutKs);
           //
           InputMap imap = component.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
@@ -285,7 +292,7 @@ public class SwingScoutRootFrame extends SwingScoutComposite<IDesktop> implement
       }
       m_installedScoutKs = null;
       // add new key strokes
-      IKeyStroke[] scoutKeyStrokes = getScoutObject().getKeyStrokes();
+      Set<IKeyStroke> scoutKeyStrokes = getScoutObject().getKeyStrokes();
       for (IKeyStroke scoutKs : scoutKeyStrokes) {
         int swingWhen = JComponent.WHEN_IN_FOCUSED_WINDOW;
         KeyStroke swingKs = SwingUtility.createKeystroke(scoutKs);
@@ -411,6 +418,18 @@ public class SwingScoutRootFrame extends SwingScoutComposite<IDesktop> implement
     m_swingFrame.dispose();
   }
 
+  protected void handleTraverseFocusFromScout(boolean forward) {
+    Component comp = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+    if (comp != null) {
+      if (forward) {
+        comp.transferFocus();
+      }
+      else {
+        comp.transferFocusBackward();
+      }
+    }
+  }
+
   protected void handleScoutPrintInSwing(DesktopEvent e) {
     final WidgetPrinter cp = new WidgetPrinter(getSwingFrame());
     try {
@@ -481,6 +500,26 @@ public class SwingScoutRootFrame extends SwingScoutComposite<IDesktop> implement
             }
           };
           getSwingEnvironment().invokeSwingAndWait(t, 60000);
+          break;
+        }
+        case DesktopEvent.TYPE_TRAVERSE_FOCUS_NEXT: {
+          Runnable t = new Runnable() {
+            @Override
+            public void run() {
+              handleTraverseFocusFromScout(true);
+            }
+          };
+          getSwingEnvironment().invokeSwingLater(t);
+          break;
+        }
+        case DesktopEvent.TYPE_TRAVERSE_FOCUS_PREVIOUS: {
+          Runnable t = new Runnable() {
+            @Override
+            public void run() {
+              handleTraverseFocusFromScout(false);
+            }
+          };
+          getSwingEnvironment().invokeSwingLater(t);
           break;
         }
       }

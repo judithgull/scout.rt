@@ -14,12 +14,13 @@ import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashSet;
+import java.util.List;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.ConfigurationUtility;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
@@ -37,6 +38,7 @@ import org.eclipse.scout.rt.client.ui.form.fields.AbstractFormField;
 import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.service.SERVICES;
 
+@ClassId("8fbfbf19-ff9d-4e89-8a78-8e6a4a8dc36c")
 public abstract class AbstractPlannerField<T extends ITable, P extends IActivityMap<RI, AI>, RI, AI> extends AbstractFormField implements IPlannerField<T, P, RI, AI> {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractPlannerField.class);
 
@@ -69,14 +71,12 @@ public abstract class AbstractPlannerField<T extends ITable, P extends IActivity
 
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(10)
-  @ConfigPropertyValue("2")
   protected int getConfiguredMiniCalendarCount() {
     return 2;
   }
 
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(20)
-  @ConfigPropertyValue("168")
   protected int getConfiguredSplitterPosition() {
     return 168;
   }
@@ -127,28 +127,27 @@ public abstract class AbstractPlannerField<T extends ITable, P extends IActivity
    */
   @ConfigOperation
   @Order(10)
-  protected Object[][] execLoadActivityMapData(RI[] resourceIds, ITableRow[] resourceRows) throws ProcessingException {
+  protected Object[][] execLoadActivityMapData(List<? extends RI> resourceIds, List<? extends ITableRow> resourceRows) throws ProcessingException {
     return null;
   }
 
   /**
    * Load activity data<br>
-   * By default loads data using {@link #execLoadActivityMapData(ITableRow[], long[])}, transforms to
-   * {@link ActivityCell}, maps to resources using the resourceId, and sets the {@link ActivityCell}s on the
-   * coresponding activtyRow.
+   * By default loads data using {@link #execLoadActivityMapData(List, List)}, transforms to {@link ActivityCell}, maps
+   * to resources using the resourceId, and sets the {@link ActivityCell}s on the
+   * corresponding activtyRow.
    */
-  @SuppressWarnings("unchecked")
   @ConfigOperation
   @Order(10)
-  protected void execPopulateActivities(RI[] resourceIds, ITableRow[] resourceRows) throws ProcessingException {
+  protected void execPopulateActivities(List<RI> resourceIds, List<ITableRow> resourceRows) throws ProcessingException {
     Object[][] data = execLoadActivityMapData(resourceIds, resourceRows);
     ArrayList<ActivityCell<RI, AI>> list = new ArrayList<ActivityCell<RI, AI>>();
     for (Object[] row : data) {
       ActivityCell<RI, AI> cell = new ActivityCell<RI, AI>(row);
       list.add(cell);
     }
-    getActivityMap().removeActivityCells(resourceIds);
-    getActivityMap().addActivityCells(list.toArray(new ActivityCell[list.size()]));
+    getActivityMap().removeActivityCellsById(resourceIds);
+    getActivityMap().addActivityCells(list);
   }
 
   @Override
@@ -167,7 +166,7 @@ public abstract class AbstractPlannerField<T extends ITable, P extends IActivity
         m_resourceTable.setEnabled(isEnabled());
       }
       catch (Exception e) {
-        LOG.warn(null, e);
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + getConfiguredResourceTable().getName() + "'.", e));
       }
       for (IColumn c : getResourceTable().getColumnSet().getKeyColumns()) {
         m_resourceIdColumn = c;
@@ -182,7 +181,7 @@ public abstract class AbstractPlannerField<T extends ITable, P extends IActivity
         m_activityMap = (P) ConfigurationUtility.newInnerInstance(this, getConfiguredActivityMap());
       }
       catch (Exception e) {
-        LOG.warn(null, e);
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + getConfiguredActivityMap().getName() + "'.", e));
       }
       if (m_activityMap instanceof AbstractActivityMap) {
         ((AbstractActivityMap) m_activityMap).setContainerInternal(this);
@@ -275,12 +274,11 @@ public abstract class AbstractPlannerField<T extends ITable, P extends IActivity
     loadActivityMapDataInternal(getResourceTable().getSelectedRows());
   }
 
-  private void loadActivityMapDataInternal(ITableRow[] resourceRows) throws ProcessingException {
-    RI[] resourceIds = getResourceIdColumnInternal().getValues(resourceRows);
+  private void loadActivityMapDataInternal(List<? extends ITableRow> resourceRows) throws ProcessingException {
+    List<RI> resourceIds = getResourceIdColumnInternal().getValues(resourceRows);
     try {
       getActivityMap().setActivityMapChanging(true);
-      //
-      execPopulateActivities(resourceIds, resourceRows);
+      execPopulateActivities(CollectionUtility.arrayList(resourceIds), CollectionUtility.arrayList(resourceRows));
     }
     finally {
       getActivityMap().setActivityMapChanging(false);
@@ -298,25 +296,25 @@ public abstract class AbstractPlannerField<T extends ITable, P extends IActivity
   }
 
   @Override
-  public ITableRow[] activityCellsToResourceRows(ActivityCell<RI, AI>[] activityCells) {
-    HashSet<ITableRow> resourceRowSet = new HashSet<ITableRow>();
+  public List<ITableRow> activityCellsToResourceRows(List<? extends ActivityCell<RI, AI>> activityCells) {
+    List<ITableRow> resourceRowSet = new ArrayList<ITableRow>(activityCells.size());
     for (ActivityCell<RI, AI> cell : activityCells) {
       ITableRow resourceRow = getResourceIdColumnInternal().findRow(cell.getResourceId());
       if (resourceRow != null) {
         resourceRowSet.add(resourceRow);
       }
     }
-    return resourceRowSet.toArray(new ITableRow[resourceRowSet.size()]);
+    return resourceRowSet;
   }
 
   @Override
-  public ActivityCell<RI, AI>[] resourceRowToActivityCells(ITableRow resourceRow) {
-    return resourceRowsToActivityCells(new ITableRow[]{resourceRow});
+  public List<ActivityCell<RI, AI>> resourceRowToActivityCells(ITableRow resourceRow) {
+    return resourceRowsToActivityCells(CollectionUtility.arrayList(resourceRow));
   }
 
   @Override
-  public ActivityCell<RI, AI>[] resourceRowsToActivityCells(ITableRow[] resourceRows) {
-    return getActivityMap().getActivityCells((RI[]) getResourceIdColumnInternal().getValues(resourceRows));
+  public List<ActivityCell<RI, AI>> resourceRowsToActivityCells(List<? extends ITableRow> resourceRows) {
+    return getActivityMap().getActivityCells(getResourceIdColumnInternal().getValues(resourceRows));
   }
 
   private void syncSelectionFromResourceToActivity() {
@@ -326,7 +324,7 @@ public abstract class AbstractPlannerField<T extends ITable, P extends IActivity
     try {
       m_selectionMediatorRunning = true;
       //
-      getActivityMap().setSelectedResourceIds((RI[]) getResourceIdColumnInternal().getSelectedValues());
+      getActivityMap().setSelectedResourceIds(getResourceIdColumnInternal().getSelectedValues());
     }
     finally {
       m_selectionMediatorRunning = false;
@@ -340,7 +338,7 @@ public abstract class AbstractPlannerField<T extends ITable, P extends IActivity
     try {
       m_selectionMediatorRunning = true;
       //
-      ITableRow[] resourceRows = getResourceIdColumnInternal().findRows(getActivityMap().getSelectedResourceIds());
+      List<ITableRow> resourceRows = getResourceIdColumnInternal().findRows(getActivityMap().getSelectedResourceIds());
       getResourceTable().selectRows(resourceRows, false);
     }
     finally {
@@ -365,6 +363,10 @@ public abstract class AbstractPlannerField<T extends ITable, P extends IActivity
       }
     }
 
+    @Override
+    public void setSplitterPositionFromUI(Integer value) {
+      propertySupport.setPropertyNoFire(PROP_SPLITTER_POSITION, value);
+    }
   }
 
   private class P_ResourceTableListener extends TableAdapter {

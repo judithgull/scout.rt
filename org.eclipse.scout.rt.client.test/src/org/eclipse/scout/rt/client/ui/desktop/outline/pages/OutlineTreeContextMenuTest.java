@@ -10,20 +10,25 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.desktop.outline.pages;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.testenvironment.TestEnvironmentClientSession;
 import org.eclipse.scout.rt.client.ui.action.menu.AbstractMenu;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.IMenuType;
+import org.eclipse.scout.rt.client.ui.action.menu.TableMenuType;
 import org.eclipse.scout.rt.client.ui.basic.table.AbstractTable;
 import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.AbstractStringColumn;
@@ -51,7 +56,7 @@ public class OutlineTreeContextMenuTest {
     IDesktop desktop = TestEnvironmentClientSession.get().getDesktop();
     assertNotNull(desktop);
 
-    desktop.setAvailableOutlines(new IOutline[]{new PageWithTableOutline()});
+    desktop.setAvailableOutlines(Collections.singletonList(new PageWithTableOutline()));
     desktop.setOutline(PageWithTableOutline.class);
 
     IOutline outline = desktop.getOutline();
@@ -70,14 +75,13 @@ public class OutlineTreeContextMenuTest {
     outline.selectFirstNode();
 
     ITreeNode selectedNode = outline.getSelectedNode();
-    IMenu[] menus = selectedNode.getTree().getUIFacade().fireNodePopupFromUI();
+    List<IMenu> menus = selectedNode.getTree().getMenus();
 
-    List<IMenu> actualMenus = Arrays.asList(menus);
     @SuppressWarnings("unchecked")
     List<IMenu> requiredMenus = resolveMenusOfActiveTablePage(outline, PageWithTableEmptySpaceMenu.class, PageWithTableEmptySpace2Menu.class);
 
-    assertTrue(actualMenus.containsAll(requiredMenus));
-    assertTrue(actualMenus.size() == (requiredMenus.size()));
+    assertTrue(OutlineTreeContextMenuNestedPageWithTablesTest.containsAllMenus(menus, requiredMenus));
+    assertEquals(OutlineTreeContextMenuNestedPageWithTablesTest.sizeMenuListWithoutSeparators(menus), requiredMenus.size());
   }
 
   private static void assertRowMenusExistOnTablePageNode(IOutline outline) throws Exception {
@@ -89,11 +93,10 @@ public class OutlineTreeContextMenuTest {
     outline.selectNextChildNode();
 
     ITreeNode selectedNode = outline.getSelectedNode();
-    IMenu[] menus = selectedNode.getTree().getUIFacade().fireNodePopupFromUI();
-    List<IMenu> actualMenus = Arrays.asList(menus);
+    List<IMenu> menus = selectedNode.getTree().getMenus();
 
-    assertTrue(actualMenus.containsAll(requiredMenus));
-    assertTrue(actualMenus.size() == (requiredMenus.size()));
+    assertTrue(OutlineTreeContextMenuNestedPageWithTablesTest.containsAllMenus(menus, requiredMenus));
+    assertEquals(OutlineTreeContextMenuNestedPageWithTablesTest.sizeMenuListWithoutSeparators(menus), requiredMenus.size());
   }
 
   private static List<IMenu> resolveMenusOfActiveTablePage(IOutline outline, Class<? extends IMenu>... menuClasses) throws Exception {
@@ -135,18 +138,13 @@ public class OutlineTreeContextMenuTest {
       public class PageWithTableEmptySpaceMenu extends AbstractMenu {
 
         @Override
-        protected boolean getConfiguredEmptySpaceAction() {
-          return true;
-        }
-
-        @Override
-        protected boolean getConfiguredSingleSelectionAction() {
-          return false;
-        }
-
-        @Override
         protected String getConfiguredText() {
           return "EmptySpace";
+        }
+
+        @Override
+        protected Set<? extends IMenuType> getConfiguredMenuTypes() {
+          return CollectionUtility.hashSet(TableMenuType.EmptySpace);
         }
 
       }
@@ -155,30 +153,28 @@ public class OutlineTreeContextMenuTest {
       public class PageWithTableEmptySpace2Menu extends AbstractMenu {
 
         @Override
-        protected boolean getConfiguredSingleSelectionAction() {
-          return false;
+        protected String getConfiguredText() {
+          return "EmptySpace 2";
         }
 
         @Override
-        protected String getConfiguredText() {
-          return "EmptySpace 2";
+        protected Set<? extends IMenuType> getConfiguredMenuTypes() {
+          return CollectionUtility.hashSet(TableMenuType.EmptySpace);
         }
 
       }
 
       @Order(20.0)
       public class PageWithTableRowMenu extends AbstractMenu {
-
-        @Override
-        protected boolean getConfiguredSingleSelectionAction() {
-          return true;
-        }
-
         @Override
         protected String getConfiguredText() {
           return "Edit";
         }
 
+        @Override
+        protected Set<? extends IMenuType> getConfiguredMenuTypes() {
+          return CollectionUtility.hashSet(TableMenuType.SingleSelection);
+        }
       }
 
       @Order(10)

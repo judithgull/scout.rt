@@ -22,7 +22,7 @@ import org.eclipse.scout.rt.client.ui.form.FormEvent;
 import org.eclipse.scout.rt.client.ui.form.FormListener;
 import org.eclipse.scout.rt.client.ui.form.IForm;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
-import org.eclipse.scout.rt.client.ui.form.fields.smartfield.ISmartFieldProposalForm;
+import org.eclipse.scout.rt.client.ui.form.fields.smartfield.IContentAssistFieldProposalForm;
 import org.eclipse.scout.rt.ui.rap.DefaultValidateRoot;
 import org.eclipse.scout.rt.ui.rap.IValidateRoot;
 import org.eclipse.scout.rt.ui.rap.LogicalGridLayout;
@@ -39,6 +39,7 @@ import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Shell;
 
+@SuppressWarnings("deprecation")
 public class RwtScoutForm extends RwtScoutComposite<IForm> implements IRwtScoutForm {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(RwtScoutForm.class);
   private static final String VARIANT_FORM = "form";
@@ -60,13 +61,17 @@ public class RwtScoutForm extends RwtScoutComposite<IForm> implements IRwtScoutF
     RwtScoutFormFieldGridData layoutData = new RwtScoutFormFieldGridData(getScoutObject().getRootGroupBox());
     getUiField().setLayoutData(layoutData);
     container.setLayout(new LogicalGridLayout(0, 0));
-    container.setData(IValidateRoot.VALIDATE_ROOT_DATA, new DefaultValidateRoot(parent));
+
+    //Add validate root for root form (not for inner forms)
+    if (getScoutObject().getOuterForm() == null) {
+      container.setData(IValidateRoot.VALIDATE_ROOT_DATA, new DefaultValidateRoot(parent));
+    }
   }
 
   @Override
   protected void attachScout() {
     super.attachScout();
-    if (getScoutObject() instanceof ISmartFieldProposalForm) {
+    if (getScoutObject() instanceof IContentAssistFieldProposalForm) {
       getUiContainer().setData(RWT.CUSTOM_VARIANT, RwtUtility.VARIANT_PROPOSAL_FORM);
     }
     if (m_scoutFormListener == null) {

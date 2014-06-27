@@ -23,17 +23,17 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
-import org.eclipse.scout.http.servletfilter.ServletFilterDelegate;
+import org.eclipse.scout.rt.server.commons.servletfilter.ServletFilterDelegate;
 
 /**
  * This filter is registered under the extension point <code>org.eclipse.equinox.http.registry.filters</code> and
  * triggers all registered servlet filters under extension point
- * <code>org.eclipse.scout.http.servletfilter.filters</code>.<br>
+ * <code>org.eclipse.scout.rt.server.commons.filters</code>.<br>
  * The reason for this delegation filter is the support of rankings in the scout servlet filters. In case of security
  * filters a ranking is strong requirement to support chainable security filters.
  */
 public class DelegateFilter implements Filter {
-  private static IScoutLogger LOG = ScoutLogManager.getLogger(DelegateFilter.class);
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(DelegateFilter.class);
 
   private ServletContext m_servletContext;
 

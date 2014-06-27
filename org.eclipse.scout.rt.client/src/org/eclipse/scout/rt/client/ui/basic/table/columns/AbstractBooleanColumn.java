@@ -10,8 +10,8 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.basic.table.columns;
 
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
@@ -23,6 +23,7 @@ import org.eclipse.scout.rt.client.ui.form.fields.booleanfield.AbstractBooleanFi
 /**
  * Column holding Boolean values
  */
+@ClassId("62fcae6b-6b75-4e8c-bb3f-ea3b400e7e30")
 public abstract class AbstractBooleanColumn extends AbstractColumn<Boolean> implements IBooleanColumn {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractBooleanColumn.class);
 
@@ -70,12 +71,8 @@ public abstract class AbstractBooleanColumn extends AbstractColumn<Boolean> impl
   @Override
   protected IFormField prepareEditInternal(final ITableRow row) throws ProcessingException {
     AbstractBooleanField f = new AbstractBooleanField() {
-      @Override
-      protected void initConfig() {
-        super.initConfig();
-        propertySupport.putPropertiesMap(AbstractBooleanColumn.this.propertySupport.getPropertiesMap());
-      }
     };
+    super.mapEditorFieldProperties(f);
     return f;
   }
 
@@ -100,7 +97,6 @@ public abstract class AbstractBooleanColumn extends AbstractColumn<Boolean> impl
    */
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(200)
-  @ConfigPropertyValue("-1")
   protected int getConfiguredVerticalAlignment() {
     return -1; // top position
   }

@@ -68,7 +68,6 @@ public class RwtScoutGroupBox extends RwtScoutFieldComposite<IGroupBox> implemen
    */
   private ScrolledComposite m_scrolledComposite;
   private Section m_section;
-  private Group m_group;
   private Label m_label;
   private Label m_line;
   private Composite m_bodyPart;
@@ -119,7 +118,6 @@ public class RwtScoutGroupBox extends RwtScoutFieldComposite<IGroupBox> implemen
     m_bodyPart.setData(IValidateRoot.VALIDATE_ROOT_DATA, new DefaultValidateRoot(m_bodyPart) {
       @Override
       public void validate() {
-        super.validate();
         if (m_scrolledComposite != null && !m_scrolledComposite.isDisposed()) {
           m_scrolledComposite.setMinSize(computeScrolledCompositeMinSize(true));
         }
@@ -133,8 +131,7 @@ public class RwtScoutGroupBox extends RwtScoutFieldComposite<IGroupBox> implemen
     m_bodyPart.setLayout(bodyLayout);
     installUiContainerBorder();
     // FIELDS:
-    IFormField[] scoutFields = getScoutObject().getControlFields();
-    for (IFormField field : scoutFields) {
+    for (IFormField field : getScoutObject().getControlFields()) {
       IRwtScoutFormField uiScoutComposite = getUiEnvironment().createFormField(m_bodyPart, field);
       RwtScoutFormFieldGridData layoutData = new RwtScoutFormFieldGridData(field);
       uiScoutComposite.getUiContainer().setLayoutData(layoutData);
@@ -204,6 +201,11 @@ public class RwtScoutGroupBox extends RwtScoutFieldComposite<IGroupBox> implemen
     else {
       deco.decoration = IGroupBox.BORDER_DECORATION_LINE;
     }
+  }
+
+  @Override
+  protected void updateKeyStrokesFromScout() {
+    // nop because the child fields also register the keystrokes of theirs parents
   }
 
   protected Composite createContainer(Composite parent) {
@@ -336,15 +338,17 @@ public class RwtScoutGroupBox extends RwtScoutFieldComposite<IGroupBox> implemen
       s = "";
     }
     if (m_section != null) {
+      if (!getScoutObject().isLabelVisible()) {
+        s = "";
+      }
       m_section.setText(s);
-      m_section.layout(true, true);
-    }
-    if (m_group != null) {
-      m_group.setText(s);
+      if (isCreated()) {
+        m_section.layout(true, true);
+      }
     }
     if (m_label != null && m_line != null) {
       m_label.setText(s);
-      if (StringUtility.hasText(s)) {
+      if (StringUtility.hasText(s) && getScoutObject().isLabelVisible()) {
         ((GridData) m_label.getLayoutData()).exclude = false;
         m_label.setVisible(true);
         ((GridData) m_line.getLayoutData()).exclude = false;
@@ -360,7 +364,15 @@ public class RwtScoutGroupBox extends RwtScoutFieldComposite<IGroupBox> implemen
           m_line.setVisible(false);
         }
       }
+      if (isCreated()) {
+        m_label.getParent().layout(true, true);
+      }
     }
+  }
+
+  @Override
+  protected void setLabelVisibleFromScout() {
+    setLabelFromScout(getScoutObject().getLabel());
   }
 
   protected void updateBackgroundImageFromScout() {

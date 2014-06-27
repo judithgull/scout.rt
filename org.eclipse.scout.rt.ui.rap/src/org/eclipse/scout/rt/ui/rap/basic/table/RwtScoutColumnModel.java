@@ -13,7 +13,8 @@ import org.eclipse.scout.rt.client.ui.basic.cell.ICell;
 import org.eclipse.scout.rt.client.ui.basic.table.ITable;
 import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.IColumn;
-import org.eclipse.scout.rt.client.ui.basic.table.columns.ISmartColumn;
+import org.eclipse.scout.rt.client.ui.basic.table.columns.IProposalColumn;
+import org.eclipse.scout.rt.client.ui.basic.table.columns.IStringColumn;
 import org.eclipse.scout.rt.shared.AbstractIcons;
 import org.eclipse.scout.rt.ui.rap.RwtIcons;
 import org.eclipse.scout.rt.ui.rap.extension.UiDecorationExtensionPoint;
@@ -33,14 +34,14 @@ public class RwtScoutColumnModel extends ColumnLabelProvider {
   private transient ListenerList listenerList = null;
   private final ITable m_scoutTable;
   private HashMap<ITableRow, HashMap<IColumn<?>, ICell>> m_cachedCells;
-  private final IRwtScoutTableForPatch m_uiTable;
+  private final RwtScoutTable m_uiTable;
   private final TableColumnManager m_columnManager;
   private Image m_imgCheckboxFalse;
   private Image m_imgCheckboxTrue;
   private Color m_disabledForegroundColor;
   private int m_defaultRowHeight;
 
-  public RwtScoutColumnModel(ITable scoutTable, IRwtScoutTableForPatch uiTable, TableColumnManager columnManager) {
+  public RwtScoutColumnModel(ITable scoutTable, RwtScoutTable uiTable, TableColumnManager columnManager) {
     m_scoutTable = scoutTable;
     m_uiTable = uiTable;
     m_columnManager = columnManager;
@@ -54,7 +55,7 @@ public class RwtScoutColumnModel extends ColumnLabelProvider {
     return m_scoutTable;
   }
 
-  public IRwtScoutTableForPatch getUiTable() {
+  public RwtScoutTable getUiTable() {
     return m_uiTable;
   }
 
@@ -83,20 +84,40 @@ public class RwtScoutColumnModel extends ColumnLabelProvider {
     }
     else if (HtmlTextUtility.isTextWithHtmlMarkup(text)) {
       text = getUiTable().getUiEnvironment().adaptHtmlCell(getUiTable(), text);
-      text = getUiTable().getUiEnvironment().convertLinksWithLocalUrlsInHtmlCell(getUiTable(), text);
+      text = getUiTable().getUiEnvironment().convertLinksInHtmlCell(getUiTable(), text);
     }
     else {
-      boolean multiline = false;
-      if (text.indexOf("\n") >= 0) {
-        multiline = getScoutTable().isMultilineText();
-        if (!multiline) {
-          text = StringUtility.replaceNewLines(text, " ");
-        }
+      boolean multiline = isMultiline(text);
+      if (!multiline) {
+        text = replaceLineBreaksInMultilineText(text);
       }
+      boolean isMultilineTable = getScoutTable().isMultilineText();
       boolean markupEnabled = Boolean.TRUE.equals(getUiTable().getUiField().getData(RWT.MARKUP_ENABLED));
+
       if (markupEnabled || multiline) {
-        text = HtmlTextUtility.transformPlainTextToHtml(text);
+        boolean replaceBreakableChars = true;
+        IColumn<?> column = m_columnManager.getColumnByModelIndex(columnIndex - 1);
+        if (column instanceof IStringColumn && isMultilineTable) {
+          IStringColumn stringColumn = (IStringColumn) column;
+          replaceBreakableChars = !stringColumn.isTextWrap();
+        }
+        text = HtmlTextUtility.transformPlainTextToHtml(text, replaceBreakableChars);
       }
+    }
+    return text;
+  }
+
+  private boolean isMultiline(String text) {
+    return isMultilineText(text) && getScoutTable().isMultilineText();
+  }
+
+  private boolean isMultilineText(String text) {
+    return text.indexOf("\n") >= 0;
+  }
+
+  private String replaceLineBreaksInMultilineText(String text) {
+    if (isMultilineText(text)) {
+      text = StringUtility.replaceNewLines(text, " ");
     }
     return text;
   }
@@ -122,7 +143,7 @@ public class RwtScoutColumnModel extends ColumnLabelProvider {
         checkBoxImage = m_imgCheckboxFalse;
       }
     }
-    else if (col != null && cell != null && col.getDataType() == Boolean.class && (!(col instanceof ISmartColumn) || ((ISmartColumn) col).getLookupCall() == null)) {
+    else if (col != null && cell != null && col.getDataType() == Boolean.class && (!(col instanceof IProposalColumn) || ((IProposalColumn) col).getLookupCall() == null)) {
       Boolean b = (Boolean) cell.getValue();
       if (b != null && b.booleanValue()) {
         checkBoxImage = m_imgCheckboxTrue;

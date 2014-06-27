@@ -154,6 +154,7 @@ public abstract class RwtScoutComposite<T extends IPropertyObserver> implements 
         getUpdateUiFromScoutLock().acquire();
         //
         attachScout();
+        installContextMenu();
       }
       finally {
         getUpdateUiFromScoutLock().release();
@@ -170,6 +171,10 @@ public abstract class RwtScoutComposite<T extends IPropertyObserver> implements 
     finally {
       m_created = true;
     }
+  }
+
+  protected void installContextMenu() {
+
   }
 
   private void setCustomWidgetIds(Widget widget) {
@@ -364,6 +369,13 @@ public abstract class RwtScoutComposite<T extends IPropertyObserver> implements 
    */
   protected void handleUiInputVerifier(boolean doit) {
     //do nothing
+  }
+
+  /**
+   * Forces UI Input to be verified.
+   */
+  public void runUiInputVerifier() {
+    handleUiInputVerifier(true);
   }
 
   protected void handleUiDispose() {

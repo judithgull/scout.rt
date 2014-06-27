@@ -53,7 +53,7 @@ public class SwingScoutForm extends SwingScoutComposite<IForm> implements ISwing
   private ISwingScoutGroupBox m_mainBoxComposite;
   private FormListener m_scoutFormListener;
   private SwingScoutViewListener m_swingScoutViewListener;
-  private ISwingScoutView m_viewComposite;
+  private final ISwingScoutView m_viewComposite;
   private WeakHashMap<FormEvent, Object> m_consumedScoutFormEvents = new WeakHashMap<FormEvent, Object>();
 
   public SwingScoutForm(ISwingEnvironment env, IForm scoutForm) {
@@ -79,15 +79,27 @@ public class SwingScoutForm extends SwingScoutComposite<IForm> implements ISwing
     if (m_viewComposite != null) {
       // attach to view
       m_viewComposite.getSwingContentPane().removeAll();
-      // use grid layout with decent min-width
-      JPanelEx optimalSizePanel = new JPanelEx(new LogicalGridLayout(getSwingEnvironment(), 0, 0));
-      optimalSizePanel.setName(getScoutForm().getClass().getSimpleName() + ".optimalSizePanel");
-      SwingScoutFormFieldGridData layoutData = new SwingScoutFormFieldGridData(getScoutForm().getRootGroupBox());
-      getSwingFormPane().putClientProperty(LogicalGridData.CLIENT_PROPERTY_NAME, layoutData);
-      optimalSizePanel.add(getSwingFormPane());
-      m_viewComposite.getSwingContentPane().add(BorderLayout.CENTER, optimalSizePanel);
+      Component rootPanel = decorateFormPane(getSwingFormPane());
+      m_viewComposite.getSwingContentPane().add(BorderLayout.CENTER, rootPanel);
       attachSwingView();
     }
+  }
+
+  /**
+   * Decorates the form pane. The default implementation wraps the form pane in a JPanelEx with a LogicalGridLayout,
+   * acting as parent for the form pane. Override this method if you have to change this behavior. For instance when
+   * you don't need the wrapper pane at all, you'd simply return the formPane here.
+   * 
+   * @param formPane
+   * @return
+   */
+  protected Component decorateFormPane(JComponent formPane) {
+    JPanelEx wrapperPanel = new JPanelEx(new LogicalGridLayout(getSwingEnvironment(), 0, 0));
+    wrapperPanel.setName(getScoutForm().getClass().getSimpleName() + ".optimalSizePanel");
+    SwingScoutFormFieldGridData layoutData = new SwingScoutFormFieldGridData(getScoutForm().getRootGroupBox());
+    getSwingFormPane().putClientProperty(LogicalGridData.CLIENT_PROPERTY_NAME, layoutData);
+    wrapperPanel.add(formPane);
+    return wrapperPanel;
   }
 
   @Override
@@ -307,9 +319,25 @@ public class SwingScoutForm extends SwingScoutComposite<IForm> implements ISwing
   protected void handlePrintFromScout(final FormEvent e) {
     WidgetPrinter wp = null;
     try {
-      if (m_viewComposite != null) {
+      ISwingScoutView view = m_viewComposite;
+      if (view == null) {
+        // the current form has no view: it is a nested form (e.g. in a AbstractWrappedFormField)
+        // get the most outer form which must have a view and use this one (bugzilla 431791).
+        IForm tmp = getScoutForm();
+        IForm outerForm = getScoutForm();
+        while ((tmp = tmp.getOuterForm()) != null) {
+          outerForm = tmp;
+        }
+        if (outerForm != getScoutForm()) {
+          ISwingScoutForm topForm = getSwingEnvironment().getStandaloneFormComposite(outerForm);
+          if (topForm != null) {
+            view = topForm.getView();
+          }
+        }
+      }
+      if (view != null) {
         if (e.getFormField() != null) {
-          for (JComponent c : SwingUtility.findChildComponents(m_viewComposite.getSwingContentPane(), JComponent.class)) {
+          for (JComponent c : SwingUtility.findChildComponents(view.getSwingContentPane(), JComponent.class)) {
             IPropertyObserver scoutModel = SwingScoutComposite.getScoutModelOnWidget(c);
             if (scoutModel == e.getFormField()) {
               wp = new WidgetPrinter(c);
@@ -318,7 +346,14 @@ public class SwingScoutForm extends SwingScoutComposite<IForm> implements ISwing
           }
         }
         if (wp == null) {
-          wp = new WidgetPrinter(SwingUtilities.getWindowAncestor(m_viewComposite.getSwingContentPane()));
+          Component printComponent;
+          if (getScoutForm().getDisplayHint() == IForm.DISPLAY_HINT_VIEW) {
+            printComponent = view.getSwingContentPane();
+          }
+          else {
+            printComponent = SwingUtilities.getWindowAncestor(view.getSwingContentPane());
+          }
+          wp = new WidgetPrinter(printComponent);
         }
       }
       if (wp != null) {
@@ -351,9 +386,29 @@ public class SwingScoutForm extends SwingScoutComposite<IForm> implements ISwing
     if (modelField == null) {
       return;
     }
-    Component comp = findUiField(modelField);
-    if (comp != null && comp.isShowing()) {
-      comp.requestFocus();
+    final Component comp = findUiField(modelField);
+    if (comp != null) {
+      if (comp.isShowing()) {
+        comp.requestFocus();
+      }
+      else if (force) {
+        // the component is not showing already. Maybe we are still opening (e.g. when we have DISPLAY_HINT_VIEW).
+        // queue runnable to set initial focus when the component is ready. See bugzilla 424603.
+        Runnable r = new Runnable() {
+          @Override
+          public void run() {
+            getSwingEnvironment().invokeSwingLater(new Runnable() {
+              @Override
+              public void run() {
+                if (comp.isShowing()) {
+                  comp.requestFocus();
+                }
+              }
+            });
+          }
+        };
+        getSwingEnvironment().invokeScoutLater(r, 0);
+      }
     }
   }
 

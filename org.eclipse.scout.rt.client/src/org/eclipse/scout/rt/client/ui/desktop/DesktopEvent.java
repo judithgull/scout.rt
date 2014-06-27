@@ -14,12 +14,11 @@ import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.EventObject;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 import org.eclipse.scout.rt.client.ui.basic.filechooser.IFileChooser;
 import org.eclipse.scout.rt.client.ui.desktop.outline.IOutline;
@@ -50,15 +49,15 @@ public class DesktopEvent extends EventObject {
    */
   public static final int TYPE_PRINT = 900;
   /**
-	 *
-	 */
+   *
+   */
   public static final int TYPE_PRINTED = 901;
   public static final int TYPE_FILE_CHOOSER_ADDED = 910;
   /**
    * Creates and opens a browser window to download a file or open an url via user interface (only supported in web ui),
-   * see {@link IDesktop#openBrowserWindow(String)}
+   * see {@link IDesktop#openUrlInBrowser(String)}
    */
-  public static final int TYPE_OPEN_BROWSER_WINDOW = 920;
+  public static final int TYPE_OPEN_URL_IN_BROWSER = 920;
   /**
    * Send a broadcast event to find the {@link IFormField} that owns the focus
    * The listener can store the result using {@link #setFocusedField()} The event waits some time to give asynchronous
@@ -71,6 +70,20 @@ public class DesktopEvent extends EventObject {
    */
   public static final int TYPE_TRAY_POPUP = 1010;
 
+  /**
+   * Event type that indicates that the desktop should traverse the focus to the next possible location.
+   * 
+   * @see IDesktop#traverseFocusNext()
+   */
+  public static final int TYPE_TRAVERSE_FOCUS_NEXT = 1020;
+
+  /**
+   * Event type that indicates that the desktop should traverse the focus to the previous location.
+   * 
+   * @see IDesktop#traverseFocusPrevious()
+   */
+  public static final int TYPE_TRAVERSE_FOCUS_PREVIOUS = 1030;
+
   private final int m_type;
   private IOutline m_outline;
   private IForm m_form;
@@ -82,6 +95,7 @@ public class DesktopEvent extends EventObject {
   private Map<String, Object> m_printParameters;
   private List<IMenu> m_popupMenus;
   private File m_printedFile;
+  private IUrlTarget m_urlTarget;
 
   public DesktopEvent(IDesktop source, int type) {
     super(source);
@@ -113,9 +127,10 @@ public class DesktopEvent extends EventObject {
     m_fileChooser = fc;
   }
 
-  public DesktopEvent(IDesktop source, int type, String path) {
+  public DesktopEvent(IDesktop source, int type, String path, IUrlTarget urlTarget) {
     this(source, type);
     m_path = path;
+    m_urlTarget = urlTarget;
   }
 
   public DesktopEvent(IDesktop source, int type, PrintDevice printDevice, Map<String, Object> printParameters) {
@@ -151,6 +166,10 @@ public class DesktopEvent extends EventObject {
 
   public String getPath() {
     return m_path;
+  }
+
+  public IUrlTarget getUrlTarget() {
+    return m_urlTarget;
   }
 
   public IMessageBox getMessageBox() {
@@ -192,25 +211,20 @@ public class DesktopEvent extends EventObject {
   /**
    * used by TYPE_TRAY_POPUP to add menus
    */
-  public void addPopupMenus(IMenu[] menus) {
+  public void addPopupMenus(List<IMenu> menus) {
     if (menus != null) {
       if (m_popupMenus == null) {
         m_popupMenus = new ArrayList<IMenu>();
       }
-      m_popupMenus.addAll(Arrays.asList(menus));
+      m_popupMenus.addAll(menus);
     }
   }
 
   /**
    * used by TYPE_TRAY_POPUP to add menus
    */
-  public IMenu[] getPopupMenus() {
-    if (m_popupMenus != null) {
-      return m_popupMenus.toArray(new IMenu[0]);
-    }
-    else {
-      return new IMenu[0];
-    }
+  public List<IMenu> getPopupMenus() {
+    return CollectionUtility.arrayList(m_popupMenus);
   }
 
   /**
@@ -226,7 +240,7 @@ public class DesktopEvent extends EventObject {
   }
 
   public Map<String, Object> getPrintParameters() {
-    return new HashMap<String, Object>(m_printParameters);
+    return CollectionUtility.copyMap(m_printParameters);
   }
 
   @Override

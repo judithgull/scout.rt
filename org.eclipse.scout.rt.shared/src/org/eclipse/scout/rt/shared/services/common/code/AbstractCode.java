@@ -16,29 +16,32 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import org.eclipse.scout.commons.ConfigurationUtility;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
+import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.shared.data.basic.FontSpec;
+import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
+import org.eclipse.scout.service.SERVICES;
 
 public abstract class AbstractCode<T> implements ICode<T>, Serializable {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractCode.class);
   private static final long serialVersionUID = 1L;
 
-  private transient ICodeType m_codeType;
-  private CodeRow m_row;
-  private transient ICode m_parentCode;
-  private transient HashMap<Object, ICode> m_codeMap = null;
-  private ArrayList<ICode> m_codeList = null;
+  private transient ICodeType<?, T> m_codeType;
+  private ICodeRow<T> m_row;
+  private transient ICode<T> m_parentCode;
+  private transient Map<T, ICode<T>> m_codeMap = null;
+  private List<ICode<T>> m_codeList = null;
 
   /**
    * Dynamic
    */
-  public AbstractCode(CodeRow row) {
+  public AbstractCode(ICodeRow<T> row) {
     m_row = row;
   }
 
@@ -51,81 +54,72 @@ public abstract class AbstractCode<T> implements ICode<T>, Serializable {
 
   @ConfigProperty(ConfigProperty.TEXT)
   @Order(50)
-  @ConfigPropertyValue("null")
   protected String getConfiguredText() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(60)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredActive() {
     return true;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(65)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredEnabled() {
     return true;
   }
 
   @ConfigProperty(ConfigProperty.ICON_ID)
   @Order(40)
-  @ConfigPropertyValue("null")
   protected String getConfiguredIconId() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.TEXT)
   @Order(70)
-  @ConfigPropertyValue("null")
   protected String getConfiguredTooltipText() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.STRING)
   @Order(20)
-  @ConfigPropertyValue("null")
   protected String getConfiguredBackgroundColor() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.STRING)
   @Order(10)
-  @ConfigPropertyValue("null")
   protected String getConfiguredForegroundColor() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.STRING)
   @Order(30)
-  @ConfigPropertyValue("null")
   protected String getConfiguredFont() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.DOUBLE)
   @Order(80)
-  @ConfigPropertyValue("null")
   protected Double getConfiguredValue() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.STRING)
   @Order(80)
-  @ConfigPropertyValue("null")
   protected String getConfiguredExtKey() {
     return null;
   }
 
-  private Class<? extends ICode>[] getConfiguredCodes() {
+  protected final List<Class<? extends ICode>> getConfiguredCodes() {
     Class[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
-    return ConfigurationUtility.sortFilteredClassesByOrderAnnotation(dca, ICode.class);
+    List<Class<ICode>> filtered = ConfigurationUtility.filterClasses(dca, ICode.class);
+    return ConfigurationUtility.sortFilteredClassesByOrderAnnotation(filtered, ICode.class);
   }
 
   protected void initConfig() {
-    m_row = interceptCodeRow(new CodeRow(
+    m_row = interceptCodeRow(new CodeRow<T>(
         getId(),
         getConfiguredText(),
         getConfiguredIconId(),
@@ -141,8 +135,8 @@ public abstract class AbstractCode<T> implements ICode<T>, Serializable {
         0
         ));
     // add configured child codes
-    for (ICode childCode : execCreateChildCodes()) {
-      addChildCodeInternal(childCode);
+    for (ICode<T> childCode : execCreateChildCodes()) {
+      addChildCodeInternal(-1, childCode);
     }
   }
 
@@ -150,18 +144,16 @@ public abstract class AbstractCode<T> implements ICode<T>, Serializable {
    * @return Creates and returns child codes. Note: {@link #addChildCodeInternal(ICode)} must not be invoked.
    * @since 3.8.3
    */
-  protected List<ICode<?>> execCreateChildCodes() {
-    List<ICode<?>> codes = new ArrayList<ICode<?>>();
-    Class<? extends ICode>[] a = getConfiguredCodes();
-    if (a != null) {
-      for (int i = 0; i < a.length; i++) {
-        try {
-          ICode code = ConfigurationUtility.newInnerInstance(this, a[i]);
-          codes.add(code);
-        }
-        catch (Exception e) {
-          LOG.warn(null, e);
-        }
+  protected List<? extends ICode<T>> execCreateChildCodes() {
+    List<ICode<T>> codes = new ArrayList<ICode<T>>();
+    for (Class<? extends ICode> codeClazz : getConfiguredCodes()) {
+      try {
+        @SuppressWarnings("unchecked")
+        ICode<T> code = ConfigurationUtility.newInnerInstance(this, codeClazz);
+        codes.add(code);
+      }
+      catch (Exception e) {
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + codeClazz.getName() + "'.", e));
       }
     }
     return codes;
@@ -174,12 +166,11 @@ public abstract class AbstractCode<T> implements ICode<T>, Serializable {
    * <p>
    * The defaukt does nothing and returns the argument row.
    */
-  protected CodeRow interceptCodeRow(CodeRow row) {
+  protected ICodeRow<T> interceptCodeRow(ICodeRow<T> row) {
     return row;
   }
 
   @Override
-  @SuppressWarnings("unchecked")
   public T getId() {
     return (T) m_row.getKey();
   }
@@ -228,7 +219,7 @@ public abstract class AbstractCode<T> implements ICode<T>, Serializable {
 
   @Override
   public String getTooltipText() {
-    return m_row.getTooltip();
+    return m_row.getTooltipText();
   }
 
   @Override
@@ -247,7 +238,7 @@ public abstract class AbstractCode<T> implements ICode<T>, Serializable {
   }
 
   @Override
-  public ICode getParentCode() {
+  public ICode<T> getParentCode() {
     return m_parentCode;
   }
 
@@ -267,30 +258,29 @@ public abstract class AbstractCode<T> implements ICode<T>, Serializable {
   }
 
   @Override
-  public ICode[] getChildCodes() {
+  public List<? extends ICode<T>> getChildCodes() {
     return getChildCodes(true);
   }
 
   @Override
-  public ICode[] getChildCodes(boolean activeOnly) {
+  public List<? extends ICode<T>> getChildCodes(boolean activeOnly) {
     if (m_codeList == null) {
-      return new ICode[0];
+      return new ArrayList<ICode<T>>(0);
     }
-    ArrayList<ICode> list = new ArrayList<ICode>(m_codeList);
+    List<ICode<T>> result = new ArrayList<ICode<T>>(m_codeList);
     if (activeOnly) {
-      for (Iterator it = list.iterator(); it.hasNext();) {
-        ICode code = (ICode) it.next();
-        if (!code.isActive()) {
+      for (Iterator<ICode<T>> it = result.iterator(); it.hasNext();) {
+        if (!it.next().isActive()) {
           it.remove();
         }
       }
     }
-    return list.toArray(new ICode[0]);
+    return result;
   }
 
   @Override
-  public ICode getChildCode(Object id) {
-    ICode c = null;
+  public ICode<T> getChildCode(T id) {
+    ICode<T> c = null;
     if (m_codeMap != null) {
       c = m_codeMap.get(id);
     }
@@ -298,8 +288,8 @@ public abstract class AbstractCode<T> implements ICode<T>, Serializable {
       if (m_codeList == null) {
         return null;
       }
-      for (Iterator it = m_codeList.iterator(); it.hasNext();) {
-        ICode childCode = (ICode) it.next();
+      for (Iterator<ICode<T>> it = m_codeList.iterator(); it.hasNext();) {
+        ICode<T> childCode = it.next();
         c = childCode.getChildCode(id);
         if (c != null) {
           return c;
@@ -310,55 +300,92 @@ public abstract class AbstractCode<T> implements ICode<T>, Serializable {
   }
 
   @Override
-  public ICode getChildCodeByExtKey(Object extKey) {
+  public ICode<T> getChildCodeByExtKey(Object extKey) {
     if (m_codeList == null) {
       return null;
     }
-    ICode c = null;
-    for (Iterator<ICode> it = m_codeList.iterator(); it.hasNext();) {
-      ICode childCode = it.next();
+    ICode<T> c = null;
+    for (Iterator<ICode<T>> it = m_codeList.iterator(); it.hasNext();) {
+      ICode<T> childCode = it.next();
       if (extKey.equals(childCode.getExtKey())) {
-        c = childCode;
+        return childCode;
       }
       else {
         c = childCode.getChildCodeByExtKey(extKey);
-      }
-      if (c != null) {
-        return c;
+        if (c != null) {
+          return c;
+        }
       }
     }
     return c;
   }
 
   @Override
-  public ICodeType getCodeType() {
+  public ICodeType<?, T> getCodeType() {
     return m_codeType;
   }
 
   @Override
-  public void addChildCodeInternal(ICode code) {
+  public void addChildCodeInternal(int index, ICode<T> code) {
+    if (code == null) {
+      return;
+    }
+    int oldIndex = removeChildCodeInternal(code.getId());
+    if (oldIndex >= 0 && index < 0) {
+      index = oldIndex;
+    }
+    if (m_codeMap == null) {
+      m_codeMap = new HashMap<T, ICode<T>>();
+    }
+    if (m_codeList == null) {
+      m_codeList = new ArrayList<ICode<T>>();
+    }
     code.setCodeTypeInternal(m_codeType);
     code.setParentCodeInternal(this);
-    if (m_codeMap == null) {
-      m_codeMap = new HashMap<Object, ICode>();
-    }
     m_codeMap.put(code.getId(), code);
-    if (m_codeList == null) {
-      m_codeList = new ArrayList<ICode>();
+    if (index < 0) {
+      m_codeList.add(code);
     }
-    m_codeList.add(code);
+    else {
+      m_codeList.add(Math.min(index, m_codeList.size()), code);
+    }
   }
 
   @Override
-  public void setParentCodeInternal(ICode c) {
+  public int removeChildCodeInternal(T codeId) {
+    if (m_codeMap == null) {
+      return -1;
+    }
+    ICode<T> droppedCode = m_codeMap.remove(codeId);
+    if (droppedCode == null) {
+      return -1;
+    }
+    int index = -1;
+    if (m_codeList != null) {
+      for (Iterator<ICode<T>> it = m_codeList.iterator(); it.hasNext();) {
+        index++;
+        ICode<T> candidateCode = it.next();
+        if (candidateCode == droppedCode) {
+          it.remove();
+          break;
+        }
+      }
+    }
+    droppedCode.setCodeTypeInternal(null);
+    droppedCode.setParentCodeInternal(null);
+    return index;
+  }
+
+  @Override
+  public void setParentCodeInternal(ICode<T> c) {
     m_parentCode = c;
   }
 
   @Override
-  public void setCodeTypeInternal(ICodeType type) {
+  public void setCodeTypeInternal(ICodeType<?, T> type) {
     m_codeType = type;
     if (m_codeList != null) {
-      for (ICode c : m_codeList) {
+      for (ICode<T> c : m_codeList) {
         c.setCodeTypeInternal(type);
       }
     }
@@ -369,15 +396,15 @@ public abstract class AbstractCode<T> implements ICode<T>, Serializable {
     return "Code[id=" + getId() + ", text='" + getText() + "' " + (isActive() ? "active" : "inactive") + "]";
   }
 
+  @SuppressWarnings("unchecked")
   @Override
-  public boolean visit(ICodeVisitor visitor, int level, boolean activeOnly) {
-    ICode[] a = getChildCodes(activeOnly);
-    for (int i = 0; i < a.length; i++) {
-      ICode code = a[i];
-      if (!visitor.visit(code, level)) {
+  public <CODE extends ICode<T>> boolean visit(ICodeVisitor<CODE> visitor, int level, boolean activeOnly) {
+    List<? extends ICode<T>> a = getChildCodes(activeOnly);
+    for (ICode<T> childCode : a) {
+      if (!visitor.visit((CODE) childCode, level)) {
         return false;
       }
-      if (!code.visit(visitor, level + 1, activeOnly)) {
+      if (!childCode.visit(visitor, level + 1, activeOnly)) {
         return false;
       }
     }
@@ -385,12 +412,12 @@ public abstract class AbstractCode<T> implements ICode<T>, Serializable {
   }
 
   protected Object readResolve() throws ObjectStreamException {
-    m_codeMap = new HashMap<Object, ICode>();
+    m_codeMap = new HashMap<T, ICode<T>>();
     if (m_codeList == null) {
-      m_codeList = new ArrayList<ICode>();
+      m_codeList = new ArrayList<ICode<T>>();
     }
     else {
-      for (ICode<?> c : m_codeList) {
+      for (ICode<T> c : m_codeList) {
         m_codeMap.put(c.getId(), c);
         c.setParentCodeInternal(this);
       }
@@ -399,7 +426,12 @@ public abstract class AbstractCode<T> implements ICode<T>, Serializable {
   }
 
   @Override
-  public CodeRow toCodeRow() {
-    return new CodeRow(m_row);
+  public ICodeRow<T> toCodeRow() {
+    return new CodeRow<T>(m_row);
+  }
+
+  @Override
+  public String classId() {
+    return ConfigurationUtility.getAnnotatedClassIdWithFallback(getClass());
   }
 }

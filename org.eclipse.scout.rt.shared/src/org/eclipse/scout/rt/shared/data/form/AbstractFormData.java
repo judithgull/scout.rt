@@ -12,6 +12,7 @@ package org.eclipse.scout.rt.shared.data.form;
 
 import java.io.Serializable;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
@@ -25,6 +26,8 @@ import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.shared.data.form.fields.AbstractFormFieldData;
 import org.eclipse.scout.rt.shared.data.form.properties.AbstractPropertyData;
+import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
+import org.eclipse.scout.service.SERVICES;
 
 public abstract class AbstractFormData implements Serializable, Cloneable {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractFormData.class);
@@ -38,46 +41,45 @@ public abstract class AbstractFormData implements Serializable, Cloneable {
     initConfig();
   }
 
-  private Class<? extends AbstractPropertyData>[] getConfiguredPropertyDatas() {
+  private List<Class<AbstractPropertyData>> getConfiguredPropertyDatas() {
     Class[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
     return ConfigurationUtility.filterClasses(dca, AbstractPropertyData.class);
   }
 
-  private Class<? extends AbstractFormFieldData>[] getConfiguredFieldDatas() {
+  private List<Class<? extends AbstractFormFieldData>> getConfiguredFieldDatas() {
     Class[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
-    Class<AbstractFormFieldData>[] fca = ConfigurationUtility.filterClasses(dca, AbstractFormFieldData.class);
+    List<Class<AbstractFormFieldData>> fca = ConfigurationUtility.filterClasses(dca, AbstractFormFieldData.class);
     return ConfigurationUtility.removeReplacedClasses(fca);
   }
 
   protected void initConfig() {
     // add properties
     m_propertyMap = new HashMap<Class<? extends AbstractPropertyData>, AbstractPropertyData>();
-    Class<? extends AbstractPropertyData>[] propArray = getConfiguredPropertyDatas();
-    for (int i = 0; i < propArray.length; i++) {
+    for (Class<AbstractPropertyData> propertyDataClazz : getConfiguredPropertyDatas()) {
       AbstractPropertyData p;
       try {
-        p = ConfigurationUtility.newInnerInstance(this, propArray[i]);
+        p = ConfigurationUtility.newInnerInstance(this, propertyDataClazz);
         m_propertyMap.put(p.getClass(), p);
       }// end try
       catch (Exception e) {
-        LOG.warn(null, e);
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + propertyDataClazz.getName() + "'.", e));
       }
     }// end for
      // add fields
     m_fieldMap = new HashMap<Class<? extends AbstractFormFieldData>, AbstractFormFieldData>();
-    Class<? extends AbstractFormFieldData>[] fieldArray = getConfiguredFieldDatas();
-    Map<Class<?>, Class<? extends AbstractFormFieldData>> replacements = ConfigurationUtility.getReplacementMapping(fieldArray);
+    List<Class<? extends AbstractFormFieldData>> formFieldDataClazzes = getConfiguredFieldDatas();
+    Map<Class<?>, Class<? extends AbstractFormFieldData>> replacements = ConfigurationUtility.getReplacementMapping(formFieldDataClazzes);
     if (!replacements.isEmpty()) {
       m_fieldDataReplacements = replacements;
     }
-    for (int i = 0; i < fieldArray.length; i++) {
+    for (Class<? extends AbstractFormFieldData> formFieldDataClazz : formFieldDataClazzes) {
       AbstractFormFieldData f;
       try {
-        f = ConfigurationUtility.newInnerInstance(this, fieldArray[i]);
+        f = ConfigurationUtility.newInnerInstance(this, formFieldDataClazz);
         m_fieldMap.put(f.getClass(), f);
       }// end try
       catch (Exception e) {
-        LOG.warn(null, e);
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + formFieldDataClazz.getName() + "'.", e));
       }
     }// end for
   }

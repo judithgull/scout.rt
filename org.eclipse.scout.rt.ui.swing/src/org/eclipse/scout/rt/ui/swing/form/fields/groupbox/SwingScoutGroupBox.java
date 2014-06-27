@@ -37,6 +37,7 @@ import org.eclipse.scout.rt.ui.swing.ext.BorderLayoutEx;
 import org.eclipse.scout.rt.ui.swing.ext.JPanelEx;
 import org.eclipse.scout.rt.ui.swing.ext.JScrollPaneEx;
 import org.eclipse.scout.rt.ui.swing.ext.JSection;
+import org.eclipse.scout.rt.ui.swing.ext.internal.LogicalGridLayoutSpyAction;
 import org.eclipse.scout.rt.ui.swing.form.fields.ISwingScoutFormField;
 import org.eclipse.scout.rt.ui.swing.form.fields.SwingScoutFieldComposite;
 import org.eclipse.scout.rt.ui.swing.form.fields.SwingScoutFormFieldGridData;
@@ -64,6 +65,7 @@ public class SwingScoutGroupBox extends SwingScoutFieldComposite<IGroupBox> impl
     m_swingBodyPart = new JPanelEx();
     m_swingBodyPart.setName("Synth.GroupBoxBody");
     m_swingBodyPart.setOpaque(false);
+    m_swingBodyPart.putClientProperty(LogicalGridLayoutSpyAction.GROUP_BOX_MARKER, Boolean.TRUE);
     m_swingButtonBarPart = createButtonBarPart();
     // main panel: NORTH=sectionHeader, CENTER=bodyPanel, SOUTH=buttonPanel
     JPanelEx swingBox = new JPanelEx();
@@ -99,12 +101,11 @@ public class SwingScoutGroupBox extends SwingScoutFieldComposite<IGroupBox> impl
     LogicalGridLayout bodyLayout = new LogicalGridLayout(getSwingEnvironment(), getSwingEnvironment().getFormColumnGap(), getSwingEnvironment().getFormRowGap());
     m_swingBodyPart.setLayout(bodyLayout);
     // items without process buttons
-    IFormField[] scoutFields = getScoutObject().getControlFields();
-    for (int i = 0; i < scoutFields.length; i++) {
+    for (IFormField field : getScoutObject().getControlFields()) {
       // create item
-      ISwingScoutFormField swingScoutComposite = getSwingEnvironment().createFormField(m_swingBodyPart, scoutFields[i]);
+      ISwingScoutFormField swingScoutComposite = getSwingEnvironment().createFormField(m_swingBodyPart, field);
       // create layout constraints
-      SwingScoutFormFieldGridData cons = new SwingScoutFormFieldGridData(scoutFields[i]);
+      SwingScoutFormFieldGridData cons = new SwingScoutFormFieldGridData(field);
       swingScoutComposite.getSwingContainer().putClientProperty(LogicalGridData.CLIENT_PROPERTY_NAME, cons);
       m_swingBodyPart.add(swingScoutComposite.getSwingContainer());
     }

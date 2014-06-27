@@ -63,6 +63,19 @@ public abstract class SwtScoutFieldComposite<T extends IFormField> extends SwtSc
 
       m_swtLabel.setLayoutData(statusLabelGridData);
     }
+    updateMnemonicFocusControl();
+  }
+
+  @Override
+  protected void setSwtField(Control swtField) {
+    super.setSwtField(swtField);
+    updateMnemonicFocusControl();
+  }
+
+  protected void updateMnemonicFocusControl() {
+    if (getSwtLabel() != null && getSwtField() != null) {
+      getSwtLabel().setMnemonicFocusControl(getSwtField());
+    }
   }
 
   public Color getMandatoryFieldBackgroundColor() {
@@ -111,9 +124,13 @@ public abstract class SwtScoutFieldComposite<T extends IFormField> extends SwtSc
 
   protected void setVisibleFromScout(boolean b) {
     boolean updateLayout = false;
-    if (getSwtContainer() != null && getSwtContainer().getVisible() != b) {
-      updateLayout = true;
-      getSwtContainer().setVisible(b);
+    if (getSwtContainer() != null) {
+      if (getSwtContainer().getVisible() != b) {
+        boolean wasVisible = getSwtContainer().isVisible();
+        getSwtContainer().setVisible(b);
+        //Update only if really changed (visibility does not get changed if parent is invisible)
+        updateLayout = wasVisible != getSwtContainer().isVisible();
+      }
     }
     else if (getSwtField() != null && getSwtField().getVisible() != b) {
       updateLayout = true;
@@ -136,26 +153,22 @@ public abstract class SwtScoutFieldComposite<T extends IFormField> extends SwtSc
   }
 
   protected void setEnabledFromScout(boolean b) {
-    boolean updateLayout = false;
     Control swtField = getSwtField();
     if (swtField != null) {
-      updateLayout = true;
       setFieldEnabled(swtField, b);
       if (b) {
         setForegroundFromScout(getScoutObject().getForegroundColor());
+        setBackgroundFromScout(getScoutObject().getBackgroundColor());
       }
       else {
         setForegroundFromScout(UiDecorationExtensionPoint.getLookAndFeel().getColorForegroundDisabled());
+        setBackgroundFromScout(UiDecorationExtensionPoint.getLookAndFeel().getColorBackgroundDisabled());
       }
     }
     if (getSwtLabel() != null) {
       if (getSwtLabel().getEnabled() != b) {
-        updateLayout = true;
         getSwtLabel().setEnabled(b);
       }
-    }
-    if (updateLayout && isConnectedToScout()) {
-      SwtLayoutUtility.invalidateLayout(getSwtContainer());
     }
   }
 
@@ -395,8 +408,7 @@ public abstract class SwtScoutFieldComposite<T extends IFormField> extends SwtSc
       }
 
       ArrayList<ISwtKeyStroke> newSwtKeyStrokes = new ArrayList<ISwtKeyStroke>();
-      IKeyStroke[] scoutKeyStrokes = getScoutObject().getKeyStrokes();
-      for (IKeyStroke scoutKeyStroke : scoutKeyStrokes) {
+      for (IKeyStroke scoutKeyStroke : getScoutObject().getKeyStrokes()) {
         ISwtKeyStroke[] swtStrokes = SwtUtility.getKeyStrokes(scoutKeyStroke, getEnvironment());
         for (ISwtKeyStroke swtStroke : swtStrokes) {
           getEnvironment().addKeyStroke(getSwtContainer(), swtStroke);

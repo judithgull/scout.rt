@@ -11,10 +11,17 @@
 package org.eclipse.scout.commons.osgi;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
+import java.util.Set;
+
+import org.eclipse.core.runtime.Platform;
+import org.eclipse.scout.commons.exception.ProcessingException;
+import org.eclipse.scout.commons.osgi.BundleInspector.IClassFilter;
 import org.eclipse.scout.rt.testing.commons.ScoutAssert;
 import org.junit.Test;
 import org.osgi.framework.Bundle;
@@ -175,4 +182,44 @@ public class BundleInspectorTest extends AbstractBundleTest {
       uninstallBundles(bundle, fragment);
     }
   }
+
+  @Test
+  public void testIsFragment() throws Exception {
+    Bundle bundle = null;
+    Bundle fragment = null;
+    try {
+      assertNull(BundleInspector.getHostBundle(null));
+      bundle = installBundle("a.bundle", "1.0.0");
+      assertFalse(BundleInspector.isFragment(bundle));
+      fragment = installFragment("a.fragment", "1.0.0", "a.bundle");
+      assertTrue(BundleInspector.isFragment(fragment));
+    }
+    finally {
+      uninstallBundles(bundle, fragment);
+    }
+  }
+
+  @Test
+  public void testGetAllClasses() throws ProcessingException {
+    Set<Class<?>> classes = BundleInspector.getAllClasses(new IClassFilter() {
+      @Override
+      public boolean accept(Class c) {
+        return true;
+      }
+    });
+
+    System.out.println("getAllClasses found: " + classes);
+    assertTrue(classes.contains(BundleInspector.class));
+    assertTrue(classes.contains(BundleInspectorTest.class));
+    assertTrue(classes.contains(Platform.class));
+    assertTrue(classes.contains(BundleInspectorTestNested.class));
+    assertTrue(classes.contains(BundleInspectorTestStaticNested.class));
+  }
+
+  public class BundleInspectorTestNested {
+  }
+
+  public static class BundleInspectorTestStaticNested {
+  }
+
 }

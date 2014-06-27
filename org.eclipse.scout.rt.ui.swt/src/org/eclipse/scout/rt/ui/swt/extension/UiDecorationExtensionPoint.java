@@ -29,7 +29,7 @@ import org.eclipse.scout.rt.ui.swt.extension.internal.UiDecoration;
 import org.eclipse.swt.SWT;
 
 public final class UiDecorationExtensionPoint {
-  private static IScoutLogger LOG = ScoutLogManager.getLogger(UiDecorationExtensionPoint.class);
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(UiDecorationExtensionPoint.class);
   private static final UiDecoration LOOK_AND_FEEL;
 
   public static final int SCOPE_DEFAULT = 1;
@@ -235,6 +235,12 @@ public final class UiDecorationExtensionPoint {
       }
       if (props.getPropertyString(ILookAndFeelProperties.PROP_COLOR_FOREGROUND_DISABLED) != null) {
         LOOK_AND_FEEL.setColorForegroundDisabled(props.getPropertyString(ILookAndFeelProperties.PROP_COLOR_FOREGROUND_DISABLED));
+      }
+      if (props.getPropertyString(ILookAndFeelProperties.PROP_COLOR_BACKGROUND_DISABLED) != null) {
+        //only set if no mandatory background color is set
+        if (StringUtility.isNullOrEmpty(LOOK_AND_FEEL.getMandatoryFieldBackgroundColor())) {
+          LOOK_AND_FEEL.setColorBackgroundDisabled(props.getPropertyString(ILookAndFeelProperties.PROP_COLOR_BACKGROUND_DISABLED));
+        }
       }
       if (props.getPropertyString(ILookAndFeelProperties.PROP_MESSAGE_BOX_MIN_WIDTH) != null) {
         LOOK_AND_FEEL.setMessageBoxMinWidth(props.getPropertyInt(ILookAndFeelProperties.PROP_MESSAGE_BOX_MIN_WIDTH));

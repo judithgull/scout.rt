@@ -21,9 +21,11 @@ import java.util.Set;
 
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.osgi.util.ManifestElement;
+import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.internal.Activator;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.commons.runtime.BundleBrowser;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleException;
 import org.osgi.framework.Constants;
@@ -306,6 +308,13 @@ public final class BundleInspector {
     return filteredBundles.toArray(new Bundle[filteredBundles.size()]);
   }
 
+  public static boolean isFragment(Bundle bundle) {
+    if (bundle != null) {
+      return Platform.isFragment(bundle);
+    }
+    return false;
+  }
+
   private static final class P_BundleNamePrefixComparator implements Comparator<Bundle> {
     private final String[] prefixList;
 
@@ -363,5 +372,46 @@ public final class BundleInspector {
     }
 
     protected abstract int getBundleSortIndex(Bundle bundle, String symbolicName);
+  }
+
+  /**
+   * Interface for filtering classes
+   */
+  public static interface IClassFilter {
+    boolean accept(Class<?> c);
+  }
+
+  /**
+   * get all loadable classes from all available bundles
+   * 
+   * @param filter
+   * @return a modifiable set
+   * @throws ProcessingException
+   */
+  public static Set<Class<?>> getAllClasses(IClassFilter filter) throws ProcessingException {
+    HashSet<Class<?>> discoveredClasses = new HashSet<Class<?>>();
+    for (Bundle bundle : Activator.getDefault().getBundle().getBundleContext().getBundles()) {
+      // Skip fragments, because classes from fragments are read when browsing the host bundle
+      if (Platform.isFragment(bundle)) {
+        continue;
+      }
+      String[] classNames;
+      BundleBrowser bundleBrowser = new BundleBrowser(bundle.getSymbolicName(), bundle.getSymbolicName());
+      classNames = bundleBrowser.getClasses(true, true);
+      for (String className : classNames) {
+        Class c = null;
+        try {
+          c = bundle.loadClass(className);
+          if (filter.accept(c)) {
+            discoveredClasses.add(c);
+          }
+        }
+        catch (Throwable t) {
+          // nop: we are only interested in loadable classes
+        }
+      }
+    }
+
+    return discoveredClasses;
   }
 }

@@ -2,8 +2,10 @@
 <feature
       id="org.eclipse.scout.rt.testing.swing"
       label="%featureName"
-      version="3.9.2.qualifier"
-      provider-name="%providerName">
+      version="4.0.0.qualifier"
+      provider-name="%providerName"
+      license-feature="org.eclipse.license"
+      license-feature-version="0.0.0">
 
    <description url="http://www.eclipse.org/scout/">
       %description
@@ -18,13 +20,13 @@
    </license>
 
    <url>
-      <update label="%updateSiteName" url="http://download.eclipse.org/releases/kepler"/>
-      <discovery label="%updateSiteName" url="http://download.eclipse.org/releases/kepler"/>
+      <update label="%updateSiteName" url="http://download.eclipse.org/releases/luna"/>
+      <discovery label="%updateSiteName" url="http://download.eclipse.org/releases/luna"/>
    </url>
 
    <requires>
-      <import feature="org.eclipse.scout.rt.testing.core" version="3.9.2.qualifier"/>
-      <import feature="org.eclipse.scout.rt.swing" version="3.9.2" match="compatible"/>
+      <import feature="org.eclipse.scout.rt.testing.core" version="4.0.0.qualifier"/>
+      <import feature="org.eclipse.scout.rt.swing" version="4.0.0" match="compatible"/>
    </requires>
 
    <plugin

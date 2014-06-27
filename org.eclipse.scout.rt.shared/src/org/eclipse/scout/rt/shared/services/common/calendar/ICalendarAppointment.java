@@ -19,21 +19,10 @@ public interface ICalendarAppointment extends ICalendarItem {
   int STATUS_TENTATIVE = 1;
   int STATUS_BUSY = 2;
   int STATUS_OUTOFOFFICE = 3;
-
   /**
-   * @return the internal person id (as {@link Long} if it is a number)
-   * @throws UnsupportedOperationException
-   *           if internal person id is not <code>null</code> or a number
-   * @deprecated use {@link #getPerson()}. method will be removed in 3.10
+   * Working-Elsewhere status as supported e.g. in Microsoft Outlook 2013 and above
    */
-  @Deprecated
-  Long getPersonId();
-
-  /**
-   * @deprecated use {@link #setPerson(Object)}. method will be removed in 3.10
-   */
-  @Deprecated
-  void setPersonId(Long n);
+  int STATUS_WORKING_ELSEWHERE = 4;
 
   void setPerson(Object person);
 
@@ -55,8 +44,17 @@ public interface ICalendarAppointment extends ICalendarItem {
 
   void setLocation(String a);
 
+  /**
+   * One of {@link #STATUS_BUSY}, {@link #STATUS_FREE}, {@link #STATUS_OUTOFOFFICE}, {@link #STATUS_TENTATIVE},
+   * {@link #STATUS_WORKING_ELSEWHERE}
+   */
   int getBusyStatus();
 
+  /**
+   * @param a
+   *          One of {@link #STATUS_BUSY}, {@link #STATUS_FREE}, {@link #STATUS_OUTOFOFFICE}, {@link #STATUS_TENTATIVE},
+   *          {@link #STATUS_WORKING_ELSEWHERE}
+   */
   void setBusyStatus(int a);
 
   String[] getRecipientEmail();

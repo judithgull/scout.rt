@@ -20,14 +20,15 @@ import java.util.regex.Pattern;
 
 import org.eclipse.scout.commons.DateUtility;
 import org.eclipse.scout.commons.LocaleThreadLocal;
+import org.eclipse.scout.commons.StringUtility;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.holders.BooleanHolder;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
-import org.eclipse.scout.rt.client.ui.form.fields.AbstractValueField;
+import org.eclipse.scout.rt.client.ui.form.fields.AbstractBasicField;
 import org.eclipse.scout.rt.shared.ScoutTexts;
 import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.service.SERVICES;
@@ -79,7 +80,8 @@ import org.eclipse.scout.service.SERVICES;
  * 
  * @see org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelObjectReplacer ServiceTunnelObjectReplacer
  */
-public abstract class AbstractDateField extends AbstractValueField<Date> implements IDateField {
+@ClassId("f73eed8c-1e70-4903-a23f-4a29d884e5ea")
+public abstract class AbstractDateField extends AbstractBasicField<Date> implements IDateField {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractDateField.class);
 
   private static enum ParseContext {
@@ -91,6 +93,7 @@ public abstract class AbstractDateField extends AbstractValueField<Date> impleme
   private IDateFieldUIFacade m_uiFacade;
   private String m_format;
   private long m_autoTimeMillis;
+  private Date m_autoDate;
 
   public AbstractDateField() {
     this(true);
@@ -100,26 +103,23 @@ public abstract class AbstractDateField extends AbstractValueField<Date> impleme
     super(callInitializer);
   }
 
-  /*
-   * Configuration
+  /**
+   * The date/time format, for a description see {@link SimpleDateFormat}
    */
   @ConfigProperty(ConfigProperty.STRING)
   @Order(230)
-  @ConfigPropertyValue("null")
   protected String getConfiguredFormat() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(240)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredHasDate() {
     return true;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(241)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredHasTime() {
     return false;
   }
@@ -129,9 +129,17 @@ public abstract class AbstractDateField extends AbstractValueField<Date> impleme
    */
   @ConfigProperty(ConfigProperty.LONG)
   @Order(270)
-  @ConfigPropertyValue("0")
   protected long getConfiguredAutoTimeMillis() {
     return 0;
+  }
+
+  /**
+   * When a time without date is picked, this date value is used as day.<br>
+   * <b>NOTE:</b> in case of null the current date will be taken.
+   */
+  @Order(270)
+  protected Date getConfiguredAutoDate() {
+    return null;
   }
 
   /**
@@ -196,13 +204,14 @@ public abstract class AbstractDateField extends AbstractValueField<Date> impleme
     setHasDate(getConfiguredHasDate());
     setHasTime(getConfiguredHasTime());
     setAutoTimeMillis(getConfiguredAutoTimeMillis());
+    setAutoDate(getConfiguredAutoDate());
   }
 
   @Override
   public void setFormat(String s) {
     m_format = s;
     if (isInitialized()) {
-      if (isAutoDisplayText()) {
+      if (shouldUpdateDisplayText(false)) {
         setDisplayText(execFormatValue(getValue()));
       }
     }
@@ -245,6 +254,11 @@ public abstract class AbstractDateField extends AbstractValueField<Date> impleme
   }
 
   @Override
+  public void setAutoDate(Date d) {
+    m_autoDate = d;
+  }
+
+  @Override
   public void setAutoTimeMillis(int hour, int minute, int second) {
     setAutoTimeMillis(((hour * 60L + minute) * 60L + second) * 1000L);
   }
@@ -254,11 +268,15 @@ public abstract class AbstractDateField extends AbstractValueField<Date> impleme
     return m_autoTimeMillis;
   }
 
+  public Date getAutoDate() {
+    return m_autoDate;
+  }
+
   @Override
   public void adjustDate(int days, int months, int years) {
     Date d = getValue();
     if (d == null) {
-      d = new Date();
+      d = applyAutoDate(d);
       d = applyAutoTime(d);
     }
     else {
@@ -276,7 +294,7 @@ public abstract class AbstractDateField extends AbstractValueField<Date> impleme
   public void adjustTime(int minutes, int hours, int reserved) {
     Date d = getValue();
     if (d == null) {
-      d = new Date();
+      d = applyAutoDate(d);
       d = applyAutoTime(d);
     }
     else {
@@ -332,10 +350,7 @@ public abstract class AbstractDateField extends AbstractValueField<Date> impleme
    */
   @Override
   protected Date parseValueInternal(String text) throws ProcessingException {
-    if (text != null && text.trim().length() == 0) {
-      text = null;
-    }
-    if (text == null) {
+    if (!StringUtility.hasText(text)) {
       return null;
     }
     Date d = null;
@@ -355,9 +370,7 @@ public abstract class AbstractDateField extends AbstractValueField<Date> impleme
       else if (pctx == ParseContext.Time) {
         d = parseTimeInternal(text, customFormat ? getIsolatedTimeFormat() : null);
         Date currentValue = getValue();
-        if (currentValue == null) {
-          currentValue = new Date();
-        }
+        currentValue = applyAutoDate(currentValue);
         d = DateUtility.createDateTime(currentValue, d);
       }
     }
@@ -424,6 +437,18 @@ public abstract class AbstractDateField extends AbstractValueField<Date> impleme
     c.set(Calendar.MINUTE, timeCal.get(Calendar.MINUTE));
     c.set(Calendar.HOUR_OF_DAY, timeCal.get(Calendar.HOUR_OF_DAY));
     d = c.getTime();
+    return d;
+  }
+
+  private Date applyAutoDate(Date d) {
+    if (d != null) {
+      return d;
+    }
+    d = getAutoDate();
+    if (d == null) {
+      // use today's date
+      d = new Date();
+    }
     return d;
   }
 
@@ -527,11 +552,8 @@ public abstract class AbstractDateField extends AbstractValueField<Date> impleme
    */
   private Date parseDateTimeInternal(String text, DateFormat defaultFormat) throws ProcessingException {
     Date retVal = null;
-    if (text != null && text.trim().length() == 0) {
-      text = null;
-    }
-    if (text == null) {
-      return retVal;
+    if (!StringUtility.hasText(text)) {
+      return null;
     }
     BooleanHolder includesTime = new BooleanHolder(false);
     Matcher verboseDeltaMatcher = Pattern.compile("([+-])([0-9]+)").matcher(text);
@@ -572,11 +594,8 @@ public abstract class AbstractDateField extends AbstractValueField<Date> impleme
    */
   private Date parseTimeInternal(String text, DateFormat defaultFormat) throws ProcessingException {
     Date retVal = null;
-    if (text != null && text.trim().length() == 0) {
-      text = null;
-    }
-    if (text == null) {
-      return retVal;
+    if (!StringUtility.hasText(text)) {
+      return null;
     }
     BooleanHolder includesTime = new BooleanHolder(false);
     retVal = parseTimeFormatsInternal(text, defaultFormat, includesTime);
@@ -942,7 +961,7 @@ public abstract class AbstractDateField extends AbstractValueField<Date> impleme
         if (df instanceof SimpleDateFormat) {
           String pattern = ((SimpleDateFormat) df).toPattern();
           if (pattern.contains(".")) {
-            SimpleDateFormat df2 = new SimpleDateFormat(pattern.replace(".", ","), LocaleThreadLocal.get());
+            SimpleDateFormat df2 = new SimpleDateFormat(pattern.replace('.', ','), LocaleThreadLocal.get());
             df2.setLenient(false);
             d = df2.parse(text);
           }
@@ -978,6 +997,7 @@ public abstract class AbstractDateField extends AbstractValueField<Date> impleme
       if (newDate != null && newDate.length() == 0) {
         newDate = null;
       }
+      setWhileTyping(false);
       if (!isHasTime()) {
         return parseValue(newDate);
       }
@@ -1003,6 +1023,7 @@ public abstract class AbstractDateField extends AbstractValueField<Date> impleme
       if (newTime != null && newTime.length() == 0) {
         newTime = null;
       }
+      setWhileTyping(false);
       if (!isHasDate()) {
         return parseValue(newTime);
       }
@@ -1022,6 +1043,7 @@ public abstract class AbstractDateField extends AbstractValueField<Date> impleme
         newText = null;
       }
       // parse always, validity might change even if text is same
+      setWhileTyping(false);
       return parseValue(newText);
     }
 
@@ -1059,10 +1081,7 @@ public abstract class AbstractDateField extends AbstractValueField<Date> impleme
       try {
         Date oldDate = getValue();
         if (d != null) {
-          if (oldDate == null) {
-            // use today's date
-            oldDate = new Date();
-          }
+          oldDate = applyAutoDate(oldDate);
           // preserve date
           Calendar calOld = Calendar.getInstance();
           calOld.setTime(oldDate);
@@ -1117,6 +1136,16 @@ public abstract class AbstractDateField extends AbstractValueField<Date> impleme
       catch (Throwable t) {
         SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("Unexpected", t));
       }
+    }
+
+    @Override
+    public boolean setTextFromUI(String newText, boolean whileTyping) {
+      if (newText != null && newText.length() == 0) {
+        newText = null;
+      }
+      // parse always, validity might change even if text is same
+      setWhileTyping(whileTyping);
+      return parseValue(newText);
     }
   }
 }

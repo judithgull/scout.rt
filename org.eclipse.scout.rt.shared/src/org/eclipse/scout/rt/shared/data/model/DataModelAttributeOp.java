@@ -10,6 +10,11 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.shared.data.model;
 
+import java.io.Serializable;
+import java.util.Collections;
+import java.util.List;
+
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.rt.shared.ScoutTexts;
 
@@ -147,7 +152,9 @@ public final class DataModelAttributeOp implements DataModelConstants {
     return null;
   }
 
-  private abstract static class AbstractDataModelOp implements IDataModelAttributeOp, DataModelConstants {
+  private abstract static class AbstractDataModelOp implements IDataModelAttributeOp, DataModelConstants, Serializable {
+
+    private static final long serialVersionUID = 1L;
     private final int m_operator;
 
     AbstractDataModelOp(int operator) {
@@ -177,14 +184,24 @@ public final class DataModelAttributeOp implements DataModelConstants {
       return this.getClass().hashCode();
     }
 
-    public static String buildText(Integer aggregationType, String attributeText, String opText, String... valueTexts) {
+    public static String buildText(Integer aggregationType, String attributeText, String opText) {
+      List<String> valueTexts = CollectionUtility.emptyArrayList();
+      return buildText(aggregationType, attributeText, opText, valueTexts);
+
+    }
+
+    public static String buildText(Integer aggregationType, String attributeText, String opText, String valueTexts) {
+      return buildText(aggregationType, attributeText, opText, Collections.singletonList(valueTexts));
+    }
+
+    public static String buildText(Integer aggregationType, String attributeText, String opText, List<String> valueTexts) {
       String text1 = null;
-      if (valueTexts != null && valueTexts.length > 0) {
-        text1 = valueTexts[0];
+      if (valueTexts != null && valueTexts.size() > 0) {
+        text1 = valueTexts.get(0);
       }
       String text2 = null;
-      if (valueTexts != null && valueTexts.length > 1) {
-        text2 = valueTexts[1];
+      if (valueTexts != null && valueTexts.size() > 1) {
+        text2 = valueTexts.get(1);
       }
       StringBuilder b = new StringBuilder();
       if (aggregationType != null) {
@@ -248,6 +265,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class NEQ extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
 
     /**
      * @param aggregationType
@@ -257,7 +275,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -273,6 +291,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class LT extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
 
     /**
      * @param aggregationType
@@ -282,7 +301,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -298,6 +317,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class LE extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
 
     /**
      * @param aggregationType
@@ -307,7 +327,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -323,6 +343,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class EQ extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
 
     /**
      * @param aggregationType
@@ -332,7 +353,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -348,6 +369,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class GT extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
 
     /**
      * @param aggregationType
@@ -357,7 +379,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -373,6 +395,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class GE extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
 
     /**
      * @param aggregationType
@@ -382,7 +405,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -398,6 +421,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class DateIsInDays extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -406,7 +431,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -422,6 +447,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class DateIsInGEDays extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -430,7 +457,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -446,6 +473,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class DateIsInGEMonths extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -454,7 +483,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -470,6 +499,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class DateIsInLEDays extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -478,7 +509,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -494,6 +525,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class DateIsInLEMonths extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -502,7 +535,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -518,6 +551,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class DateIsInLastDays extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -526,7 +561,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -542,6 +577,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class DateIsInLastMonths extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -550,7 +587,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -566,6 +603,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class DateIsInMonths extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -574,7 +613,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -590,6 +629,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class DateIsInNextDays extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -598,7 +639,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -614,6 +655,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class DateIsInNextMonths extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -622,7 +665,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -638,6 +681,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class DateIsNotToday extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -646,7 +691,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, ScoutTexts.get("LogicDateIsNotToday"));
     }
 
@@ -662,6 +707,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class DateIsToday extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -670,7 +717,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, ScoutTexts.get("LogicDateIsToday"));
     }
 
@@ -686,6 +733,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class DateTimeIsInGEHours extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -694,7 +743,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -710,6 +759,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class DateTimeIsInGEMinutes extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -718,7 +769,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -734,6 +785,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class DateTimeIsInLEHours extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -742,7 +795,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -758,6 +811,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class DateTimeIsInLEMinutes extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -766,7 +821,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -782,6 +837,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class DateTimeIsNotNow extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -790,7 +847,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, ScoutTexts.get("LogicDateTimeIsNotNow"));
     }
 
@@ -806,6 +863,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class DateTimeIsNow extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -814,7 +873,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, ScoutTexts.get("LogicDateTimeIsNow"));
     }
 
@@ -830,6 +889,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class EndsWith extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -838,7 +899,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -854,6 +915,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class NotEndsWith extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -862,7 +925,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -878,6 +941,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class In extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -886,7 +951,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -902,6 +967,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class Contains extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -910,7 +977,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -926,6 +993,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class NotIn extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -934,7 +1003,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -950,6 +1019,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class NotContains extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -958,7 +1029,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -974,6 +1045,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class NotNull extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -982,7 +1055,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, ScoutTexts.get("LogicNotNull"));
     }
 
@@ -1001,6 +1074,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
    * nvl(x,0)<>0
    */
   private static class NumberNotNull extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -1009,7 +1084,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, ScoutTexts.get("LogicNotNull"));
     }
 
@@ -1025,6 +1100,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class Null extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -1033,7 +1110,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, ScoutTexts.get("LogicNull"));
     }
 
@@ -1052,6 +1129,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
    * nvl(x,0)==0
    */
   private static class NumberNull extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -1060,7 +1139,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, ScoutTexts.get("LogicNull"));
     }
 
@@ -1076,6 +1155,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class StartsWith extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -1084,7 +1165,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -1100,6 +1181,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class NotStartsWith extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -1108,7 +1191,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -1124,6 +1207,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class TimeIsInGEHours extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -1132,7 +1217,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -1148,6 +1233,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class TimeIsInGEMinutes extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -1156,7 +1243,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -1172,6 +1259,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class TimeIsInHours extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -1180,7 +1269,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -1196,6 +1285,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class TimeIsInLEHours extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -1204,7 +1295,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -1220,6 +1311,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class TimeIsInLEMinutes extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -1228,7 +1321,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -1244,6 +1337,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class TimeIsInMinutes extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -1252,7 +1347,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 
@@ -1268,6 +1363,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class TimeIsNow extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -1276,7 +1373,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, ScoutTexts.get("LogicTimeIsNow"));
     }
 
@@ -1292,6 +1389,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class TimeIsNotNow extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -1300,7 +1399,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, ScoutTexts.get("LogicTimeIsNotNow"));
     }
 
@@ -1316,6 +1415,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class Between extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
 
     /**
      * @param aggregationType
@@ -1330,12 +1430,12 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
-      if (StringUtility.isNullOrEmpty(valueTexts[0])) {
-        return buildText(aggregationType, attributeText, ScoutTexts.get("LogicLE"), valueTexts[1]);
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
+      if (StringUtility.isNullOrEmpty(valueTexts.get(0))) {
+        return buildText(aggregationType, attributeText, ScoutTexts.get("LogicLE"), valueTexts.get(0));
       }
-      else if (StringUtility.isNullOrEmpty(valueTexts[1])) {
-        return buildText(aggregationType, attributeText, ScoutTexts.get("LogicGE"), valueTexts[0]);
+      else if (StringUtility.isNullOrEmpty(valueTexts.get(1))) {
+        return buildText(aggregationType, attributeText, ScoutTexts.get("LogicGE"), valueTexts.get(1));
       }
       else {
         return buildText(aggregationType, attributeText, getText(), valueTexts);
@@ -1354,6 +1454,8 @@ public final class DataModelAttributeOp implements DataModelConstants {
   }
 
   private static class Like extends AbstractDataModelOp {
+    private static final long serialVersionUID = 1L;
+
     /**
      * @param aggregationType
      */
@@ -1362,7 +1464,7 @@ public final class DataModelAttributeOp implements DataModelConstants {
     }
 
     @Override
-    public String createVerboseText(Integer aggregationType, String attributeText, String[] valueTexts) {
+    public String createVerboseText(Integer aggregationType, String attributeText, List<String> valueTexts) {
       return buildText(aggregationType, attributeText, getText(), valueTexts);
     }
 

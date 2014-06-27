@@ -11,7 +11,6 @@
 package org.eclipse.scout.rt.client;
 
 import java.beans.PropertyChangeListener;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Locale;
@@ -22,12 +21,12 @@ import javax.security.auth.Subject;
 
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.equinox.app.IApplication;
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.EventListenerList;
 import org.eclipse.scout.commons.LocaleThreadLocal;
 import org.eclipse.scout.commons.TypeCastUtility;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
@@ -36,7 +35,7 @@ import org.eclipse.scout.commons.security.SimplePrincipal;
 import org.eclipse.scout.rt.client.services.common.clientnotification.ClientNotificationConsumerEvent;
 import org.eclipse.scout.rt.client.services.common.clientnotification.IClientNotificationConsumerListener;
 import org.eclipse.scout.rt.client.services.common.clientnotification.IClientNotificationConsumerService;
-import org.eclipse.scout.rt.client.servicetunnel.IServiceTunnel;
+import org.eclipse.scout.rt.client.servicetunnel.http.IClientServiceTunnel;
 import org.eclipse.scout.rt.client.ui.DataChangeListener;
 import org.eclipse.scout.rt.client.ui.IIconLocator;
 import org.eclipse.scout.rt.client.ui.IconLocator;
@@ -57,6 +56,7 @@ import org.osgi.service.prefs.BackingStoreException;
 import org.osgi.service.prefs.Preferences;
 
 public abstract class AbstractClientSession implements IClientSession {
+
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractClientSession.class);
 
   // context
@@ -64,12 +64,13 @@ public abstract class AbstractClientSession implements IClientSession {
   // state
   private final Object m_stateLock;
   private volatile boolean m_active;
+  private volatile boolean m_isStopping;
   private Throwable m_loadError;
   private int m_exitCode = IApplication.EXIT_OK;
   // model
   private IDesktop m_desktop;
   private VirtualDesktop m_virtualDesktop;
-  private IServiceTunnel m_serviceTunnel;
+  private IClientServiceTunnel m_serviceTunnel;
   private Subject m_offlineSubject;
   private Subject m_subject;
   private final SharedVariableMap m_sharedVariableMap;
@@ -86,6 +87,7 @@ public abstract class AbstractClientSession implements IClientSession {
   public AbstractClientSession(boolean autoInitConfig) {
     m_clientSessionData = new HashMap<String, Object>();
     m_stateLock = new Object();
+    m_isStopping = false;
     m_sharedVariableMap = new SharedVariableMap();
     m_locale = LocaleThreadLocal.get();
     if (autoInitConfig) {
@@ -93,17 +95,8 @@ public abstract class AbstractClientSession implements IClientSession {
     }
   }
 
-  /**
-   * @deprecated use {@link #getConfiguredSingleThreadSession()} instead. Will be removed in Release 3.10.
-   */
-  @Deprecated
-  protected boolean getConfiguredWebSession() {
-    return getConfiguredSingleThreadSession();
-  }
-
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(100)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredSingleThreadSession() {
     return false;
   }
@@ -175,7 +168,7 @@ public abstract class AbstractClientSession implements IClientSession {
 
   @Override
   public Map<String, Object> getSharedVariableMap() {
-    return Collections.unmodifiableMap(m_sharedVariableMap);
+    return CollectionUtility.copyMap(m_sharedVariableMap);
   }
 
   /**
@@ -346,7 +339,15 @@ public abstract class AbstractClientSession implements IClientSession {
 
   @Override
   public void stopSession(int exitCode) {
+    synchronized (m_stateLock) {
+      if (isStopping()) {
+        // we are already stopping. ignore event
+        return;
+      }
+      m_isStopping = true;
+    }
     if (!m_desktop.doBeforeClosingInternal()) {
+      m_isStopping = false;
       return;
     }
     m_exitCode = exitCode;
@@ -382,18 +383,31 @@ public abstract class AbstractClientSession implements IClientSession {
     }
   }
 
+  protected boolean isStopping() {
+    return m_isStopping;
+  }
+
   @Override
   public int getExitCode() {
     return m_exitCode;
   }
 
   @Override
-  public IServiceTunnel getServiceTunnel() {
+  public IClientServiceTunnel getServiceTunnel() {
     return m_serviceTunnel;
   }
 
-  protected void setServiceTunnel(IServiceTunnel tunnel) {
+  protected void setServiceTunnel(IClientServiceTunnel tunnel) {
     m_serviceTunnel = tunnel;
+  }
+
+  /**
+   * @deprecated: use setServiceTunnel(IClientServiceTunnel) instead. Will be removed in the 5.0 Release.
+   */
+  @Deprecated
+  @SuppressWarnings("deprecation")
+  protected void setServiceTunnel(org.eclipse.scout.rt.client.servicetunnel.IServiceTunnel tunnel) {
+    setServiceTunnel((IClientServiceTunnel) tunnel);
   }
 
   @Override
@@ -438,12 +452,6 @@ public abstract class AbstractClientSession implements IClientSession {
     m_offlineSubject = new Subject();
     m_offlineSubject.getPrincipals().add(new SimplePrincipal(offlineUser));
     OfflineState.setOfflineDefault(true);
-  }
-
-  @Override
-  @SuppressWarnings("deprecation")
-  public boolean isWebSession() {
-    return isSingleThreadSession();
   }
 
   @Override

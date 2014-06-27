@@ -10,8 +10,15 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.basic.table.customizer;
 
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
+import java.util.Set;
+
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.ui.action.menu.AbstractMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.IMenuType;
+import org.eclipse.scout.rt.client.ui.action.menu.TableMenuType;
 import org.eclipse.scout.rt.client.ui.basic.table.ITable;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.IColumn;
 import org.eclipse.scout.rt.client.ui.messagebox.MessageBox;
@@ -32,12 +39,31 @@ public class RemoveCustomColumnMenu extends AbstractMenu {
   }
 
   @Override
-  protected void execInitAction() throws ProcessingException {
-    setVisiblePermission(new DeleteCustomColumnPermission());
+  protected Set<IMenuType> getConfiguredMenuTypes() {
+    return CollectionUtility.<IMenuType> hashSet(TableMenuType.Header);
   }
 
   @Override
-  protected void execPrepareAction() throws ProcessingException {
+  protected void execInitAction() throws ProcessingException {
+    setVisiblePermission(new DeleteCustomColumnPermission());
+    m_table.addPropertyChangeListener(new PropertyChangeListener() {
+
+      @Override
+      public void propertyChange(PropertyChangeEvent evt) {
+        if (ITable.PROP_CONTEXT_COLUMN.equals(evt.getPropertyName()) ||
+            ITable.PROP_TABLE_CUSTOMIZER.equals(evt.getPropertyName())) {
+          updateVisibility();
+        }
+      }
+
+    });
+    updateVisibility();
+  }
+
+  /**
+   *
+   */
+  private void updateVisibility() {
     ITableCustomizer cst = m_table.getTableCustomizer();
     IColumn<?> col = m_table.getContextColumn();
     setVisible(cst != null && col instanceof ICustomColumn<?>);

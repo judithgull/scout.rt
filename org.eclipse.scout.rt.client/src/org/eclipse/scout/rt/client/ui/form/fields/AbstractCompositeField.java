@@ -13,10 +13,13 @@ package org.eclipse.scout.rt.client.ui.form.fields;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.ConfigurationUtility;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.InjectFieldTo;
 import org.eclipse.scout.commons.annotations.Replace;
 import org.eclipse.scout.commons.exception.ProcessingException;
@@ -31,9 +34,10 @@ import org.eclipse.scout.rt.client.ui.form.fields.wrappedform.IWrappedFormField;
 import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.service.SERVICES;
 
+@ClassId("4a641cd4-801f-45d2-9f08-5798e20b03c4")
 public abstract class AbstractCompositeField extends AbstractFormField implements ICompositeField {
 
-  private IFormField[] m_fields;
+  private List<IFormField> m_fields;
   private Map<Class<?>, Class<? extends IFormField>> m_formFieldReplacements;
 
   public AbstractCompositeField() {
@@ -44,9 +48,9 @@ public abstract class AbstractCompositeField extends AbstractFormField implement
     super(callInitializer);
   }
 
-  protected Class<? extends IFormField>[] getConfiguredFields() {
+  protected List<Class<? extends IFormField>> getConfiguredFields() {
     Class[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
-    return ConfigurationUtility.sortFilteredClassesByOrderAnnotation(dca, IFormField.class);
+    return ConfigurationUtility.sortFilteredClassesByOrderAnnotation(Arrays.asList(dca), IFormField.class);
   }
 
   /**
@@ -65,13 +69,12 @@ public abstract class AbstractCompositeField extends AbstractFormField implement
      * E.g. setEnabled(getConfiguredEnabled()) would enable/disable all children when called
      * after field creation. -> all fields would have the enabled state of the MainBox.
      */
-    m_fields = new IFormField[0];
+    m_fields = CollectionUtility.emptyArrayList();
     super.initConfig();
-    Class<? extends IFormField>[] fieldArray = getConfiguredFields();
     // prepare injected fields
     DefaultFormFieldInjection injectedFields = null;
     List<Class<? extends IFormField>> configuredFields = new ArrayList<Class<? extends IFormField>>();
-    for (Class<? extends IFormField> clazz : fieldArray) {
+    for (Class<? extends IFormField> clazz : getConfiguredFields()) {
       if (ConfigurationUtility.isInjectFieldAnnotationPresent(clazz)) {
         if (injectedFields == null) {
           injectedFields = new DefaultFormFieldInjection(this);
@@ -82,7 +85,7 @@ public abstract class AbstractCompositeField extends AbstractFormField implement
         configuredFields.add(clazz);
       }
     }
-    ArrayList<IFormField> fieldList = new ArrayList<IFormField>();
+    List<IFormField> fieldList = new ArrayList<IFormField>();
     try {
       if (injectedFields != null) {
         FormFieldInjectionThreadLocal.push(injectedFields);
@@ -95,7 +98,7 @@ public abstract class AbstractCompositeField extends AbstractFormField implement
           fieldList.add(f);
         }// end try
         catch (Throwable t) {
-          SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("field: " + clazz.getName(), t));
+          SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + clazz.getName() + "'.", t));
         }
       }
       injectFieldsInternal(fieldList);
@@ -109,7 +112,7 @@ public abstract class AbstractCompositeField extends AbstractFormField implement
     for (IFormField f : fieldList) {
       f.setParentFieldInternal(this);
     }
-    m_fields = fieldList.toArray(new IFormField[fieldList.size()]);
+    m_fields = fieldList;
     // attach a proxy controller to each child field in the group for: visible, saveNeeded
     for (IFormField f : m_fields) {
       f.addPropertyChangeListener(new P_FieldPropertyChangeListener());
@@ -150,26 +153,19 @@ public abstract class AbstractCompositeField extends AbstractFormField implement
     if (form instanceof AbstractForm) {
       ((AbstractForm) form).registerFormFieldReplacementsInternal(m_formFieldReplacements);
     }
-    IFormField[] a = m_fields;
-    for (int i = 0; i < a.length; i++) {
-      IFormField f = a[i];
-      f.setFormInternal(form);
+    for (IFormField field : m_fields) {
+      field.setFormInternal(form);
     }
   }
 
   @Override
   public int getFieldIndex(IFormField f) {
-    for (int i = 0; i < m_fields.length; i++) {
-      if (m_fields[i] == f) {
-        return i;
-      }
-    }
-    return -1;
+    return m_fields.indexOf(f);
   }
 
   @Override
   public int getFieldCount() {
-    return m_fields.length;
+    return m_fields.size();
   }
 
   @Override
@@ -248,10 +244,8 @@ public abstract class AbstractCompositeField extends AbstractFormField implement
   }
 
   @Override
-  public IFormField[] getFields() {
-    IFormField[] a = new IFormField[m_fields.length];
-    System.arraycopy(m_fields, 0, a, 0, a.length);
-    return a;
+  public List<IFormField> getFields() {
+    return CollectionUtility.arrayList(m_fields);
   }
 
   @Override
@@ -262,20 +256,19 @@ public abstract class AbstractCompositeField extends AbstractFormField implement
     }
     // children
     int index = 0;
-    IFormField[] f = m_fields;
-    for (int i = 0; i < f.length; i++) {
-      if (f[i] instanceof ICompositeField) {
-        if (!((ICompositeField) f[i]).visitFields(visitor, startLevel + 1)) {
+    for (IFormField field : m_fields) {
+      if (field instanceof ICompositeField) {
+        if (!((ICompositeField) field).visitFields(visitor, startLevel + 1)) {
           return false;
         }
       }
-      else if (f[i] instanceof IWrappedFormField) {
-        if (!((IWrappedFormField) f[i]).visitFields(visitor, startLevel + 1)) {
+      else if (field instanceof IWrappedFormField) {
+        if (!((IWrappedFormField) field).visitFields(visitor, startLevel + 1)) {
           return false;
         }
       }
       else {
-        if (!visitor.visitField(f[i], startLevel, index)) {
+        if (!visitor.visitField(field, startLevel, index)) {
           return false;
         }
       }
@@ -324,14 +317,6 @@ public abstract class AbstractCompositeField extends AbstractFormField implement
   }
 
   /**
-   * do not broadcast this change to all children
-   */
-  @Override
-  public void setVisible(boolean b) {
-    super.setVisible(b);
-  }
-
-  /**
    * when granting of enabled property changes, broadcast and set this property
    * on all children that have no permission set
    */
@@ -371,9 +356,8 @@ public abstract class AbstractCompositeField extends AbstractFormField implement
   // box is only visible when it has at least one visible item
   protected void handleFieldVisibilityChanged() {
     int visCount = 0;
-    IFormField[] f = m_fields;
-    for (int i = 0; i < f.length; i++) {
-      if (f[i].isVisible()) {
+    for (IFormField field : m_fields) {
+      if (field.isVisible()) {
         visCount++;
       }
     }

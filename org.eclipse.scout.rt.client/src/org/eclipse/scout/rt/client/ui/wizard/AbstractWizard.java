@@ -15,17 +15,17 @@ import java.beans.PropertyChangeListener;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.ConfigurationUtility;
 import org.eclipse.scout.commons.EventListenerList;
 import org.eclipse.scout.commons.OptimisticLock;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.beans.AbstractPropertyObserver;
 import org.eclipse.scout.commons.exception.ProcessingException;
@@ -47,12 +47,12 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
 
   private boolean m_initialized;
   private final EventListenerList m_listenerList;
-  private ArrayList<IWizardStep<? extends IForm>> m_availableStepList;
-  private ArrayList<IWizardStep<? extends IForm>> m_stepList;
+  private List<IWizardStep<? extends IForm>> m_availableStepList;
+  private List<IWizardStep<? extends IForm>> m_stepList;
   private IWizardStep<? extends IForm> m_activeStep;
   // event accumulation (coalescation)
   private final OptimisticLock m_changingLock;
-  private ArrayList<WizardEvent> m_accumulatedEvents;
+  private List<WizardEvent> m_accumulatedEvents;
   //
   private boolean m_displayHintLocked;
   private boolean m_modal;
@@ -92,71 +92,71 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
 
   @ConfigProperty(ConfigProperty.FORM_DISPLAY_HINT)
   @Order(100)
-  @ConfigPropertyValue("DISPLAY_HINT_DIALOG")
   protected int getConfiguredDisplayHint() {
     return DISPLAY_HINT_DIALOG;
   }
 
   @ConfigProperty(ConfigProperty.FORM_VIEW_ID)
   @Order(105)
-  @ConfigPropertyValue("null")
   protected String getConfiguredDisplayViewId() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(106)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredModal() {
     return false;
   }
 
   @ConfigProperty(ConfigProperty.TEXT)
   @Order(10)
-  @ConfigPropertyValue("null")
   protected String getConfiguredTitle() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.TEXT)
   @Order(20)
-  @ConfigPropertyValue("null")
   protected String getConfiguredTitleHtml() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.TEXT)
   @Order(30)
-  @ConfigPropertyValue("null")
   protected String getConfiguredTooltipText() {
     return null;
   }
 
-  @ConfigProperty(ConfigProperty.DOC)
+  /**
+   * @deprecated: Use a {@link ClassId} annotation as key for Doc-Text. Will be removed in the 5.0 Release.
+   */
+  @Deprecated
   @Order(40)
-  @ConfigPropertyValue("null")
   protected String getConfiguredDoc() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.ICON_ID)
   @Order(20)
-  @ConfigPropertyValue("null")
   protected String getConfiguredIconId() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.STRING)
   @Order(50)
-  @ConfigPropertyValue("null")
   protected String getConfiguredWizardNo() {
     return null;
   }
 
   @SuppressWarnings("unchecked")
-  private Class<? extends IWizardStep<? extends IForm>>[] getConfiguredAvailableSteps() {
+  private List<Class<? extends IWizardStep<? extends IForm>>> getConfiguredAvailableSteps() {
     Class<?>[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
-    return (Class<? extends IWizardStep<? extends IForm>>[]) ConfigurationUtility.sortFilteredClassesByOrderAnnotation(dca, IWizardStep.class);
+    List<Class<IWizardStep>> filtered = ConfigurationUtility.filterClasses(dca, IWizardStep.class);
+    List<Class<? extends IWizardStep>> wizardSteps = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(filtered, IWizardStep.class);
+    List<Class<? extends IWizardStep<? extends IForm>>> result = new ArrayList<Class<? extends IWizardStep<? extends IForm>>>();
+    for (Class<? extends IWizardStep> wizardStep : wizardSteps) {
+      result.add((Class<? extends IWizardStep<? extends IForm>>) wizardStep);
+    }
+    return result;
   }
 
   /**
@@ -336,14 +336,13 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
     setCloseTypeInternal(CloseType.Unknown);
     // steps
     ArrayList<IWizardStep<? extends IForm>> list = new ArrayList<IWizardStep<? extends IForm>>();
-    Class<? extends IWizardStep<? extends IForm>>[] a = getConfiguredAvailableSteps();
-    for (Class<? extends IWizardStep<? extends IForm>> element : a) {
+    for (Class<? extends IWizardStep<? extends IForm>> element : getConfiguredAvailableSteps()) {
       try {
         IWizardStep<? extends IForm> step = ConfigurationUtility.newInnerInstance(this, element);
         list.add(step);
       }
       catch (Exception e) {
-        LOG.error("failed creating " + element, e);
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + element.getName() + "'.", e));
       }
     }
     injectStepsInternal(list);
@@ -438,7 +437,7 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
       m_changingLock.release();
       if (m_changingLock.isReleased()) {
         // now send all accumulated events
-        ArrayList<WizardEvent> list = m_accumulatedEvents;
+        List<WizardEvent> list = m_accumulatedEvents;
         m_accumulatedEvents = new ArrayList<WizardEvent>(3);
         for (WizardEvent e : list) {
           fireWizardEvent(e);
@@ -628,12 +627,7 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
 
   @Override
   public List<IWizardStep<? extends IForm>> getAvailableSteps() {
-    if (m_availableStepList != null) {
-      return new ArrayList<IWizardStep<? extends IForm>>(m_availableStepList);
-    }
-    else {
-      return Collections.emptyList();
-    }
+    return CollectionUtility.<IWizardStep<? extends IForm>> arrayList(m_availableStepList);
   }
 
   @Override
@@ -650,16 +644,11 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
 
   @Override
   public List<IWizardStep<? extends IForm>> getSteps() {
-    if (m_stepList != null) {
-      return new ArrayList<IWizardStep<? extends IForm>>(m_stepList);
-    }
-    else {
-      return Collections.emptyList();
-    }
+    return CollectionUtility.<IWizardStep<? extends IForm>> arrayList(m_stepList);
   }
 
   @Override
-  public void setSteps(IWizardStep<? extends IForm>... steps) {
+  public void setSteps(IWizardStep<?>... steps) {
     if (steps == null) {
       steps = new IWizardStep<?>[0];
     }
@@ -925,23 +914,23 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
     }
   }
 
-  public IWizardStep<? extends IForm>[] getHistory() {
+  public List<IWizardStep<? extends IForm>> getHistory() {
     int index = getStepIndex(getActiveStep());
     if (m_stepList.size() > 0 && index >= 0) {
-      return m_stepList.subList(0, Math.min(index, m_stepList.size())).toArray(new IWizardStep<?>[0]);
+      return CollectionUtility.arrayList(m_stepList.subList(0, Math.min(index, m_stepList.size())));
     }
     else {
-      return new IWizardStep<?>[0];
+      return CollectionUtility.emptyArrayList();
     }
   }
 
-  public IWizardStep<? extends IForm>[] getExpectedFuture() {
+  public List<IWizardStep<? extends IForm>> getExpectedFuture() {
     int index = getStepIndex(getActiveStep());
     if (m_stepList.size() > 0 && index < m_stepList.size()) {
-      return m_stepList.subList(Math.max(index + 1, 0), m_stepList.size()).toArray(new IWizardStep<?>[0]);
+      return CollectionUtility.arrayList(m_stepList.subList(Math.max(index + 1, 0), m_stepList.size()));
     }
     else {
-      return new IWizardStep<?>[0];
+      return CollectionUtility.emptyArrayList();
     }
   }
 
@@ -1200,6 +1189,11 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
   @Override
   public IWizardContainerForm getContainerForm() {
     return m_containerForm;
+  }
+
+  @Override
+  public String classId() {
+    return ConfigurationUtility.getAnnotatedClassIdWithFallback(getClass());
   }
 
 }

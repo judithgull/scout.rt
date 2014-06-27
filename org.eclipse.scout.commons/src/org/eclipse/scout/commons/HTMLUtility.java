@@ -10,6 +10,7 @@
  ******************************************************************************/
 package org.eclipse.scout.commons;
 
+import java.awt.Color;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -84,20 +85,20 @@ public final class HTMLUtility {
     HTMLEditorKit kit = new HTMLEditorKit();
     // remove meta tags (see JavaDoc of @{link HTMLDocument#parseDocument(String)} for more information)
     Pattern[] metaPatterns = new Pattern[]{
-          Pattern.compile("<meta\\s+[^>]*>"),
-          Pattern.compile("<Meta\\s+[^>]*>"),
-          Pattern.compile("<META\\s+[^>]*>"),
-          Pattern.compile("</\\s*meta\\s*>"),
-          Pattern.compile("</\\s*Meta\\s*>"),
-          Pattern.compile("</\\s*META\\s*>"),
-        };
+        Pattern.compile("<meta\\s+[^>]*>"),
+        Pattern.compile("<Meta\\s+[^>]*>"),
+        Pattern.compile("<META\\s+[^>]*>"),
+        Pattern.compile("</\\s*meta\\s*>"),
+        Pattern.compile("</\\s*Meta\\s*>"),
+        Pattern.compile("</\\s*META\\s*>"),
+    };
     for (Pattern p : metaPatterns) {
       htmlText = p.matcher(htmlText).replaceAll("");
     }
 
     // Remove quotes in style attribute which are not closed.
-    htmlText = HTMLUtility.removeUnclosedStyleQuotes(htmlText, true);
-    htmlText = HTMLUtility.removeUnclosedStyleQuotes(htmlText, false);
+    htmlText = removeUnclosedStyleQuotes(htmlText, true);
+    htmlText = removeUnclosedStyleQuotes(htmlText, false);
 
     // fix incorrect single tag endings ( <br/ > <br /> )
     htmlText = htmlText.replaceAll("/\\s+>", "/>");
@@ -141,6 +142,13 @@ public final class HTMLUtility {
   }
 
   /**
+   * @see #cleanupHtml(String, boolean, boolean, DefaultFont, Color)
+   */
+  public static String cleanupHtml(String rawHtml, boolean ensureContentType, boolean cleanupCss, DefaultFont defaultFont) {
+    return cleanupHtml(rawHtml, ensureContentType, cleanupCss, defaultFont, null);
+  }
+
+  /**
    * <p>
    * Applies some intelligence to the HTML document to ensure a valid HTML document.
    * </p>
@@ -155,9 +163,11 @@ public final class HTMLUtility {
    *          </small>
    * @param defaultFont
    *          to ensure default font set
+   * @param defaultHyperlinkColor
+   *          the default color used for hyperlinks (&lt;a&gt; elements) - used for CSS cleanup only
    * @return the formatted HTML document
    */
-  public static String cleanupHtml(String rawHtml, boolean ensureContentType, boolean cleanupCss, DefaultFont defaultFont) {
+  public static String cleanupHtml(String rawHtml, boolean ensureContentType, boolean cleanupCss, DefaultFont defaultFont, Color defaultHyperlinkColor) {
     rawHtml = StringUtility.nvl(rawHtml, "");
 
     try {
@@ -230,17 +240,11 @@ public final class HTMLUtility {
       rawHtml = eliminateVerticalScrollbar(rawHtml);
 
       // 6) cleanup CSS of document
-      if (cleanupCss) {
-        HTMLDocument htmlDoc = HTMLUtility.toHtmlDocument(rawHtml);
-        if (htmlDoc != null) {
-          htmlDoc = HTMLUtility.cleanupCss(htmlDoc, defaultFont);
-          rawHtml = HTMLUtility.toHtmlText(htmlDoc);
-        }
-      }
+      rawHtml = adjustCssIfNeeded(rawHtml, cleanupCss, defaultFont, defaultHyperlinkColor);
 
       // 7) ensure <META> element with content-type and charset (This must be done after 6) as <META> tags are removed in cleanup)
       if (ensureContentType) {
-        rawHtml = HTMLUtility.addHtmlMetaElement("content-type", "text/html;charset=UTF-8", rawHtml);
+        rawHtml = addHtmlMetaElement("content-type", "text/html;charset=UTF-8", rawHtml);
       }
     }
     catch (Throwable t) {
@@ -252,11 +256,41 @@ public final class HTMLUtility {
   }
 
   /**
-   * HTML has several troubles with some CSS and tag style concepts.
+   * Formats the HTML source if either {@code cleanupCss == true} or {@code defaultHyperlinkColor != null}. If the
+   * latter holds, a definition for hyperlink colors will be added to the CSS accordingly (unless such a definition
+   * already exists). If {@code cleanupCss == true} the method {@link #cleanupCss(HTMLDocument, DefaultFont)} will be
+   * called.
+   * <p>
+   * If none of the conditions hold, the HTML source is not changed.
    * 
-   * @param htmlDoc
-   * @param defaultFont
-   * @return
+   * @return the adjusted HTML source according to the description above.
+   */
+  private static String adjustCssIfNeeded(String rawHtml, boolean cleanupCss, DefaultFont defaultFont, Color defaultHyperlinkColor) {
+    if (cleanupCss || defaultHyperlinkColor != null) {
+      HTMLDocument htmlDoc = toHtmlDocument(rawHtml);
+      if (htmlDoc != null) {
+        if (defaultHyperlinkColor != null) {
+          String colorAttributeValue = ColorUtility.rgbToText(defaultHyperlinkColor.getRed(), defaultHyperlinkColor.getGreen(), defaultHyperlinkColor.getBlue());
+          StyleSheet styleSheet = htmlDoc.getStyleSheet();
+          Style aStyle = styleSheet.getStyle("a");
+          if (aStyle == null) {
+            aStyle = styleSheet.addStyle("a", null);
+          }
+          if (aStyle.getAttribute(CSS.Attribute.COLOR) == null) {
+            styleSheet.addCSSAttribute(aStyle, CSS.Attribute.COLOR, colorAttributeValue);
+          }
+        }
+        if (cleanupCss) {
+          htmlDoc = cleanupCss(htmlDoc, defaultFont);
+        }
+        rawHtml = toHtmlText(htmlDoc);
+      }
+    }
+    return rawHtml;
+  }
+
+  /**
+   * HTML has several troubles with some CSS and tag style concepts.
    */
   public static HTMLDocument cleanupCss(HTMLDocument htmlDoc, DefaultFont defaultFont) {
     if (htmlDoc == null) {
@@ -522,6 +556,64 @@ public final class HTMLUtility {
   }
 
   /**
+   * Conversion of html text to plain text without parsing and building of a html model.
+   * <p>
+   * Rule based conversion:
+   * <ul>
+   * <li>br, p, closing tr, closing table tags create newlines</li>
+   * <li>p tags in table cells will be ignored</li>
+   * <li>table columns are rendered with a pipe character (|)</li>
+   * </ul>
+   * 
+   * @param html
+   *          input HTML code as string.
+   * @return plain text as string
+   */
+  public static String toPlainTextWithTable(String html) {
+    String s = html;
+    //escape comments:
+    s = Pattern.compile("<!\\-\\-(.*?)\\-\\->", Pattern.DOTALL).matcher(s).replaceAll("");
+
+    //find body or sanitize head:
+    String body = StringUtility.getTag(s, "body");
+    if (body == null || body.length() == 0) {
+      s = StringUtility.replaceTags(s, "head", "");
+      s = StringUtility.replaceTags(s, "title", "");
+      s = StringUtility.replaceTags(s, "meta", "");
+      s = StringUtility.replaceTags(s, "link", "");
+    }
+    else {
+      s = body;
+    }
+
+    //replace newlines:
+    s = s.replaceAll("\n", " ");
+
+    //strip <p> and <br> from table cells (td, th):
+    Pattern pattern = Pattern.compile("(<t[dh][^>]*>((?!</?\\s*(p|t[dh])).)*)</?\\s*p[^>]*>", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    Matcher matcher = pattern.matcher(s);
+    while (matcher.find()) {
+      s = matcher.replaceFirst("$1");
+      matcher = pattern.matcher(s);
+    }
+
+    //create new lines:
+    s = Pattern.compile("<br\\s*/?\\s*>|</?p/?[^>]*>|</tr\\s*>", Pattern.CASE_INSENSITIVE).matcher(s).replaceAll("\n");
+    //table column
+    s = Pattern.compile("</t[hd]\\s*>", Pattern.CASE_INSENSITIVE).matcher(s).replaceAll(" | ");
+    //remove tags
+    s = Pattern.compile("<[^>]+>", Pattern.DOTALL).matcher(s).replaceAll(" ");
+    //remove multiple spaces
+    s = s.replaceAll("[ ]+", " ");
+    //remove spaces at the beginning and end of each line
+    s = s.replaceAll("[ ]+\n", "\n");
+    s = s.replaceAll("\n[ ]+", "\n");
+    s = StringUtility.htmlDecode(s);
+    s = s.trim();
+    return s;
+  }
+
+  /**
    * @return encoded text, ready to be included in a html text
    *         <xmp>replaces &, ", ', <, > and all whitespace</xmp>
    */
@@ -708,7 +800,7 @@ public final class HTMLUtility {
         String postStyleContent = matcherStyleTag.group(3);
         // ensure overflow:auto in style attribute
         if (!styleContent.toLowerCase().contains("overflow")) {
-          if (styleContent.trim().length() > 0 && !styleContent.endsWith(";")) {
+          if (StringUtility.hasText(styleContent) && !styleContent.endsWith(";")) {
             styleContent += ";";
           }
           styleContent += "overflow:auto;";
@@ -717,7 +809,7 @@ public final class HTMLUtility {
       }
       else {
         // no style attribute available
-        int endBracket = contentBodyTag.lastIndexOf(">");
+        int endBracket = contentBodyTag.lastIndexOf('>');
         contentBodyTag = contentBodyTag.substring(0, endBracket) + " style=\"overflow:auto;\">";
         rawHtml = matcherBodyTag.replaceAll(contentBodyTag);
       }

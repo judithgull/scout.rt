@@ -10,13 +10,12 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.server.services.common.security;
 
-import java.lang.reflect.Method;
 import java.security.AccessController;
 import java.security.AllPermission;
 import java.security.Permission;
 import java.security.Permissions;
 import java.security.Principal;
-import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -25,8 +24,14 @@ import java.util.regex.Pattern;
 import javax.security.auth.Subject;
 
 import org.eclipse.scout.commons.annotations.Priority;
+import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotification;
+import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificationListener;
+import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificationMessage;
+import org.eclipse.scout.rt.server.services.common.clustersync.IClusterSynchronizationService;
+import org.eclipse.scout.rt.server.services.common.security.internal.AccessControlCacheChangedClusterNotification;
 import org.eclipse.scout.rt.server.services.common.security.internal.AccessControlStore;
 import org.eclipse.scout.rt.shared.security.BasicHierarchyPermission;
 import org.eclipse.scout.rt.shared.security.RemoteServiceAccessPermission;
@@ -34,12 +39,13 @@ import org.eclipse.scout.rt.shared.services.common.ping.IPingService;
 import org.eclipse.scout.rt.shared.services.common.security.IAccessControlService;
 import org.eclipse.scout.service.AbstractService;
 import org.eclipse.scout.service.SERVICES;
+import org.osgi.framework.ServiceRegistration;
 
 /**
  * Implementations should override {@link #execLoadPermissions()}
  */
 @Priority(-1)
-public class AbstractAccessControlService extends AbstractService implements IAccessControlService {
+public class AbstractAccessControlService extends AbstractService implements IClusterSyncAccessControlService, IClusterNotificationListener {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractAccessControlService.class);
 
   private AccessControlStore m_accessControlStore;
@@ -109,11 +115,21 @@ public class AbstractAccessControlService extends AbstractService implements IAc
     return null;
   }
 
-  @SuppressWarnings("deprecation")
   @Override
-  public void initializeService() {
+  public void initializeService(ServiceRegistration registration) {
     m_accessControlStore = new AccessControlStore();
-    super.initializeService();
+    super.initializeService(registration);
+    addClusterNotificationListener();
+  }
+
+  /**
+   *
+   */
+  protected void addClusterNotificationListener() {
+    IClusterSynchronizationService s = SERVICES.getService(IClusterSynchronizationService.class);
+    if (s != null) {
+      s.addListener(this);
+    }
   }
 
   @Override
@@ -228,43 +244,57 @@ public class AbstractAccessControlService extends AbstractService implements IAc
 
   @Override
   public void clearCache() {
+    clearCacheNoFire();
+
+    try {
+      IClusterSynchronizationService s = SERVICES.getService(IClusterSynchronizationService.class);
+      if (s != null) {
+        s.publishNotification(new AccessControlCacheChangedClusterNotification());
+      }
+    }
+    catch (ProcessingException e) {
+      LOG.error("failed notifying cluster for permission changes", e);
+    }
+  }
+
+  @Override
+  public void clearCacheOfUserIds(Collection<String> userIds) {
+    clearCacheOfUserIdsNoFire(userIds);
+    try {
+      IClusterSynchronizationService s = SERVICES.getService(IClusterSynchronizationService.class);
+      if (s != null) {
+        s.publishNotification(new AccessControlCacheChangedClusterNotification(userIds));
+      }
+    }
+    catch (ProcessingException e) {
+      LOG.error("failed notifying cluster for permission changes", e);
+    }
+
+    m_accessControlStore.clearCacheOfUserIds(userIds);
+  }
+
+  @Override
+  public void clearCacheNoFire() {
     m_accessControlStore.clearCache();
   }
 
-  /**
-   * @deprecated Use {@link #clearCacheOfUserIds(String...)} instead. Will be removed in Release 3.10.
-   */
-  @SuppressWarnings("deprecation")
   @Override
-  @Deprecated
-  public void clearCacheOfPrincipals(String... userIds) {
-    clearCacheOfUserIds(userIds);
+  public void clearCacheOfUserIdsNoFire(Collection<String> userIds) {
+    m_accessControlStore.clearCacheOfUserIdsNoFire(userIds);
   }
 
   @Override
-  public void clearCacheOfUserIds(String... userIds) {
-    if (userIds == null || userIds.length == 0) {
-      return;
-    }
-    String[] users = m_accessControlStore.getUserIds();
-    ArrayList<String> toDelete = new ArrayList<String>();
-    for (String name : userIds) {
-      if (name != null) {
-        name = name.toLowerCase();
-        for (String p : users) {
-          if (p.equals(name)) {
-            toDelete.add(p);
-            break;
-          }
-        }
+  public void onNotification(IClusterNotificationMessage notification) {
+    IClusterNotification clusterNotification = notification.getNotification();
+    if ((clusterNotification instanceof AccessControlCacheChangedClusterNotification)) {
+      AccessControlCacheChangedClusterNotification n = (AccessControlCacheChangedClusterNotification) clusterNotification;
+      if (n.getUserIds() == null) {
+        clearCacheNoFire();
+      }
+      else {
+        clearCacheOfUserIdsNoFire(n.getUserIds());
       }
     }
-    m_accessControlStore.clearCacheOfUserIds(toDelete.toArray(new String[toDelete.size()]));
   }
 
-  @SuppressWarnings("deprecation")
-  @Override
-  public boolean checkServiceTunnelAccess(Class serviceInterfaceClass, Method method, Object[] args) {
-    return false;
-  }
 }

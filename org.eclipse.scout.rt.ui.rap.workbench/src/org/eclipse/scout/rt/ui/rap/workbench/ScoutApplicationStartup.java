@@ -31,8 +31,13 @@ import org.eclipse.ui.PerspectiveAdapter;
 import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.progress.UIJob;
 
+/**
+ * @deprecated will be removed with the M-release.
+ */
+@Deprecated
+@SuppressWarnings("deprecation")
 public class ScoutApplicationStartup {
-  private static IScoutLogger LOG = ScoutLogManager.getLogger(ScoutApplicationStartup.class);
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(ScoutApplicationStartup.class);
 
   private final IRwtEnvironment m_uiEnvironment;
 

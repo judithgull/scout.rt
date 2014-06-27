@@ -16,8 +16,8 @@ import java.util.Calendar;
 import java.util.Date;
 
 import org.eclipse.scout.commons.LocaleThreadLocal;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.ui.basic.cell.Cell;
@@ -28,6 +28,7 @@ import org.eclipse.scout.rt.client.ui.form.fields.datefield.AbstractDateField;
 /**
  * Column holding Date
  */
+@ClassId("9185f9ed-3dc2-459b-b06b-f39c6c6fed2e")
 public abstract class AbstractDateColumn extends AbstractColumn<Date> implements IDateColumn {
   // DO NOT init members, this has the same effect as if they were set AFTER
   // initConfig()
@@ -55,7 +56,6 @@ public abstract class AbstractDateColumn extends AbstractColumn<Date> implements
    */
   @ConfigProperty(ConfigProperty.STRING)
   @Order(140)
-  @ConfigPropertyValue("null")
   protected String getConfiguredFormat() {
     return null;
   }
@@ -70,7 +70,6 @@ public abstract class AbstractDateColumn extends AbstractColumn<Date> implements
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(150)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredHasDate() {
     return true;
   }
@@ -85,7 +84,6 @@ public abstract class AbstractDateColumn extends AbstractColumn<Date> implements
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(151)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredHasTime() {
     return false;
   }
@@ -95,7 +93,6 @@ public abstract class AbstractDateColumn extends AbstractColumn<Date> implements
    */
   @ConfigProperty(ConfigProperty.LONG)
   @Order(152)
-  @ConfigPropertyValue("0")
   protected long getConfiguredAutoTimeMillis() {
     return 0;
   }
@@ -202,17 +199,17 @@ public abstract class AbstractDateColumn extends AbstractColumn<Date> implements
   @Override
   protected IFormField prepareEditInternal(ITableRow row) throws ProcessingException {
     AbstractDateField f = new AbstractDateField() {
-      @Override
-      protected void initConfig() {
-        super.initConfig();
-        propertySupport.putPropertiesMap(AbstractDateColumn.this.propertySupport.getPropertiesMap());
-      }
     };
+    mapEditorFieldProperties(f);
+    return f;
+  }
+
+  protected void mapEditorFieldProperties(AbstractDateField f) {
+    super.mapEditorFieldProperties(f);
     f.setFormat(getFormat());
     f.setHasDate(isHasDate());
     f.setHasTime(isHasTime());
     f.setAutoTimeMillis(getAutoTimeMillis());
-    return f;
   }
 
   @Override

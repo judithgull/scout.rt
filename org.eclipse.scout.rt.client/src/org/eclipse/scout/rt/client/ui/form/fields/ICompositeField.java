@@ -4,11 +4,13 @@
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- * 
+ *
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.form.fields;
+
+import java.util.List;
 
 import org.eclipse.scout.rt.client.ui.form.IFormFieldVisitor;
 
@@ -16,6 +18,9 @@ public interface ICompositeField extends IFormField {
 
   String PROP_VISIBLE_FIELD_COUNT = "visibleFieldCount";
 
+  /**
+   * Returns the index of the first occurrence of the {@link IFormField} element, or -1 if the element can't be found.
+   */
   int getFieldIndex(IFormField comp);
 
   boolean visitFields(IFormFieldVisitor visitor, int startLevel);
@@ -33,7 +38,7 @@ public interface ICompositeField extends IFormField {
   /**
    * direct child fields including process buttons
    */
-  IFormField[] getFields();
+  List<IFormField> getFields();
 
   /**
    * search all fields in this container and its subtree<br>

@@ -10,24 +10,31 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.desktop.outline.pages;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.testenvironment.TestEnvironmentClientSession;
 import org.eclipse.scout.rt.client.ui.action.menu.AbstractMenu;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.IMenuType;
 import org.eclipse.scout.rt.client.ui.action.menu.MenuSeparator;
+import org.eclipse.scout.rt.client.ui.action.menu.TableMenuType;
 import org.eclipse.scout.rt.client.ui.basic.table.AbstractTable;
 import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.AbstractStringColumn;
+import org.eclipse.scout.rt.client.ui.basic.table.internal.TablePageTreeMenuWrapper;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
 import org.eclipse.scout.rt.client.ui.desktop.IDesktop;
 import org.eclipse.scout.rt.client.ui.desktop.outline.AbstractOutline;
@@ -51,7 +58,7 @@ public class OutlineTreeContextMenuNestedPageWithTablesTest {
     IDesktop desktop = TestEnvironmentClientSession.get().getDesktop();
     assertNotNull(desktop);
 
-    desktop.setAvailableOutlines(new IOutline[]{new PageWithTableOutline()});
+    desktop.setAvailableOutlines(Collections.singletonList(new PageWithTableOutline()));
     desktop.setOutline(PageWithTableOutline.class);
 
     IOutline outline = desktop.getOutline();
@@ -76,23 +83,60 @@ public class OutlineTreeContextMenuNestedPageWithTablesTest {
 
     SubPageWithTable subTablePage = outline.findPage(SubPageWithTable.class);
     requiredMenus.addAll(resolveMenusOfPageWithTable(subTablePage, SubPageWithTableEmptySpaceMenu.class));
+    for (IMenu iMenu : requiredMenus) {
+      System.out.println(" r- " + iMenu);
+    }
 
     ITreeNode selectedNode = outline.getSelectedNode();
-    IMenu[] menus = selectedNode.getTree().getUIFacade().fireNodePopupFromUI();
-    List<IMenu> actualMenus = Arrays.asList(menus);
+    List<IMenu> menus = selectedNode.getTree().getMenus();
+    for (IMenu iMenu : menus) {
+      System.out.println(" m- " + iMenu);
+    }
+    assertTrue(containsAllMenus(menus, requiredMenus));
 
-    assertTrue(actualMenus.containsAll(requiredMenus));
-
-    assertTrue(actualMenus.size() == (requiredMenus.size() + 1)); // + 1 stands for menu separator
+    assertEquals(sizeMenuListWithoutSeparators(menus), requiredMenus.size()); // + 1 stands for menu separator
 
     boolean hasMenuSeparator = false;
-    for (IMenu menu : actualMenus) {
+    for (IMenu menu : menus) {
       if (menu instanceof MenuSeparator) {
         hasMenuSeparator = true;
       }
     }
 
     assertTrue(hasMenuSeparator);
+  }
+
+  public static boolean containsAllMenus(Collection<IMenu> reference, Collection<IMenu> menus) {
+    // normalize reference
+    List<IMenu> refNormalized = new ArrayList<IMenu>(reference.size());
+    for (IMenu m : reference) {
+      if (m instanceof TablePageTreeMenuWrapper) {
+        refNormalized.add(((TablePageTreeMenuWrapper) m).getWrappedMenu());
+      }
+      else {
+        refNormalized.add(m);
+      }
+    }
+    List<IMenu> menusNormalized = new ArrayList<IMenu>(menus.size());
+    for (IMenu m : menus) {
+      if (m instanceof TablePageTreeMenuWrapper) {
+        menusNormalized.add(((TablePageTreeMenuWrapper) m).getWrappedMenu());
+      }
+      else {
+        menusNormalized.add(m);
+      }
+    }
+    return refNormalized.containsAll(menusNormalized);
+  }
+
+  public static int sizeMenuListWithoutSeparators(Collection<IMenu> menus) {
+    int i = 0;
+    for (IMenu m : menus) {
+      if (!m.isSeparator()) {
+        i++;
+      }
+    }
+    return i;
   }
 
   private static List<IMenu> resolveMenusOfPageWithTable(IPageWithTable<?> page, Class<? extends IMenu>... menuClasses) throws Exception {
@@ -133,18 +177,13 @@ public class OutlineTreeContextMenuNestedPageWithTablesTest {
       public class PageWithTableEmptySpaceMenu extends AbstractMenu {
 
         @Override
-        protected boolean getConfiguredEmptySpaceAction() {
-          return true;
-        }
-
-        @Override
-        protected boolean getConfiguredSingleSelectionAction() {
-          return false;
-        }
-
-        @Override
         protected String getConfiguredText() {
           return "EmptySpace";
+        }
+
+        @Override
+        protected Set<? extends IMenuType> getConfiguredMenuTypes() {
+          return CollectionUtility.hashSet(TableMenuType.EmptySpace);
         }
 
       }
@@ -153,15 +192,14 @@ public class OutlineTreeContextMenuNestedPageWithTablesTest {
       public class PageWithTableRowMenu extends AbstractMenu {
 
         @Override
-        protected boolean getConfiguredSingleSelectionAction() {
-          return true;
-        }
-
-        @Override
         protected String getConfiguredText() {
           return "Edit";
         }
 
+        @Override
+        protected Set<? extends IMenuType> getConfiguredMenuTypes() {
+          return CollectionUtility.hashSet(TableMenuType.SingleSelection);
+        }
       }
 
       @Order(10)
@@ -187,18 +225,13 @@ public class OutlineTreeContextMenuNestedPageWithTablesTest {
       public class SubPageWithTableEmptySpaceMenu extends AbstractMenu {
 
         @Override
-        protected boolean getConfiguredEmptySpaceAction() {
-          return true;
-        }
-
-        @Override
-        protected boolean getConfiguredSingleSelectionAction() {
-          return false;
-        }
-
-        @Override
         protected String getConfiguredText() {
           return "EmptySpace";
+        }
+
+        @Override
+        protected Set<? extends IMenuType> getConfiguredMenuTypes() {
+          return CollectionUtility.hashSet(TableMenuType.EmptySpace);
         }
 
       }
@@ -207,13 +240,13 @@ public class OutlineTreeContextMenuNestedPageWithTablesTest {
       public class SubPageWithTableRowMenu extends AbstractMenu {
 
         @Override
-        protected boolean getConfiguredSingleSelectionAction() {
-          return true;
+        protected String getConfiguredText() {
+          return "Edit";
         }
 
         @Override
-        protected String getConfiguredText() {
-          return "Edit";
+        protected Set<? extends IMenuType> getConfiguredMenuTypes() {
+          return CollectionUtility.hashSet(TableMenuType.SingleSelection);
         }
 
       }

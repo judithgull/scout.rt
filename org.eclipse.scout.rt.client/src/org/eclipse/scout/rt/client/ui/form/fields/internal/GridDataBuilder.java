@@ -4,7 +4,7 @@
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- * 
+ *
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
@@ -18,7 +18,7 @@ public final class GridDataBuilder {
   }
 
   public static GridData createFromHints(IFormField f, int gridColumnCount) {
-    GridData data = f.getGridDataHints();
+    GridData data = new GridData(f.getGridDataHints());
     if (data.w == IFormField.FULL_WIDTH) {
       data.w = gridColumnCount;
     }

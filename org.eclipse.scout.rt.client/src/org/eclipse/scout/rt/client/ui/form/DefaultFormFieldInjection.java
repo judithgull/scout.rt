@@ -23,10 +23,13 @@ import org.eclipse.scout.commons.ConfigurationUtility;
 import org.eclipse.scout.commons.annotations.InjectFieldTo;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.annotations.Replace;
+import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.form.fields.ICompositeField;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
+import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
+import org.eclipse.scout.service.SERVICES;
 
 /**
  * Default implementation that inserts new fields at the right place based on their {@link Order} annotation and that
@@ -34,7 +37,7 @@ import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
  * 
  * @since 3.8.2
  */
-public class DefaultFormFieldInjection implements IFormFieldInjection2 {
+public class DefaultFormFieldInjection implements IFormFieldInjection {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(DefaultFormFieldInjection.class);
 
   private final Map<IFormField, Set<Class<? extends IFormField>>> m_replacingFormFieldsByContainer;
@@ -116,9 +119,7 @@ public class DefaultFormFieldInjection implements IFormFieldInjection2 {
 
     // 2. remove transitive replacements (i.e. compute replacing leaf classes)
     if (!m_replacingFields.isEmpty()) {
-      @SuppressWarnings("unchecked")
-      Class<? extends IFormField>[] classes = m_replacingFields.toArray(new Class[m_replacingFields.size()]);
-      m_replacingFields = ConfigurationUtility.getReplacingLeafClasses(classes);
+      m_replacingFields = ConfigurationUtility.getReplacingLeafClasses(new ArrayList<Class<? extends IFormField>>(m_replacingFields));
     }
 
     // 3. remove injected fields that are replaced and treat those replacing fields as injected fields
@@ -245,7 +246,7 @@ public class DefaultFormFieldInjection implements IFormFieldInjection2 {
       list.add(f);
     }
     catch (Exception e) {
-      LOG.error("exception while injecting a field", e);
+      SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("exception while injecting field '" + fieldClass.getName() + "'.", e));
     }
   }
 

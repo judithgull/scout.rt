@@ -17,8 +17,10 @@ import java.awt.MenuItem;
 import java.awt.PopupMenu;
 import java.awt.SystemTray;
 import java.awt.TrayIcon;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.action.IAction;
@@ -40,26 +42,38 @@ public class SwingScoutTray extends SwingScoutComposite<IDesktop> implements ISw
 
   @Override
   protected void initializeSwing() {
+    m_trayIcon = createTrayIcon();
+    if (m_trayIcon != null) {
+      PopupMenu pm = createPopupMenu();
+      if (pm != null) {
+        updatePopupMenus(pm);
+        m_trayIcon.setPopupMenu(pm);
+      }
+      try {
+        SystemTray.getSystemTray().add(m_trayIcon);
+      }
+      catch (AWTException e) {
+        LOG.warn("Failed attaching tray icon", e);
+      }
+    }
+  }
+
+  protected TrayIcon createTrayIcon() {
     Image icon = Activator.getImage(SwingIcons.Window); // legacy
     if (icon == null) {
       icon = Activator.getImage(SwingIcons.Tray); // different from window icon (should be a GIF for Win XP)
     }
-    m_trayIcon = new TrayIcon(icon);
-    PopupMenu pm = new PopupMenu();
-    updatePopupMenus(pm);
-    m_trayIcon.setPopupMenu(pm);
-    try {
-      SystemTray.getSystemTray().add(m_trayIcon);
-    }
-    catch (AWTException e) {
-      LOG.warn("Failed attaching tray icon", e);
-    }
+    return new TrayIcon(icon);
+  }
+
+  protected PopupMenu createPopupMenu() {
+    return new PopupMenu();
   }
 
   protected void updatePopupMenus(PopupMenu pm) {
     pm.removeAll();
     if (getScoutObject() != null) {
-      final AtomicReference<IMenu[]> scoutMenusRef = new AtomicReference<IMenu[]>();
+      final AtomicReference<List<IMenu>> scoutMenusRef = new AtomicReference<List<IMenu>>();
       // notify Scout
       Runnable t = new Runnable() {
         @Override
@@ -74,7 +88,7 @@ public class SwingScoutTray extends SwingScoutComposite<IDesktop> implements ISw
         //nop
       }
       // end notify
-      if (scoutMenusRef.get() != null && scoutMenusRef.get().length > 0) {
+      if (CollectionUtility.hasElements(scoutMenusRef.get())) {
         //create awt menu wrappers
         for (IAction a : scoutMenusRef.get()) {
           if (a.isSeparator()) {
@@ -107,5 +121,32 @@ public class SwingScoutTray extends SwingScoutComposite<IDesktop> implements ISw
   @Override
   public TrayIcon getSwingTrayIcon() {
     return m_trayIcon;
+  }
+
+  @Override
+  protected void attachScout() {
+    super.attachScout();
+    IDesktop desktop = getScoutObject();
+    setTooltipFromScout(desktop.getTitle());
+  }
+
+  /*
+   * properties
+   */
+  protected void setTooltipFromScout(String tooltip) {
+    if (m_trayIcon != null) {
+      m_trayIcon.setToolTip(tooltip);
+    }
+  }
+
+  /*
+   * extended property observer
+   */
+  @Override
+  protected void handleScoutPropertyChange(String name, Object newValue) {
+    super.handleScoutPropertyChange(name, newValue);
+    if (IDesktop.PROP_TITLE.equals(name)) {
+      setTooltipFromScout((String) newValue);
+    }
   }
 }

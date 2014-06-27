@@ -14,18 +14,24 @@ import static org.junit.Assert.assertArrayEquals;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.testenvironment.TestEnvironmentClientSession;
+import org.eclipse.scout.rt.client.ui.action.ActionUtility;
 import org.eclipse.scout.rt.client.ui.action.menu.AbstractMenu;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.IMenuType;
+import org.eclipse.scout.rt.client.ui.action.menu.TableMenuType;
 import org.eclipse.scout.rt.client.ui.basic.table.AbstractTable;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.AbstractIntegerColumn;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.AbstractStringColumn;
 import org.eclipse.scout.rt.client.ui.desktop.IDesktop;
 import org.eclipse.scout.rt.client.ui.desktop.outline.AbstractOutline;
-import org.eclipse.scout.rt.client.ui.desktop.outline.IOutline;
 import org.eclipse.scout.rt.shared.services.common.jdbc.SearchFilter;
 import org.eclipse.scout.testing.client.runner.ScoutClientTestRunner;
 import org.junit.Test;
@@ -43,54 +49,37 @@ public class PageWithTable6Test {
   public void testMenus() throws Exception {
     IDesktop desktop = TestEnvironmentClientSession.get().getDesktop();
     Outline outline = new Outline();
-    desktop.setAvailableOutlines(new IOutline[]{outline});
+    desktop.setAvailableOutlines(Collections.singletonList(outline));
     desktop.setOutline(outline);
     PageWithTable page = (PageWithTable) desktop.getOutline().getActivePage();
     PageWithTable.Table table = page.getTable();
     //
     table.selectRow(null);
-    assertEmptySpaceMenus(table, new String[]{"New Account"});
-    assertRowMenus(table, new String[]{});
+    assertMenus(table, new String[]{"New Account"});
     //
     table.selectRow(0);
-    assertEmptySpaceMenus(table, new String[]{"New Account"});
-    assertRowMenus(table, new String[]{"Edit Account"});
+    assertMenus(table, new String[]{"Edit Account"});
     //
     table.selectRow(1);
-    assertEmptySpaceMenus(table, new String[]{"New Account"});
-    assertRowMenus(table, new String[]{});
+    assertMenus(table, new String[]{});
     //
     table.selectAllRows();
-    assertEmptySpaceMenus(table, new String[]{"New Account"});
-    assertRowMenus(table, new String[]{});
+    assertMenus(table, new String[]{});
     //
     table.selectRow(1);
-    assertEmptySpaceMenus(table, new String[]{"New Account"});
-    assertRowMenus(table, new String[]{});
-    //
+    assertMenus(table, new String[]{});
+
     table.selectRow(0);
-    assertEmptySpaceMenus(table, new String[]{"New Account"});
-    assertRowMenus(table, new String[]{"Edit Account"});
+    assertMenus(table, new String[]{"Edit Account"});
     //
     table.deselectAllRows();
-    assertEmptySpaceMenus(table, new String[]{"New Account"});
-    assertRowMenus(table, new String[]{});
+    assertMenus(table, new String[]{"New Account"});
   }
 
-  private static void assertEmptySpaceMenus(PageWithTable.Table table, String[] expectedMenus) {
-    ArrayList<String> actualMenus = new ArrayList<String>();
-    for (IMenu m : table.getUIFacade().fireEmptySpacePopupFromUI()) {
-      if (m.isVisible() && m.isEnabled()) {
-        actualMenus.add(m.getText());
-      }
-    }
-    assertArrayEquals(expectedMenus, actualMenus.toArray(new String[0]));
-  }
-
-  private static void assertRowMenus(PageWithTable.Table table, String[] expectedMenus) {
-    ArrayList<String> actualMenus = new ArrayList<String>();
-    for (IMenu m : table.getUIFacade().fireRowPopupFromUI()) {
-      if (m.isVisible() && m.isEnabled()) {
+  private static void assertMenus(PageWithTable.Table table, String[] expectedMenus) {
+    List<String> actualMenus = new ArrayList<String>();
+    for (IMenu m : ActionUtility.visibleNormalizedActions(table.getContextMenu().getChildActions(), table.getContextMenu().getActiveFilter())) {
+      if (m.isEnabled()) {
         actualMenus.add(m.getText());
       }
     }
@@ -116,7 +105,7 @@ public class PageWithTable6Test {
     @Override
     protected void execPopulateTable() throws ProcessingException {
       super.execPopulateTable();
-      getTable().findRowByKey(new Object[]{2}).setEnabled(false);
+      getTable().findRowByKey(CollectionUtility.arrayList((Object) Integer.valueOf(2))).setEnabled(false);
     }
 
     public class Table extends AbstractTable {
@@ -158,13 +147,8 @@ public class PageWithTable6Test {
         }
 
         @Override
-        protected boolean getConfiguredSingleSelectionAction() {
-          return false;
-        }
-
-        @Override
-        protected boolean getConfiguredEmptySpaceAction() {
-          return true;
+        protected Set<? extends IMenuType> getConfiguredMenuTypes() {
+          return CollectionUtility.hashSet(TableMenuType.EmptySpace);
         }
       }
 
@@ -176,16 +160,10 @@ public class PageWithTable6Test {
         }
 
         @Override
-        protected boolean getConfiguredSingleSelectionAction() {
-          return true;
-        }
-
-        @Override
-        protected boolean getConfiguredEmptySpaceAction() {
-          return false;
+        protected Set<? extends IMenuType> getConfiguredMenuTypes() {
+          return CollectionUtility.hashSet(TableMenuType.SingleSelection);
         }
       }
-
     }
   }
 }

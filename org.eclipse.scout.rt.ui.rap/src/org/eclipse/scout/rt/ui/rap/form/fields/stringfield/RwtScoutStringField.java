@@ -11,28 +11,34 @@
 package org.eclipse.scout.rt.ui.rap.form.fields.stringfield;
 
 import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 
-import org.eclipse.scout.commons.CompareUtility;
+import org.eclipse.rap.rwt.RWT;
 import org.eclipse.scout.commons.beans.IPropertyObserver;
 import org.eclipse.scout.commons.dnd.TransferObject;
 import org.eclipse.scout.commons.holders.Holder;
 import org.eclipse.scout.commons.job.JobEx;
 import org.eclipse.scout.rt.client.ui.IDNDSupport;
+import org.eclipse.scout.rt.client.ui.action.menu.root.IContextMenu;
+import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.stringfield.IStringField;
 import org.eclipse.scout.rt.ui.rap.LogicalGridLayout;
+import org.eclipse.scout.rt.ui.rap.RwtMenuUtility;
+import org.eclipse.scout.rt.ui.rap.action.menu.RwtContextMenuMarkerComposite;
+import org.eclipse.scout.rt.ui.rap.action.menu.RwtScoutContextMenu;
 import org.eclipse.scout.rt.ui.rap.ext.StatusLabelEx;
 import org.eclipse.scout.rt.ui.rap.ext.StyledTextEx;
 import org.eclipse.scout.rt.ui.rap.ext.custom.StyledText;
 import org.eclipse.scout.rt.ui.rap.extension.UiDecorationExtensionPoint;
 import org.eclipse.scout.rt.ui.rap.form.fields.AbstractRwtScoutDndSupport;
-import org.eclipse.scout.rt.ui.rap.form.fields.RwtScoutValueFieldComposite;
+import org.eclipse.scout.rt.ui.rap.form.fields.LogicalGridDataBuilder;
+import org.eclipse.scout.rt.ui.rap.form.fields.RwtScoutBasicFieldComposite;
 import org.eclipse.scout.rt.ui.rap.internal.TextFieldEditableSupport;
 import org.eclipse.scout.rt.ui.rap.keystroke.IRwtKeyStroke;
 import org.eclipse.scout.rt.ui.rap.keystroke.RwtKeyStroke;
+import org.eclipse.scout.rt.ui.rap.util.RwtUtility;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.dnd.DropTargetEvent;
-import org.eclipse.swt.events.ModifyEvent;
-import org.eclipse.swt.events.ModifyListener;
 import org.eclipse.swt.events.MouseAdapter;
 import org.eclipse.swt.events.MouseEvent;
 import org.eclipse.swt.events.MouseListener;
@@ -40,11 +46,13 @@ import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.VerifyEvent;
 import org.eclipse.swt.events.VerifyListener;
+import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Event;
+import org.eclipse.swt.widgets.Menu;
 
-public class RwtScoutStringField extends RwtScoutValueFieldComposite<IStringField> implements IRwtScoutStringField {
+public class RwtScoutStringField extends RwtScoutBasicFieldComposite<IStringField> implements IRwtScoutStringField {
 
   public static final int DEFAULT_CASE = 0;
   public static final int UPPER_CASE = 1;
@@ -54,11 +62,13 @@ public class RwtScoutStringField extends RwtScoutValueFieldComposite<IStringFiel
   private int m_characterType = -1;
   private MouseListener m_linkTrigger;
   // private MouseListener m_linkTrigger;
-  private boolean m_validateOnAnyKey;
   private boolean m_linkDecoration;
   private TextFieldEditableSupport m_editableSupport;
-  private P_RwtValidateOnAnyKeyModifyListener m_validateOnAnyKeyModifyListener;
   private P_UpperLowerCaseVerifyListener m_upperLowerCaseVerifyListener;
+
+  private RwtContextMenuMarkerComposite m_menuMarkerComposite;
+  private RwtScoutContextMenu m_uiContextMenu;
+  private P_ContextMenuPropertyListener m_contextMenuPropertyListener;
 
   public RwtScoutStringField() {
   }
@@ -68,7 +78,26 @@ public class RwtScoutStringField extends RwtScoutValueFieldComposite<IStringFiel
     Composite container = getUiEnvironment().getFormToolkit().createComposite(parent);
     StatusLabelEx label = getUiEnvironment().getFormToolkit().createStatusLabel(container, getScoutObject());
 
-    int style = SWT.BORDER;
+    m_menuMarkerComposite = new RwtContextMenuMarkerComposite(container, getUiEnvironment());
+    getUiEnvironment().getFormToolkit().adapt(m_menuMarkerComposite);
+    m_menuMarkerComposite.setData(RWT.CUSTOM_VARIANT, RwtUtility.VARIANT_COMPOSITE_INPUT_FIELD_BORDER);
+    m_menuMarkerComposite.addSelectionListener(new SelectionAdapter() {
+      private static final long serialVersionUID = 1L;
+
+      @Override
+      public void widgetSelected(SelectionEvent e) {
+        if (getUiContextMenu() != null) {
+          Menu uiMenu = getUiContextMenu().getUiMenu();
+          if (e.widget instanceof Control) {
+            Point loc = ((Control) e.widget).toDisplay(e.x, e.y);
+            uiMenu.setLocation(RwtMenuUtility.getMenuLocation(getScoutObject().getContextMenu().getChildActions(), uiMenu, loc, getUiEnvironment()));
+          }
+          uiMenu.setVisible(true);
+        }
+      }
+    });
+
+    int style = SWT.None;// SWT.BORDER;
     //Password
     if (getScoutObject().isInputMasked()) {
       style |= SWT.PASSWORD;
@@ -85,7 +114,8 @@ public class RwtScoutStringField extends RwtScoutValueFieldComposite<IStringFiel
     if (getScoutObject().isWrapText()) {
       style |= SWT.WRAP;
     }
-    StyledText textField = getUiEnvironment().getFormToolkit().createStyledText(container, style);
+    style |= RwtUtility.getHorizontalAlignment(getScoutObject().getGridData().horizontalAlignment);
+    StyledText textField = getUiEnvironment().getFormToolkit().createStyledText(m_menuMarkerComposite, style);
 
     setUiContainer(container);
     setUiLabel(label);
@@ -96,6 +126,7 @@ public class RwtScoutStringField extends RwtScoutValueFieldComposite<IStringFiel
     // layout
     LogicalGridLayout layout = new LogicalGridLayout(1, 0);
     getUiContainer().setLayout(layout);
+    m_menuMarkerComposite.setLayoutData(LogicalGridDataBuilder.createField(((IFormField) getScoutObject()).getGridData()));
   }
 
   protected void addDefaultUiListeners(StyledText textField) {
@@ -110,11 +141,17 @@ public class RwtScoutStringField extends RwtScoutValueFieldComposite<IStringFiel
     setDecorationLinkFromScout(f.isDecorationLink());
     setFormatFromScout(f.getFormat());
     setMaxLengthFromScout(f.getMaxLength());
-    setValidateOnAnyKeyFromScout(f.isValidateOnAnyKey());
     setSelectionFromScout(f.getSelectionStart(), f.getSelectionEnd());
     setTextWrapFromScout(f.isWrapText());
 
     attachDndSupport();
+
+    // context menu
+    updateContextMenuVisibilityFromScout();
+    if (getScoutObject().getContextMenu() != null && m_contextMenuPropertyListener == null) {
+      m_contextMenuPropertyListener = new P_ContextMenuPropertyListener();
+      getScoutObject().getContextMenu().addPropertyChangeListener(IContextMenu.PROP_VISIBLE, m_contextMenuPropertyListener);
+    }
   }
 
   protected void attachDndSupport() {
@@ -124,8 +161,33 @@ public class RwtScoutStringField extends RwtScoutValueFieldComposite<IStringFiel
   }
 
   @Override
+  protected void detachScout() {
+    // context menu listener
+    if (m_contextMenuPropertyListener != null) {
+      getScoutObject().getContextMenu().removePropertyChangeListener(IContextMenu.PROP_VISIBLE, m_contextMenuPropertyListener);
+      m_contextMenuPropertyListener = null;
+    }
+    super.detachScout();
+  }
+
+  @Override
   public StyledTextEx getUiField() {
     return (StyledTextEx) super.getUiField();
+  }
+
+  public RwtScoutContextMenu getUiContextMenu() {
+    return m_uiContextMenu;
+  }
+
+  @Override
+  protected void setEnabledFromScout(boolean b) {
+    super.setEnabledFromScout(b);
+    if (b) {
+      m_menuMarkerComposite.setData(RWT.CUSTOM_VARIANT, RwtUtility.VARIANT_COMPOSITE_INPUT_FIELD_BORDER);
+    }
+    else {
+      m_menuMarkerComposite.setData(RWT.CUSTOM_VARIANT, RwtUtility.VARIANT_COMPOSITE_INPUT_FIELD_BORDER_READONLY);
+    }
   }
 
   @Override
@@ -210,11 +272,9 @@ public class RwtScoutStringField extends RwtScoutValueFieldComposite<IStringFiel
   }
 
   protected void setDoInsertFromScout(String s) {
-    //XXX rap
-    /*
     if (s != null && s.length() > 0) {
       StyledText field = getUiField();
-      int offset = field.getCaretOffset();
+      int offset = field.getCaretPosition();
       int a = field.getSelection().x;
       int b = field.getSelection().y;
       String uiText = field.getText();
@@ -231,68 +291,11 @@ public class RwtScoutStringField extends RwtScoutValueFieldComposite<IStringFiel
       if (builder != null) {
         field.setText(builder.toString());
       }
-    }
-    */
-  }
 
-  @SuppressWarnings("unused")
-  @Override
-  protected void setDisplayTextFromScout(String s) {
-    //loop detection
-    if (m_validateOnAnyKey && getUiField().isFocusControl()) {
-      return;
+      // reset the cursor after the inserted text
+      field.setSelection(a + s.length());
     }
-    StyledText field = getUiField();
-    String oldText = field.getText();
-    if (s == null) {
-      s = "";
-    }
-    if (oldText == null) {
-      oldText = "";
-    }
-    if (oldText.equals(s)) {
-      return;
-    }
-    //
-    int startIndex = field.getSelection().x;
-    //XXX rap     int caretOffset = field.getCaretOffset();
-    int endIndex = -field.getSelection().y;
-    field.setText(s);
-    // restore selection and caret
-    int textLength = field.getText().length();
-    //XXX rap
-    /*
-    if (caretOffset > 0) {
-      startIndex = Math.min(Math.max(startIndex, 0), textLength);
-      endIndex = Math.min(Math.max(endIndex, 0), textLength);
-      field.setCaretOffset(caretOffset);
-      field.setSelection(startIndex, endIndex);
-    }
-    */
-  }
 
-  protected void setValidateOnAnyKeyFromScout(boolean b) {
-    m_validateOnAnyKey = b;
-    if (b) {
-      addValidateOnAnyKeyModifyListener();
-    }
-    else {
-      removeValidateOnAnyKeyModifyListener();
-    }
-  }
-
-  protected void addValidateOnAnyKeyModifyListener() {
-    if (m_validateOnAnyKeyModifyListener == null) {
-      m_validateOnAnyKeyModifyListener = new P_RwtValidateOnAnyKeyModifyListener();
-      getUiField().addModifyListener(m_validateOnAnyKeyModifyListener);
-    }
-  }
-
-  protected void removeValidateOnAnyKeyModifyListener() {
-    if (m_validateOnAnyKeyModifyListener != null) {
-      getUiField().removeModifyListener(m_validateOnAnyKeyModifyListener);
-      m_validateOnAnyKeyModifyListener = null;
-    }
   }
 
   protected void setSelectionFromScout(int startIndex, int endIndex) {
@@ -314,6 +317,21 @@ public class RwtScoutStringField extends RwtScoutValueFieldComposite<IStringFiel
     }
   }
 
+  protected void updateContextMenuVisibilityFromScout() {
+    m_menuMarkerComposite.setMarkerVisible(getScoutObject().getContextMenu().isVisible());
+    if (getScoutObject().getContextMenu().isVisible()) {
+      if (m_uiContextMenu == null) {
+        m_uiContextMenu = new RwtScoutContextMenu(getUiField().getShell(), getScoutObject().getContextMenu(), getUiEnvironment());
+      }
+    }
+    else {
+      if (m_uiContextMenu != null) {
+        m_uiContextMenu.dispose();
+      }
+      m_uiContextMenu = null;
+    }
+  }
+
   /**
    * scout property handler override
    */
@@ -328,9 +346,6 @@ public class RwtScoutStringField extends RwtScoutValueFieldComposite<IStringFiel
     }
     else if (name.equals(IStringField.PROP_INSERT_TEXT)) {
       setDoInsertFromScout((String) newValue);
-    }
-    else if (name.equals(IStringField.PROP_VALIDATE_ON_ANY_KEY)) {
-      setValidateOnAnyKeyFromScout(((Boolean) newValue).booleanValue());
     }
     else if (name.equals(IStringField.PROP_SELECTION_START)) {
       IStringField f = getScoutObject();
@@ -381,45 +396,6 @@ public class RwtScoutStringField extends RwtScoutValueFieldComposite<IStringFiel
   }
 
   @Override
-  protected void handleUiInputVerifier(boolean doit) {
-    if (!doit) {
-      return;
-    }
-    final String text = getUiField().getText();
-    // only handle if text has changed
-    if (CompareUtility.equals(text, getScoutObject().getDisplayText()) && getScoutObject().getErrorStatus() == null) {
-      return;
-    }
-    final Holder<Boolean> result = new Holder<Boolean>(Boolean.class, false);
-    // notify Scout
-    Runnable t = new Runnable() {
-      @Override
-      public void run() {
-        boolean b = getScoutObject().getUIFacade().setTextFromUI(text);
-        result.setValue(b);
-      }
-    };
-    JobEx job = getUiEnvironment().invokeScoutLater(t, 0);
-    try {
-      job.join(2345);
-    }
-    catch (InterruptedException e) {
-      //nop
-    }
-    doit = result.getValue();
-    getUiEnvironment().dispatchImmediateUiJobs();
-  }
-
-  @Override
-  protected void handleUiFocusGained() {
-    super.handleUiFocusGained();
-
-    if (isSelectAllOnFocusEnabled()) {
-      getUiField().setSelection(0, getUiField().getText().length());
-    }
-  }
-
-  @Override
   protected boolean isSelectAllOnFocusEnabled() {
     return super.isSelectAllOnFocusEnabled() && getScoutObject().isSelectAllOnFocus();
   }
@@ -439,39 +415,6 @@ public class RwtScoutStringField extends RwtScoutValueFieldComposite<IStringFiel
       }
     }
   } // end class P_TextVerifyListener
-
-  private class P_RwtValidateOnAnyKeyModifyListener implements ModifyListener {
-    private static final long serialVersionUID = 1L;
-
-    /*
-     * Do not call handleUiInputVerifier(), this can lead to endless loops.
-     */
-    @Override
-    public void modifyText(ModifyEvent e) {
-      if (!m_validateOnAnyKey) {
-        return;
-      }
-
-      if (getUpdateUiFromScoutLock().isReleased()) {
-        sendVerifyToScoutAndIgnoreResponses();
-      }
-    }
-
-    /*
-     * Do not call handleUiInputVerifier(), this can lead to endless loops.
-     */
-    private void sendVerifyToScoutAndIgnoreResponses() {
-      final String text = getUiField().getText();
-      // notify Scout
-      Runnable t = new Runnable() {
-        @Override
-        public void run() {
-          getScoutObject().getUIFacade().setTextFromUI(text);
-        }
-      };
-      getUiEnvironment().invokeScoutLater(t, 0);
-    }
-  } // end class P_RwtTextListener
 
   private class P_RwtLinkTrigger extends MouseAdapter {
     private static final long serialVersionUID = 1L;
@@ -531,4 +474,18 @@ public class RwtScoutStringField extends RwtScoutValueFieldComposite<IStringFiel
     }
   }// end class P_DndSupport
 
+  private class P_ContextMenuPropertyListener implements PropertyChangeListener {
+    @Override
+    public void propertyChange(PropertyChangeEvent evt) {
+      if (IContextMenu.PROP_VISIBLE.equals(evt.getPropertyName())) {
+        // synchronize
+        getUiEnvironment().invokeUiLater(new Runnable() {
+          @Override
+          public void run() {
+            updateContextMenuVisibilityFromScout();
+          }
+        });
+      }
+    }
+  }
 }

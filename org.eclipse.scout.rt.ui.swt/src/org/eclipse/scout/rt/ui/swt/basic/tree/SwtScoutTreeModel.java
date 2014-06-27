@@ -10,6 +10,8 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.ui.swt.basic.tree;
 
+import java.util.List;
+
 import org.eclipse.jface.viewers.IColorProvider;
 import org.eclipse.jface.viewers.IFontProvider;
 import org.eclipse.jface.viewers.ITreeContentProvider;
@@ -39,6 +41,7 @@ public class SwtScoutTreeModel extends LabelProvider implements ITreeContentProv
   private Image m_imgCheckboxTrue;
   private Image m_imgCheckboxFalse;
   private Color m_disabledForegroundColor;
+  private Color m_disabledBackgroundColor;
 
   public SwtScoutTreeModel(ITree tree, ISwtEnvironment environment, TreeViewer treeViewer) {
     m_tree = tree;
@@ -47,12 +50,14 @@ public class SwtScoutTreeModel extends LabelProvider implements ITreeContentProv
     m_imgCheckboxTrue = Activator.getIcon(SwtIcons.CheckboxYes);
     m_imgCheckboxFalse = Activator.getIcon(SwtIcons.CheckboxNo);
     m_disabledForegroundColor = m_environment.getColor(UiDecorationExtensionPoint.getLookAndFeel().getColorForegroundDisabled());
+    m_disabledBackgroundColor = m_environment.getColor(UiDecorationExtensionPoint.getLookAndFeel().getColorBackgroundDisabled());
   }
 
   @Override
   public Object[] getChildren(Object parentElement) {
     ITreeNode scoutNode = (ITreeNode) parentElement;
-    return scoutNode.getFilteredChildNodes();
+    List<ITreeNode> childNodes = scoutNode.getFilteredChildNodes();
+    return childNodes.toArray(new ITreeNode[childNodes.size()]);
   }
 
   @Override
@@ -74,7 +79,8 @@ public class SwtScoutTreeModel extends LabelProvider implements ITreeContentProv
         return new Object[]{m_tree.getRootNode()};
       }
       else {
-        return m_tree.getRootNode().getFilteredChildNodes();
+        List<ITreeNode> childNodes = m_tree.getRootNode().getFilteredChildNodes();
+        return childNodes.toArray(new ITreeNode[childNodes.size()]);
       }
     }
     else {
@@ -134,7 +140,11 @@ public class SwtScoutTreeModel extends LabelProvider implements ITreeContentProv
   public Color getBackground(Object element) {
     ITreeNode scoutNode = (ITreeNode) element;
     if (scoutNode.getCell().getBackgroundColor() != null) {
-      return m_environment.getColor(scoutNode.getCell().getBackgroundColor());
+      Color col = m_environment.getColor(scoutNode.getCell().getBackgroundColor());
+      if (col == null && !scoutNode.isEnabled()) {
+        col = m_disabledBackgroundColor;
+      }
+      return col;
     }
     return null;
   }

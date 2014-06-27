@@ -115,7 +115,7 @@
                   </enumeration>
                   <enumeration value="processButton.maxWidth">
                   </enumeration>
-                  <enumeration value="color.forground.disabled">
+                  <enumeration value="color.foreground.disabled">
                   </enumeration>
                   <enumeration value="formFieldLabel.alignment">
                   </enumeration>
@@ -126,6 +126,8 @@
                   <enumeration value="table.mouseMoveSelectionSupport.enabled">
                   </enumeration>
                   <enumeration value="table.multilineTooltipSupport.enabled">
+                  </enumeration>
+                  <enumeration value="color.background.disabled">
                   </enumeration>
                </restriction>
             </simpleType>

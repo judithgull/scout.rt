@@ -15,7 +15,7 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.TreeMap;
 import java.util.zip.CRC32;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.CompareUtility;
 import org.eclipse.scout.commons.CompositeObject;
 import org.eclipse.scout.commons.ConfigurationUtility;
@@ -31,6 +32,9 @@ import org.eclipse.scout.commons.exception.ProcessingStatus;
 import org.eclipse.scout.commons.exception.VetoException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.services.common.bookmark.DefaultBookmarkAdapter;
+import org.eclipse.scout.rt.client.services.common.bookmark.IBookmarkAdapter;
+import org.eclipse.scout.rt.client.ui.ClientUIPreferences;
 import org.eclipse.scout.rt.client.ui.basic.table.ColumnSet;
 import org.eclipse.scout.rt.client.ui.basic.table.ITable;
 import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
@@ -60,7 +64,7 @@ public final class BookmarkUtility {
   private BookmarkUtility() {
   }
 
-  public static IOutline resolveOutline(IOutline[] outlines, String className) {
+  public static IOutline resolveOutline(List<? extends IOutline> outlines, String className) {
     if (className == null) {
       return null;
     }
@@ -86,7 +90,7 @@ public final class BookmarkUtility {
    * @param className
    *          is the columnId, simple class name or class name of the columns to find
    */
-  public static IColumn resolveColumn(IColumn[] columns, String identifier) {
+  public static IColumn resolveColumn(List<? extends IColumn> columns, String identifier) {
     if (identifier == null) {
       return null;
     }
@@ -112,7 +116,7 @@ public final class BookmarkUtility {
     return null;
   }
 
-  public static IPage resolvePage(IPage[] pages, String className, String userPreferenceContext) {
+  public static IPage resolvePage(List<? extends IPage> pages, String className, String bookmarkIdentifier) {
     if (className == null) {
       return null;
     }
@@ -128,7 +132,8 @@ public final class BookmarkUtility {
       else if (p.getClass().getSimpleName().equalsIgnoreCase(simpleClassName)) {
         classNameScore = -1;
       }
-      if (userPreferenceContext == null || userPreferenceContext.equalsIgnoreCase(p.getUserPreferenceContext())) {
+      IBookmarkAdapter bookmarkAdapter = getBookmarkAdapter(p);
+      if (bookmarkIdentifier == null || bookmarkIdentifier.equalsIgnoreCase(bookmarkAdapter.getIdentifier())) {
         userPreferenceContextScore = -1;
       }
       if (classNameScore != 0 && userPreferenceContextScore != 0) {
@@ -145,7 +150,7 @@ public final class BookmarkUtility {
       // check ambiguity
       CompositeObject nextKey = sortMap.firstKey();
       if (CompareUtility.equals(bestMatchingKey.getComponent(0), nextKey.getComponent(0)) && CompareUtility.equals(bestMatchingKey.getComponent(1), nextKey.getComponent(1))) {
-        LOG.warn("More than one pages found for page class [" + className + "] and user preference context [" + userPreferenceContext + "]");
+        LOG.warn("More than one pages found for page class [" + className + "] and bookmark Identifier [" + bookmarkIdentifier + "]");
       }
     }
     return bestMatchingPage;
@@ -155,8 +160,9 @@ public final class BookmarkUtility {
    * intercept objects that are not remoting-capable or not serializable and
    * replace by strings
    */
-  public static Object[] makeSerializableKeys(Object[] a, boolean useLegacySupport) {
-    return (Object[]) makeSerializableKey(a, useLegacySupport);
+  @SuppressWarnings("unchecked")
+  public static List<Object> makeSerializableKeys(List<?> a, boolean useLegacySupport) {
+    return (List<Object>) makeSerializableKey(a, useLegacySupport);
   }
 
   public static Object makeSerializableKey(Object o, boolean useLegacySupport) {
@@ -174,6 +180,13 @@ public final class BookmarkUtility {
     }
     else if (o instanceof Date) {
       return o;
+    }
+    else if (o instanceof Collection) {
+      List<Object> result = new ArrayList<Object>();
+      for (Object oi : (Collection) o) {
+        result.add(makeSerializableKey(oi, useLegacySupport));
+      }
+      return result;
     }
     else if (o.getClass().isArray()) {
       ArrayList<Integer> dimList = new ArrayList<Integer>();
@@ -396,9 +409,9 @@ public final class BookmarkUtility {
           }
         }
       }
-      List<IColumn> existingVisibleCols = Arrays.asList(columnSet.getVisibleColumns());
+      List<IColumn<?>> existingVisibleCols = columnSet.getVisibleColumns();
       if (!existingVisibleCols.equals(visibleColumns)) {
-        columnSet.setVisibleColumns(visibleColumns.toArray(new IColumn[0]));
+        columnSet.setVisibleColumns(visibleColumns);
       }
       // filters
       if (table.getColumnFilterManager() != null) {
@@ -450,7 +463,16 @@ public final class BookmarkUtility {
         }
         table.sort();
       }
+      ClientUIPreferences.getInstance().setAllTableColumnPreferences(table);
     }
+  }
+
+  public static IBookmarkAdapter getBookmarkAdapter(IPage page) {
+    IBookmarkAdapter bookmarkAdapter = page.getAdapter(IBookmarkAdapter.class);
+    if (bookmarkAdapter != null) {
+      return bookmarkAdapter;
+    }
+    return new DefaultBookmarkAdapter(page);
   }
 
   public static Bookmark createBookmark(IDesktop desktop) throws ProcessingException {
@@ -467,25 +489,27 @@ public final class BookmarkUtility {
     if (page == null || page.getOutline() == null) {
       return null;
     }
+    IBookmarkAdapter bookmarkAdapter = getBookmarkAdapter(page);
 
     IOutline outline = page.getOutline();
     Bookmark b = new Bookmark();
-    b.setIconId(page.getCell().getIconId());
+    b.setIconId(bookmarkAdapter.getIconId());
     // outline
-    b.setOutlineClassName(outline.getClass().getName());
+    b.setOutlineClassName(bookmarkAdapter.getOutlineClassName());
     ArrayList<IPage> path = new ArrayList<IPage>();
     ArrayList<String> titleSegments = new ArrayList<String>();
     while (page != null) {
+      IBookmarkAdapter currentBookmarkAdapter = getBookmarkAdapter(page);
       path.add(0, page);
-      String s = page.getCell().getText();
+      String s = currentBookmarkAdapter.getTitle();
       if (s != null) {
         titleSegments.add(0, s);
       }
       // next
       page = (IPage) page.getParentNode();
     }
-    if (outline.getTitle() != null) {
-      titleSegments.add(0, outline.getTitle());
+    if (bookmarkAdapter.getOutlineTitle() != null) {
+      titleSegments.add(0, bookmarkAdapter.getOutlineTitle());
     }
     // title
     int len = 0;
@@ -521,8 +545,9 @@ public final class BookmarkUtility {
     String prefix = "";
     for (int i = 0; i < path.size(); i++) {
       page = path.get(i);
+      IBookmarkAdapter currentBookmarkAdapter = getBookmarkAdapter(page);
       if (i > 0 || outline.isRootNodeVisible()) {
-        text.append(prefix + page.getCell().getText());
+        text.append(prefix + currentBookmarkAdapter.getText());
         text.append("\n");
         if (page instanceof IPageWithTable) {
           IPageWithTable tablePage = (IPageWithTable) page;
@@ -571,8 +596,8 @@ public final class BookmarkUtility {
       byte[] curData = tc.getSerializedData();
       if (!CompareUtility.equals(curData, newData)) {
         tc.removeAllColumns();
-        tc.setSerializedData(tablePageState.getTableCustomizerData());
-        tablePage.getTable().resetColumnConfiguration();
+        tc.setSerializedData(newData);
+        table.resetColumnConfiguration();
         tablePage.setChildrenLoaded(false);
       }
     }
@@ -582,8 +607,13 @@ public final class BookmarkUtility {
     try {
       table.setTableChanging(true);
       //legacy support
-      @SuppressWarnings("deprecation")
-      List<TableColumnState> allColumns = tablePageState.getVisibleColumns();
+      List<TableColumnState> allColumns = new ArrayList<TableColumnState>();
+      for (TableColumnState tcs : tablePageState.getAvailableColumns()) {
+        if (tcs.getVisible()) {
+          allColumns.add(tcs);
+        }
+      }
+
       if (allColumns == null || allColumns.size() == 0) {
         allColumns = tablePageState.getAvailableColumns();
       }
@@ -641,9 +671,9 @@ public final class BookmarkUtility {
         }
       }
       else {
-        ITreeNode[] filteredChildNodes = tablePage.getFilteredChildNodes();
-        if (filteredChildNodes.length > 0) {
-          childPage = (IPage) filteredChildNodes[0];
+        List<ITreeNode> filteredChildNodes = tablePage.getFilteredChildNodes();
+        if (filteredChildNodes.size() > 0) {
+          childPage = (IPage) CollectionUtility.firstElement(filteredChildNodes);
         }
         else if (tablePage.getChildNodeCount() > 0) {
           childPage = tablePage.getChildPage(0);
@@ -667,7 +697,7 @@ public final class BookmarkUtility {
           }
         }
         if (rowList.size() > 0) {
-          table.selectRows(rowList.toArray(new ITableRow[0]));
+          table.selectRows(rowList);
         }
       }
 
@@ -729,8 +759,9 @@ public final class BookmarkUtility {
     ITable table = page.getTable();
     TablePageState state = new TablePageState();
     state.setPageClassName(page.getClass().getName());
-    state.setBookmarkIdentifier(page.getUserPreferenceContext());
-    state.setLabel(page.getCell().getText());
+    IBookmarkAdapter bookmarkAdapter = getBookmarkAdapter(page);
+    state.setBookmarkIdentifier(bookmarkAdapter.getIdentifier());
+    state.setLabel(bookmarkAdapter.getText());
     state.setExpanded(page.isExpanded());
     IForm searchForm = page.getSearchFormInternal();
     if (searchForm != null) {
@@ -764,8 +795,9 @@ public final class BookmarkUtility {
   private static NodePageState bmStoreNodePage(IPageWithNodes page) throws ProcessingException {
     NodePageState state = new NodePageState();
     state.setPageClassName(page.getClass().getName());
-    state.setBookmarkIdentifier(page.getUserPreferenceContext());
-    state.setLabel(page.getCell().getText());
+    IBookmarkAdapter bookmarkAdapter = getBookmarkAdapter(page);
+    state.setBookmarkIdentifier(bookmarkAdapter.getIdentifier());
+    state.setLabel(bookmarkAdapter.getText());
     state.setExpanded(page.isExpanded());
     return state;
   }

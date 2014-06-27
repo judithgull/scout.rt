@@ -12,20 +12,21 @@ package org.eclipse.scout.rt.client.ui.basic.calendar.provider;
 
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.ConfigurationUtility;
 import org.eclipse.scout.commons.DateUtility;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.beans.AbstractPropertyObserver;
 import org.eclipse.scout.commons.exception.ProcessingException;
-import org.eclipse.scout.commons.holders.Holder;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ClientAsyncJob;
@@ -48,7 +49,7 @@ public abstract class AbstractCalendarItemProvider extends AbstractPropertyObser
   private P_ReloadJob m_reloadJob;
 
   private boolean m_initialized;
-  private IMenu[] m_menus;
+  private List<IMenu> m_menus;
   private Date m_minDateLoaded;
   private Date m_maxDateLoaded;
 
@@ -75,21 +76,20 @@ public abstract class AbstractCalendarItemProvider extends AbstractPropertyObser
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(10)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredMoveItemEnabled() {
     return false;
   }
 
   @ConfigProperty(ConfigProperty.LONG)
   @Order(20)
-  @ConfigPropertyValue("0")
   protected long getConfiguredRefreshIntervallMillis() {
     return 0;
   }
 
-  private Class<? extends IMenu>[] getConfiguredMenus() {
+  protected List<Class<? extends IMenu>> getDeclaredMenus() {
     Class[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
-    Class<IMenu>[] foca = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(dca, IMenu.class);
+    List<Class<IMenu>> filtered = ConfigurationUtility.filterClasses(dca, IMenu.class);
+    List<Class<? extends IMenu>> foca = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(filtered, IMenu.class);
     return ConfigurationUtility.removeReplacedClasses(foca);
   }
 
@@ -104,7 +104,7 @@ public abstract class AbstractCalendarItemProvider extends AbstractPropertyObser
    */
   @ConfigOperation
   @Order(30)
-  protected void execLoadItems(final Date minDate, final Date maxDate, final Holder<ICalendarItem[]> resultHolder) throws ProcessingException {
+  protected void execLoadItems(final Date minDate, final Date maxDate, final Set<ICalendarItem> result) throws ProcessingException {
   }
 
   /**
@@ -115,11 +115,11 @@ public abstract class AbstractCalendarItemProvider extends AbstractPropertyObser
    */
   @ConfigOperation
   @Order(40)
-  protected void execLoadItemsInBackground(final IClientSession session, final Date minDate, final Date maxDate, final Holder<ICalendarItem[]> resultHolder) throws ProcessingException {
+  protected void execLoadItemsInBackground(final IClientSession session, final Date minDate, final Date maxDate, final Set<ICalendarItem> result) throws ProcessingException {
     ClientSyncJob job = new ClientSyncJob(getClass().getSimpleName() + " load items", session) {
       @Override
       protected void runVoid(IProgressMonitor monitor) throws Throwable {
-        execLoadItems(minDate, maxDate, resultHolder);
+        execLoadItems(minDate, maxDate, result);
       }
     };
     job.schedule();
@@ -153,15 +153,15 @@ public abstract class AbstractCalendarItemProvider extends AbstractPropertyObser
     setMoveItemEnabled(getConfiguredMoveItemEnabled());
     setRefreshIntervalMillis(getConfiguredRefreshIntervallMillis());
     // menus
-    ArrayList<IMenu> menuList = new ArrayList<IMenu>();
-    Class<? extends IMenu>[] ma = getConfiguredMenus();
-    for (int i = 0; i < ma.length; i++) {
+    List<IMenu> menuList = new ArrayList<IMenu>();
+    for (Class<? extends IMenu> menuClazz : getDeclaredMenus()) {
       try {
-        IMenu menu = ConfigurationUtility.newInnerInstance(this, ma[i]);
+        IMenu menu = ConfigurationUtility.newInnerInstance(this, menuClazz);
+        menu.initAction();
         menuList.add(menu);
       }
       catch (Exception e) {
-        LOG.warn(null, e);
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + menuClazz.getName() + "'.", e));
       }
     }
 
@@ -171,7 +171,7 @@ public abstract class AbstractCalendarItemProvider extends AbstractPropertyObser
     catch (Exception e) {
       LOG.error("error occured while dynamically contribute menus.", e);
     }
-    m_menus = menuList.toArray(new IMenu[0]);
+    m_menus = menuList;
   }
 
   /**
@@ -249,18 +249,19 @@ public abstract class AbstractCalendarItemProvider extends AbstractPropertyObser
   }
 
   @Override
-  public ICalendarItem[] getItems(Date minDate, Date maxDate) {
+  public Set<ICalendarItem> getItems(Date minDate, Date maxDate) {
     ensureItemsLoadedInternal(minDate, maxDate);
-    ArrayList<ICalendarItem> list = new ArrayList<ICalendarItem>();
-    ICalendarItem[] a = (ICalendarItem[]) propertySupport.getProperty(PROP_ITEMS);
-    if (a != null) {
-      for (ICalendarItem item : a) {
+    Set<ICalendarItem> allItems = propertySupport.getPropertySet(PROP_ITEMS);
+    if (CollectionUtility.hasElements(allItems)) {
+      Set<ICalendarItem> list = new HashSet<ICalendarItem>(allItems.size());
+      for (ICalendarItem item : allItems) {
         if (item.isIntersecting(minDate, maxDate)) {
           list.add(item);
         }
       }
+      return list;
     }
-    return list.toArray(new ICalendarItem[list.size()]);
+    return CollectionUtility.hashSet();
   }
 
   @Override
@@ -268,15 +269,16 @@ public abstract class AbstractCalendarItemProvider extends AbstractPropertyObser
     loadItemsAsyncInternal(ClientSyncJob.getCurrentSession(), m_minDateLoaded, m_maxDateLoaded, 250);
   }
 
-  private void setItemsInternal(Date minDate, Date maxDate, ICalendarItem[] items) {
+  private void setItemsInternal(Date minDate, Date maxDate, Set<ICalendarItem> items0) {
+    Set<ICalendarItem> items = CollectionUtility.hashSetWithoutNullElements(items0);
     m_minDateLoaded = minDate;
     m_maxDateLoaded = maxDate;
-    propertySupport.setProperty(PROP_ITEMS, items);
+    propertySupport.setPropertySet(PROP_ITEMS, items);
   }
 
   @Override
-  public IMenu[] getMenus() {
-    return m_menus;
+  public List<IMenu> getMenus() {
+    return CollectionUtility.arrayList(m_menus);
   }
 
   @Override
@@ -297,6 +299,16 @@ public abstract class AbstractCalendarItemProvider extends AbstractPropertyObser
   @Override
   public void setLoadInProgress(boolean b) {
     propertySupport.setPropertyBool(PROP_LOAD_IN_PROGRESS, b);
+  }
+
+  private void setLoadInProgressInSyncJob(final boolean b) {
+    ClientSyncJob job = new ClientSyncJob(getClass().getSimpleName() + " prepare", ClientSyncJob.getCurrentSession()) {
+      @Override
+      protected void runVoid(IProgressMonitor monitor) throws Throwable {
+        setLoadInProgress(b);
+      }
+    };
+    job.schedule();
   }
 
   @Override
@@ -363,31 +375,22 @@ public abstract class AbstractCalendarItemProvider extends AbstractPropertyObser
    * Reload Job
    */
   private class P_ReloadJob extends ClientAsyncJob {
-    private final Holder<ICalendarItem[]> m_result;
+    private final Set<ICalendarItem> m_result;
     private final Date m_loadingMinDate;
     private final Date m_loadingMaxDate;
 
     public P_ReloadJob(IClientSession session, Date loadingMinDate, Date loadingMaxDate) {
       super(AbstractCalendarItemProvider.this.getClass().getSimpleName() + " reload", session);
-      m_result = new Holder<ICalendarItem[]>(null);
+      m_result = new HashSet<ICalendarItem>();
       m_loadingMinDate = loadingMinDate;
       m_loadingMaxDate = loadingMaxDate;
     }
 
     @Override
-    protected IStatus runStatus(IProgressMonitor monitor) {
-      try {
-        // set loading property in scout
-        ClientSyncJob job = new ClientSyncJob(AbstractCalendarItemProvider.this.getClass().getSimpleName() + " prepare", ClientSyncJob.getCurrentSession()) {
-          @Override
-          protected void runVoid(IProgressMonitor monitor2) throws Throwable {
-            setLoadInProgress(true);
-          }
-        };
-        job.schedule();
-        if (monitor != null && monitor.isCanceled()) {
-          return Status.OK_STATUS;
-        }
+    protected IStatus runStatus(final IProgressMonitor monitor) {
+      // set loading property in scout
+      setLoadInProgressInSyncJob(true);
+      if (!monitor.isCanceled()) {
         // call user code
         try {
           execLoadItemsInBackground(ClientSyncJob.getCurrentSession(), m_loadingMinDate, m_loadingMaxDate, m_result);
@@ -396,55 +399,39 @@ public abstract class AbstractCalendarItemProvider extends AbstractPropertyObser
           if (!e.isInterruption()) {
             LOG.error(null, e);
           }
-          return Status.OK_STATUS;
         }
-        // wait for result
-        while (true) {
-          if (monitor != null && monitor.isCanceled()) {
-            return Status.OK_STATUS;
-          }
-          synchronized (m_result) {
-            if (m_result != null) {
-              break;
-            }
-            try {
-              m_result.wait(2000L);
-            }
-            catch (InterruptedException e) {
-              return Status.OK_STATUS;
-            }
-          }
-        }
-        if (monitor != null && monitor.isCanceled()) {
-          return Status.OK_STATUS;
-        }
-        if (m_result != null) {
-          new ClientSyncJob(AbstractCalendarItemProvider.this.getClass().getSimpleName() + " setItems", ClientSyncJob.getCurrentSession()) {
+        if (!m_result.isEmpty()) {
+          ClientSyncJob setItemsJob = new ClientSyncJob(AbstractCalendarItemProvider.this.getClass().getSimpleName() + " setItems", ClientSyncJob.getCurrentSession()) {
             @Override
             protected void runVoid(IProgressMonitor monitor2) throws Throwable {
-              setItemsInternal(m_loadingMinDate, m_loadingMaxDate, m_result.getValue());
+              synchronized (AbstractCalendarItemProvider.this) {
+                if (!monitor.isCanceled()) {
+                  setItemsInternal(m_loadingMinDate, m_loadingMaxDate, m_result);
+                  reschedule(monitor);
+                }
+              }
             }
-          }.schedule();
-        }
-        return Status.OK_STATUS;
-      }
-      finally {
-        // reset loading property in scout
-        new ClientSyncJob(AbstractCalendarItemProvider.this.getClass().getSimpleName() + " complete", ClientSyncJob.getCurrentSession()) {
-          @Override
-          protected void runVoid(IProgressMonitor monitor2) throws Throwable {
-            setLoadInProgress(false);
+
+            private void reschedule(final IProgressMonitor monitor2) {
+              long n = getRefreshIntervalMillis();
+              if (n > 0 && !monitor2.isCanceled()) {
+                //-> Rescheduling (and cancelling a currently running job) should only happen, if a previous job actually succeeded in loading the calendar items
+                //    AND loading dates are still consistent with ui (If they are not consistent, monitor is cancled during setItemsInternal(...))
+                loadItemsAsyncInternal(ClientSyncJob.getCurrentSession(), m_loadingMinDate, m_loadingMaxDate, n);
+              }
+            }
+          };
+          setItemsJob.schedule();
+          try {
+            setItemsJob.join();
           }
-        }.schedule();
-        // re-schedule
-        long n = getRefreshIntervalMillis();
-        if (n > 0 && m_minDateLoaded != null && m_maxDateLoaded != null) {
-          //m_minDateLoaded and m_maxDateLoaded might not have been set yet.
-          //-> Rescheduling (and cancelling a currently running job) should only happen,
-          //   if a previous job actually succeeded in loading the calendar items.
-          loadItemsAsyncInternal(ClientSyncJob.getCurrentSession(), m_minDateLoaded, m_maxDateLoaded, n);
+          catch (InterruptedException e) {
+            // nop
+          }
         }
+        setLoadInProgressInSyncJob(false);
       }
+      return Status.OK_STATUS;
     }
   }
 

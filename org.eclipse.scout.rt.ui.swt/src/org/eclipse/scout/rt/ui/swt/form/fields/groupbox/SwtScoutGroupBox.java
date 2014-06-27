@@ -25,6 +25,7 @@ import org.eclipse.scout.rt.ui.swt.extension.UiDecorationExtensionPoint;
 import org.eclipse.scout.rt.ui.swt.form.fields.ISwtScoutFormField;
 import org.eclipse.scout.rt.ui.swt.form.fields.SwtScoutFieldComposite;
 import org.eclipse.scout.rt.ui.swt.form.fields.SwtScoutFormFieldGridData;
+import org.eclipse.scout.rt.ui.swt.internal.debug.layout.spy.LogicalGridLayoutSpy;
 import org.eclipse.scout.rt.ui.swt.window.ISwtScoutPart;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.layout.GridData;
@@ -81,7 +82,6 @@ public class SwtScoutGroupBox extends SwtScoutFieldComposite<IGroupBox> implemen
     m_swtBodyPart.setData(IValidateRoot.VALIDATE_ROOT_DATA, new DefaultValidateRoot(m_swtBodyPart) {
       @Override
       public void validate() {
-        super.validate();
         if (m_scrolledForm != null) {
           if (!m_scrolledForm.isDisposed()) {
             m_scrolledForm.reflow(true);
@@ -89,6 +89,7 @@ public class SwtScoutGroupBox extends SwtScoutFieldComposite<IGroupBox> implemen
         }
       }
     });
+    m_swtBodyPart.setData(LogicalGridLayoutSpy.GROUP_BOX_MARKER, Boolean.TRUE);
     createButtonbar(rootPane);
 
     IUiDecoration deco = UiDecorationExtensionPoint.getLookAndFeel();
@@ -96,8 +97,7 @@ public class SwtScoutGroupBox extends SwtScoutFieldComposite<IGroupBox> implemen
     m_swtBodyPart.setLayout(bodyLayout);
     installSwtContainerBorder();
     // FIELDS:
-    IFormField[] scoutFields = getScoutObject().getControlFields();
-    for (IFormField field : scoutFields) {
+    for (IFormField field : getScoutObject().getControlFields()) {
       ISwtScoutFormField swtScoutComposite = getEnvironment().createFormField(m_swtBodyPart, field);
       SwtScoutFormFieldGridData layoutData = new SwtScoutFormFieldGridData(field);
       swtScoutComposite.getSwtContainer().setLayoutData(layoutData);

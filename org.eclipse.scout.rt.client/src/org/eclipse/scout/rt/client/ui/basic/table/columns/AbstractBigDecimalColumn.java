@@ -14,23 +14,34 @@ package org.eclipse.scout.rt.client.ui.basic.table.columns;
  * C
  */
 import java.math.BigDecimal;
-import java.text.DecimalFormat;
-import java.text.NumberFormat;
 
-import org.eclipse.scout.commons.LocaleThreadLocal;
+import org.eclipse.scout.commons.annotations.ClassId;
+import org.eclipse.scout.commons.annotations.ConfigProperty;
+import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
-import org.eclipse.scout.rt.client.ui.basic.cell.Cell;
 import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
-import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.bigdecimalfield.AbstractBigDecimalField;
+import org.eclipse.scout.rt.client.ui.form.fields.bigdecimalfield.IBigDecimalField;
 
-/**
- * Column holding Double
- */
+@ClassId("cf4984e1-7ec9-4442-a9d8-23145b0e1614")
 public abstract class AbstractBigDecimalColumn extends AbstractDecimalColumn<BigDecimal> implements IBigDecimalColumn {
 
   public AbstractBigDecimalColumn() {
     super();
+  }
+
+  @Override
+  @ConfigProperty(ConfigProperty.BIG_DECIMAL)
+  @Order(200)
+  protected BigDecimal getConfiguredMaxValue() {
+    return null;
+  }
+
+  @Override
+  @ConfigProperty(ConfigProperty.BIG_DECIMAL)
+  @Order(210)
+  protected BigDecimal getConfiguredMinValue() {
+    return null;
   }
 
   @Override
@@ -55,61 +66,9 @@ public abstract class AbstractBigDecimalColumn extends AbstractDecimalColumn<Big
   }
 
   @Override
-  protected IFormField prepareEditInternal(ITableRow row) throws ProcessingException {
-    return super.prepareEditInternal(row);
-  }
-
-  @Override
-  protected AbstractBigDecimalField getEditorField() {
+  protected IBigDecimalField getEditorField() {
     return new AbstractBigDecimalField() {
-      @Override
-      protected void initConfig() {
-        super.initConfig();
-        propertySupport.putPropertiesMap(AbstractBigDecimalColumn.this.propertySupport.getPropertiesMap());
-      }
     };
-  }
-
-  @Override
-  protected void decorateCellInternal(Cell cell, ITableRow row) {
-    super.decorateCellInternal(cell, row);
-    if (cell.getValue() != null) {
-      cell.setText(getNumberFormat().format(cell.getValue()));
-    }
-    else {
-      cell.setText("");
-    }
-  }
-
-  @Override
-  public NumberFormat getNumberFormat() {
-    if (super.getNumberFormat() == null) {
-      NumberFormat fmt;
-      if (isPercent()) {
-        fmt = NumberFormat.getPercentInstance(LocaleThreadLocal.get());
-      }
-      else {
-        fmt = NumberFormat.getNumberInstance(LocaleThreadLocal.get());
-      }
-      if (fmt instanceof DecimalFormat) {
-        ((DecimalFormat) fmt).setMultiplier(getMultiplier());
-        if (getFormat() != null) {
-          ((DecimalFormat) fmt).applyPattern(getFormat());
-        }
-        else {
-          fmt.setMinimumFractionDigits(getMinFractionDigits());
-          fmt.setMaximumFractionDigits(getMaxFractionDigits());
-          fmt.setGroupingUsed(isGroupingUsed());
-        }
-      }
-      else {
-        fmt.setMinimumFractionDigits(getMinFractionDigits());
-        fmt.setMaximumFractionDigits(getMaxFractionDigits());
-        fmt.setGroupingUsed(isGroupingUsed());
-      }
-      setNumberFormat(fmt);
-    }
-    return super.getNumberFormat();
   }
 
 }

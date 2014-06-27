@@ -13,13 +13,17 @@ package org.eclipse.scout.rt.client.ui.action.tree;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.ConfigurationUtility;
+import org.eclipse.scout.commons.ITypeWithClassId;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.action.AbstractAction;
 import org.eclipse.scout.rt.client.ui.action.IAction;
 import org.eclipse.scout.rt.client.ui.action.IActionVisitor;
+import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
+import org.eclipse.scout.service.SERVICES;
 
 public abstract class AbstractActionNode<T extends IActionNode> extends AbstractAction implements IActionNode<T> {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractActionNode.class);
@@ -36,9 +40,10 @@ public abstract class AbstractActionNode<T extends IActionNode> extends Abstract
   /*
    * Configuration
    */
-  private Class<? extends IActionNode>[] getConfiguredChildActions() {
+  private List<? extends Class<? extends IActionNode>> getConfiguredChildActions() {
     Class[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
-    Class<IActionNode>[] foca = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(dca, IActionNode.class);
+    List<Class<IActionNode>> filtered = ConfigurationUtility.filterClasses(dca, IActionNode.class);
+    List<Class<? extends IActionNode>> foca = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(filtered, IActionNode.class);
     return ConfigurationUtility.removeReplacedClasses(foca);
   }
 
@@ -47,16 +52,17 @@ public abstract class AbstractActionNode<T extends IActionNode> extends Abstract
   protected void initConfig() {
     super.initConfig();
     // menus
-    ArrayList<T> nodeList = new ArrayList<T>();
-    Class<? extends IActionNode>[] ma = getConfiguredChildActions();
-    for (int i = 0; i < ma.length; i++) {
+    List<T> nodeList = new ArrayList<T>();
+    List<? extends Class<? extends IActionNode>> ma = getConfiguredChildActions();
+    for (Class<? extends IActionNode> a : ma) {
+
       try {
-        IActionNode node = ConfigurationUtility.newInnerInstance(this, ma[i]);
+        IActionNode node = ConfigurationUtility.newInnerInstance(this, a);
         node.setParent(this);
         nodeList.add((T) node);
       }
       catch (Exception e) {
-        LOG.warn(null, e);
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + a.getName() + "'.", e));
       }
     }
 
@@ -66,6 +72,7 @@ public abstract class AbstractActionNode<T extends IActionNode> extends Abstract
     catch (Exception e) {
       LOG.error("error occured while dynamically contribute action nodes.", e);
     }
+    // add
     setChildActions(nodeList);
   }
 
@@ -78,6 +85,23 @@ public abstract class AbstractActionNode<T extends IActionNode> extends Abstract
    *          and added to composite field
    */
   protected void injectActionNodesInternal(List<T> nodeList) {
+  }
+
+  @Override
+  public void setContainerInternal(ITypeWithClassId container) {
+    super.setContainerInternal(container);
+    // children
+    setContainerOnActions(getChildActionsInternal());
+  }
+
+  protected void setContainerOnActions(List<? extends T> actions) {
+    if (actions != null) {
+      for (T childAction : actions) {
+        if (childAction != null) {
+          childAction.setContainerInternal(getContainer());
+        }
+      }
+    }
   }
 
   /*
@@ -98,38 +122,85 @@ public abstract class AbstractActionNode<T extends IActionNode> extends Abstract
    * 
    * @throws ProcessingException
    */
+  @SuppressWarnings("deprecation")
   @Override
   protected void prepareActionInternal() throws ProcessingException {
     super.prepareActionInternal();
     // child menus
-    for (T node : getChildActionsInternal()) {
-      node.prepareAction();
+    if (hasChildActions()) {
+      for (T node : getChildActionsInternal()) {
+        node.prepareAction();
+      }
     }
   }
 
-  @SuppressWarnings("unchecked")
   private List<T> getChildActionsInternal() {
-    return (List<T>) propertySupport.getProperty(PROP_CHILD_ACTIONS);
+    return propertySupport.getPropertyList(PROP_CHILD_ACTIONS);
   }
 
   @Override
   public boolean hasChildActions() {
-    return getChildActionsInternal().size() > 0;
+    return CollectionUtility.hasElements(getChildActionsInternal());
   }
 
   @Override
   public int getChildActionCount() {
-    return getChildActionsInternal().size();
+    return CollectionUtility.size(getChildActionsInternal());
   }
 
   @Override
   public List<T> getChildActions() {
-    return new ArrayList<T>(getChildActionsInternal());
+    return CollectionUtility.arrayList(getChildActionsInternal());
   }
 
   @Override
-  public void setChildActions(List<T> newList) {
-    propertySupport.setProperty(PROP_CHILD_ACTIONS, new ArrayList<T>(newList));
+  public void setChildActions(List<? extends T> newList) {
+    // remove old
+    removeChildActions(getChildActionsInternal());
+    // add new
+    addChildActions(newList);
+  }
+
+  @Override
+  public void addChildAction(T action) {
+    addChildActions(CollectionUtility.arrayList(action));
+  }
+
+  @Override
+  public void addChildActions(List<? extends T> actionList) {
+    List<T> normalizedList = CollectionUtility.arrayListWithoutNullElements(actionList);
+    if (!normalizedList.isEmpty()) {
+      setContainerOnActions(normalizedList);
+      List<T> childList = getChildActionsInternal();
+      if (childList == null) {
+        childList = new ArrayList<T>(normalizedList.size());
+      }
+      childList.addAll(normalizedList);
+      propertySupport.setPropertyAlwaysFire(PROP_CHILD_ACTIONS, childList);
+    }
+  }
+
+  @Override
+  public void removeChildAction(T action) {
+    removeChildActions(CollectionUtility.arrayList(action));
+  }
+
+  @Override
+  public void removeChildActions(List<? extends T> actionList) {
+    List<T> normalizedList = CollectionUtility.arrayListWithoutNullElements(actionList);
+    if (!normalizedList.isEmpty()) {
+      List<T> childList = getChildActionsInternal();
+      boolean listChanged = false;
+      for (T a : normalizedList) {
+        if (childList.remove(a)) {
+          listChanged = true;
+          a.setContainerInternal(null);
+        }
+      }
+      if (listChanged) {
+        propertySupport.setPropertyAlwaysFire(PROP_CHILD_ACTIONS, childList);
+      }
+    }
   }
 
   @Override

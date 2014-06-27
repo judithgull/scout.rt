@@ -14,6 +14,7 @@ import java.awt.Component;
 import java.awt.Dialog;
 import java.awt.Frame;
 import java.awt.Image;
+import java.awt.Insets;
 import java.awt.Rectangle;
 import java.awt.Window;
 import java.beans.PropertyChangeListener;
@@ -26,11 +27,11 @@ import javax.swing.UIDefaults;
 import org.eclipse.scout.commons.job.JobEx;
 import org.eclipse.scout.rt.client.IClientSession;
 import org.eclipse.scout.rt.client.ui.action.IAction;
+import org.eclipse.scout.rt.client.ui.action.IActionFilter;
 import org.eclipse.scout.rt.client.ui.basic.filechooser.IFileChooser;
 import org.eclipse.scout.rt.client.ui.basic.table.ITable;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.IColumn;
 import org.eclipse.scout.rt.client.ui.desktop.IDesktop;
-import org.eclipse.scout.rt.client.ui.form.FormEvent;
 import org.eclipse.scout.rt.client.ui.form.IForm;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.groupbox.IGroupBox;
@@ -39,11 +40,13 @@ import org.eclipse.scout.rt.ui.swing.action.ISwingScoutAction;
 import org.eclipse.scout.rt.ui.swing.basic.table.ISwingScoutTable;
 import org.eclipse.scout.rt.ui.swing.basic.table.SwingTableColumn;
 import org.eclipse.scout.rt.ui.swing.ext.JDialogEx;
+import org.eclipse.scout.rt.ui.swing.ext.JFrameEx;
 import org.eclipse.scout.rt.ui.swing.ext.JStatusLabelEx;
 import org.eclipse.scout.rt.ui.swing.form.ISwingScoutForm;
 import org.eclipse.scout.rt.ui.swing.form.fields.ISwingScoutFormField;
 import org.eclipse.scout.rt.ui.swing.form.fields.OnFieldLabelDecorator;
 import org.eclipse.scout.rt.ui.swing.form.fields.tabbox.ISwingScoutTabItem;
+import org.eclipse.scout.rt.ui.swing.icons.CheckboxIcon;
 import org.eclipse.scout.rt.ui.swing.window.ISwingScoutView;
 import org.eclipse.scout.rt.ui.swing.window.desktop.ISwingScoutDesktop;
 import org.eclipse.scout.rt.ui.swing.window.desktop.ISwingScoutRootFrame;
@@ -56,16 +59,6 @@ import org.eclipse.scout.rt.ui.swing.window.messagebox.ISwingScoutMessageBox;
  * methods of this interface also run in swing thread
  */
 public interface ISwingEnvironment {
-
-  /**
-   * {@link Boolean} busy/idle handling Use positive edge from swing 0->1 and
-   * negative edge from scout 1->0
-   * 
-   * @deprecated replaced by {@link org.eclipse.scout.rt.ui.swing.ext.busy.SwingBusyHandler SwingBusyHandler} Will be
-   *             removed in Release 3.10.
-   */
-  @Deprecated
-  String PROP_BUSY = "busy";
 
   /**
    * This method should be called prior to using any methods in the environment
@@ -177,13 +170,6 @@ public interface ISwingEnvironment {
   void interceptUIDefaults(UIDefaults defaults);
 
   /**
-   * @deprecated replaced by {@link org.eclipse.scout.rt.ui.swing.ext.busy.SwingBusyHandler SwingBusyHandler}. Will be
-   *             removed in Release 3.10.
-   */
-  @Deprecated
-  void setBusyFromSwing(boolean b);
-
-  /**
    * start up the gui
    */
   void showGUI(IClientSession session);
@@ -203,13 +189,6 @@ public interface ISwingEnvironment {
   IClientSession getScoutSession();
 
   IFormField findFocusOwnerField();
-
-  /**
-   * @deprecated replaced by {@link org.eclipse.scout.rt.ui.swing.ext.busy.SwingBusyHandler SwingBusyHandler}. Will be
-   *             removed in Release 3.10.
-   */
-  @Deprecated
-  boolean isBusy();
 
   /**
    * This method may be called from showGUI
@@ -300,13 +279,13 @@ public interface ISwingEnvironment {
    *          must not be null, typically a {@link javax.swing.JPopupMenu JPopupMenu}, a {@link javax.swing.JMenu JMenu}
    *          or a {@link javax.swing.JMenuBar JMenuBar}
    */
-  void appendActions(JComponent parent, List<? extends IAction> actions);
+  void appendActions(JComponent parent, List<? extends IAction> actions, IActionFilter filter);
 
   /**
    * create a gui for an action, recursively creates and attaches child actions on
    * {@link org.eclipse.scout.rt.client.ui.action.tree.IActionNode IActionNode}s and menus
    */
-  ISwingScoutAction createAction(JComponent parent, IAction action);
+  ISwingScoutAction createAction(JComponent parent, IAction action, IActionFilter filter);
 
   /**
    * Called from scout job/thread to post an immediate swing job into the waiting queue.
@@ -349,18 +328,6 @@ public interface ISwingEnvironment {
    */
   void invokeSwingAndWait(final Runnable r, long timeout);
 
-  /**
-   * @deprecated Will be removed in Release 3.10
-   */
-  @Deprecated
-  boolean acceptAsFocusTarget(Component comp);
-
-  /**
-   * @deprecated use {@link #createStatusLabel(IFormField)} instead. Will be removed in Release 3.10.
-   */
-  @Deprecated
-  JStatusLabelEx createStatusLabel();
-
   JStatusLabelEx createStatusLabel(IFormField formField);
 
   OnFieldLabelDecorator createOnFieldLabelDecorator(JComponent c, boolean mandatory);
@@ -392,12 +359,6 @@ public interface ISwingEnvironment {
   String styleHtmlText(ISwingScoutFormField<?> uiComposite, String rawHtml);
 
   /**
-   * @deprecated use {@link IForm#getEventHistory()}. Will be removed in Release 3.10.
-   */
-  @Deprecated
-  FormEvent[] fetchPendingPrintEvents(IForm form);
-
-  /**
    * Enables customization of JDialogEx by returning subtypes.
    * 
    * @return
@@ -410,6 +371,13 @@ public interface ISwingEnvironment {
    * @return
    */
   JDialogEx createJDialogEx(Frame swingParent);
+
+  /**
+   * Enables customization of JFrameE by returning subtypes.
+   * 
+   * @return
+   */
+  JFrameEx createJFrameEx();
 
   /**
    * Creates a swing scout table instance for the given table model. The default implementation returns a
@@ -434,5 +402,16 @@ public interface ISwingEnvironment {
    * @since 3.9.0
    */
   SwingTableColumn createColumn(int swingModelIndex, IColumn scoutColumn);
+
+  /**
+   * Creates the checkbox Icon used to display boolean values in a Scout table. The default implementation returns a
+   * <code>CheckboxWithMarginIcon</code>.
+   * 
+   * @param insets
+   *          insets applied on the icon
+   * @return a checkbox Icon
+   * @since 3.10.0-M3
+   */
+  CheckboxIcon createCheckboxWithMarginIcon(Insets insets);
 
 }

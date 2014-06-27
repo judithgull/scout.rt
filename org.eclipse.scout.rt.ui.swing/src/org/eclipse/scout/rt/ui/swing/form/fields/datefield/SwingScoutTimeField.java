@@ -11,6 +11,10 @@
 package org.eclipse.scout.rt.ui.swing.form.fields.datefield;
 
 import java.awt.event.ActionEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.text.DateFormat;
 import java.util.Date;
 
@@ -33,18 +37,24 @@ import org.eclipse.scout.commons.holders.Holder;
 import org.eclipse.scout.commons.job.JobEx;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 import org.eclipse.scout.rt.client.ui.form.fields.datefield.IDateField;
 import org.eclipse.scout.rt.shared.AbstractIcons;
 import org.eclipse.scout.rt.ui.swing.LogicalGridLayout;
 import org.eclipse.scout.rt.ui.swing.SwingUtility;
+import org.eclipse.scout.rt.ui.swing.action.menu.SwingScoutContextMenu;
+import org.eclipse.scout.rt.ui.swing.basic.ColorUtility;
 import org.eclipse.scout.rt.ui.swing.basic.IconGroup;
 import org.eclipse.scout.rt.ui.swing.basic.document.BasicDocumentFilter;
-import org.eclipse.scout.rt.ui.swing.ext.IDropDownButtonListener;
 import org.eclipse.scout.rt.ui.swing.ext.JPanelEx;
 import org.eclipse.scout.rt.ui.swing.ext.JStatusLabelEx;
-import org.eclipse.scout.rt.ui.swing.ext.JTextFieldWithTransparentIcon;
 import org.eclipse.scout.rt.ui.swing.ext.calendar.TimeChooser;
-import org.eclipse.scout.rt.ui.swing.form.fields.SwingScoutValueFieldComposite;
+import org.eclipse.scout.rt.ui.swing.ext.decoration.ContextMenuDecorationItem;
+import org.eclipse.scout.rt.ui.swing.ext.decoration.DecorationGroup;
+import org.eclipse.scout.rt.ui.swing.ext.decoration.DropDownDecorationItem;
+import org.eclipse.scout.rt.ui.swing.ext.decoration.IDecorationGroup;
+import org.eclipse.scout.rt.ui.swing.ext.decoration.JTextFieldWithDecorationIcons;
+import org.eclipse.scout.rt.ui.swing.form.fields.SwingScoutBasicFieldComposite;
 import org.eclipse.scout.rt.ui.swing.window.SwingScoutViewEvent;
 import org.eclipse.scout.rt.ui.swing.window.SwingScoutViewListener;
 import org.eclipse.scout.rt.ui.swing.window.popup.SwingScoutDropDownPopup;
@@ -52,7 +62,7 @@ import org.eclipse.scout.rt.ui.swing.window.popup.SwingScoutDropDownPopup;
 /**
  * time field in combination with a date field to create a date/time field
  */
-public class SwingScoutTimeField extends SwingScoutValueFieldComposite<IDateField> implements ISwingScoutDateField {
+public class SwingScoutTimeField extends SwingScoutBasicFieldComposite<IDateField> implements ISwingScoutDateField {
   private static final long serialVersionUID = 1L;
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(SwingScoutTimeField.class);
 
@@ -61,6 +71,10 @@ public class SwingScoutTimeField extends SwingScoutValueFieldComposite<IDateFiel
   private String m_displayTextToVerify;
   // cache
   private SwingScoutDropDownPopup m_proposalPopup;
+
+  private ContextMenuDecorationItem m_contextMenuMarker;
+  private DropDownDecorationItem m_dropdownIcon;
+  private SwingScoutContextMenu m_contextMenu;
 
   public boolean isIgnoreLabel() {
     return m_ignoreLabel;
@@ -76,6 +90,16 @@ public class SwingScoutTimeField extends SwingScoutValueFieldComposite<IDateFiel
 
   public void setDateTimeCompositeMember(boolean dateTimeCompositeMember) {
     m_dateTimeCompositeMember = dateTimeCompositeMember;
+  }
+
+  @Override
+  protected void setSelectionFromSwing() {
+    //Nothing to do: Selection is not stored in model for DateField.
+  }
+
+  @Override
+  protected boolean isSelectAllOnFocusInScout() {
+    return true; //No such property in Scout for DecimalField.
   }
 
   @Override
@@ -108,6 +132,7 @@ public class SwingScoutTimeField extends SwingScoutValueFieldComposite<IDateFiel
         setInputDirty(true);
       }
     });
+    addInputListenersForBasicField(timeField, doc);
     container.add(timeField);
     // key mappings
     InputMap inputMap = timeField.getInputMap(JTextField.WHEN_FOCUSED);
@@ -135,29 +160,74 @@ public class SwingScoutTimeField extends SwingScoutValueFieldComposite<IDateFiel
    * May add additional components to the container.
    */
   protected JTextField createTimeField(JComponent container) {
-    JTextFieldWithTransparentIcon textField = new JTextFieldWithTransparentIcon();
-    initializeTimeField(textField);
+    JTextFieldWithDecorationIcons textField = new JTextFieldWithDecorationIcons();
+    textField.addMouseListener(new MouseAdapter() {
+      @Override
+      public void mouseClicked(MouseEvent e) {
+        JTextFieldWithDecorationIcons text = (JTextFieldWithDecorationIcons) e.getComponent();
+        // ensure click not on decorations
+        if (!text.isDecorationIconRegion(e.getPoint()) && e.getButton() == MouseEvent.BUTTON1) {
+          handleSwingTimeChooserAction();
+        }
+      }
+    });
     container.add(textField);
+    IDecorationGroup decorationGroup = new DecorationGroup(textField, getSwingEnvironment());
+    // context menu marker
+    m_contextMenuMarker = new ContextMenuDecorationItem(getScoutObject().getContextMenu(), textField, getSwingEnvironment());
+    m_contextMenuMarker.addMouseListener(new MouseAdapter() {
+      @Override
+      public void mouseClicked(MouseEvent e) {
+        m_contextMenu.showSwingPopup(e.getX(), e.getY(), false);
+      }
+    });
+    decorationGroup.addDecoration(m_contextMenuMarker);
+
+    // dropdown decoration
+    m_dropdownIcon = new DropDownDecorationItem(textField, getSwingEnvironment());
+    m_dropdownIcon.setIconGroup(new IconGroup(getSwingEnvironment(), AbstractIcons.DateFieldTime));
+    m_dropdownIcon.addMouseListener(new MouseAdapter() {
+      @Override
+      public void mouseClicked(MouseEvent e) {
+        if (e.getButton() == MouseEvent.BUTTON3) {
+          m_contextMenu.showSwingPopup(e.getX(), e.getY(), false);
+        }
+        else {
+          getSwingTimeField().requestFocus();
+          handleSwingTimeChooserAction();
+        }
+      }
+    });
+    decorationGroup.addDecoration(m_dropdownIcon);
+
+    textField.setDecorationIcon(decorationGroup);
     return textField;
   }
 
-  protected void initializeTimeField(JTextFieldWithTransparentIcon textField) {
-    textField.setIconGroup(new IconGroup(getSwingEnvironment(), AbstractIcons.DateFieldTime));
-    textField.addDropDownButtonListener(new IDropDownButtonListener() {
-      @Override
-      public void iconClicked(Object source) {
-        getSwingTimeField().requestFocus();
-        handleSwingTimeChooserAction();
-      }
+  @Override
+  protected void installContextMenu() {
+    getScoutObject().getContextMenu().addPropertyChangeListener(new PropertyChangeListener() {
 
       @Override
-      public void menuClicked(Object source) {
+      public void propertyChange(PropertyChangeEvent evt) {
+
+        if (IMenu.PROP_VISIBLE.equals(evt.getPropertyName())) {
+          m_contextMenuMarker.setMarkerVisible(getScoutObject().getContextMenu().isVisible());
+        }
       }
     });
+    m_contextMenuMarker.setMarkerVisible(getScoutObject().getContextMenu().isVisible());
+    m_contextMenu = SwingScoutContextMenu.installContextMenuWithSystemMenus(getSwingTimeField(), getScoutObject().getContextMenu(), getSwingEnvironment());
   }
 
   public JTextField getSwingTimeField() {
     return (JTextField) getSwingField();
+  }
+
+  @Override
+  protected void setEnabledFromScout(boolean b) {
+    super.setEnabledFromScout(b);
+    m_dropdownIcon.setEnabled(b);
   }
 
   @Override
@@ -212,16 +282,6 @@ public class SwingScoutTimeField extends SwingScoutValueFieldComposite<IDateFiel
     // end notify
     getSwingEnvironment().dispatchImmediateSwingJobs();
     return true;// continue always
-  }
-
-  @Override
-  protected void handleSwingFocusGained() {
-    super.handleSwingFocusGained();
-    JTextComponent swingField = getSwingTimeField();
-    if (swingField.getDocument().getLength() > 0) {
-      swingField.setCaretPosition(swingField.getDocument().getLength());
-      swingField.moveCaretPosition(0);
-    }
   }
 
   private void acceptProposalFromSwing(final Date newDate) {
@@ -325,7 +385,7 @@ public class SwingScoutTimeField extends SwingScoutValueFieldComposite<IDateFiel
   protected void setForegroundFromScout(String scoutColor) {
     JComponent fld = getSwingField();
     if (fld != null && scoutColor != null && fld instanceof JTextComponent) {
-      setDisabledTextColor(SwingUtility.createColor(scoutColor), (JTextComponent) fld);
+      setDisabledTextColor(ColorUtility.createColor(scoutColor), (JTextComponent) fld);
     }
     super.setForegroundFromScout(scoutColor);
   }

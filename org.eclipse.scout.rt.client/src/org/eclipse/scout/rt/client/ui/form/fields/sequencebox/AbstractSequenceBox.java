@@ -18,9 +18,9 @@ import java.util.HashSet;
 import org.eclipse.scout.commons.CompareUtility;
 import org.eclipse.scout.commons.OptimisticLock;
 import org.eclipse.scout.commons.StringUtility;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.exception.VetoException;
@@ -33,6 +33,7 @@ import org.eclipse.scout.rt.client.ui.form.fields.button.IButton;
 import org.eclipse.scout.rt.client.ui.form.fields.sequencebox.internal.SequenceBoxGrid;
 import org.eclipse.scout.rt.shared.ScoutTexts;
 
+@ClassId("e71e8b93-1168-4f5e-8781-4774f01eee26")
 public abstract class AbstractSequenceBox extends AbstractCompositeField implements ISequenceBox {
 
   private boolean m_autoCheckFromTo;
@@ -67,20 +68,17 @@ public abstract class AbstractSequenceBox extends AbstractCompositeField impleme
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(200)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredAutoCheckFromTo() {
     return true;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(210)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredEqualColumnWidths() {
     return false;
   }
 
   @Override
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredGridUseUiHeight() {
     return true;
   }

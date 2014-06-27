@@ -16,10 +16,14 @@ import java.awt.Frame;
 import java.awt.Window;
 import java.io.File;
 import java.io.FilenameFilter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.rt.client.ui.basic.filechooser.IFileChooser;
 import org.eclipse.scout.rt.ui.swing.ISwingEnvironment;
@@ -40,7 +44,7 @@ public class SwingScoutFileChooser implements ISwingScoutFileChooser {
 
   @Override
   public void showFileChooser() {
-    File[] files = null;
+    List<File> files = null;
     try {
       if (m_useAWT && !m_scoutFileChooser.isFolderMode()) {
         files = showFileChooserAWT();
@@ -50,7 +54,7 @@ public class SwingScoutFileChooser implements ISwingScoutFileChooser {
       }
     }
     finally {
-      final File[] finalFiles = files;
+      final List<File> finalFiles = files;
       Runnable t = new Runnable() {
         @Override
         public void run() {
@@ -62,8 +66,8 @@ public class SwingScoutFileChooser implements ISwingScoutFileChooser {
     }
   }
 
-  protected File[] showFileChooserSwing() {
-    String[] extensions = m_scoutFileChooser.getFileExtensions();
+  protected List<File> showFileChooserSwing() {
+    List<String> extensions = m_scoutFileChooser.getFileExtensions();
     boolean openMode = m_scoutFileChooser.isTypeLoad();
     File curDir = m_scoutFileChooser.getDirectory();
     boolean folderMode = m_scoutFileChooser.isFolderMode();
@@ -88,15 +92,17 @@ public class SwingScoutFileChooser implements ISwingScoutFileChooser {
       dlg.setFileSelectionMode(JFileChooser.FILES_ONLY);
     }
 
-    if (extensions != null && extensions.length > 0) {
+    if (extensions.size() > 0) {
       // remove old
       javax.swing.filechooser.FileFilter[] filters = dlg.getChoosableFileFilters();
       for (int i = 0; filters != null && i < filters.length; i++) {
         dlg.removeChoosableFileFilter(filters[i]);
       }
-      for (int i = 0; i < extensions.length; i++) {
-        String oneExt = extensions[i];
-        dlg.addChoosableFileFilter(new ExtensionFileFilter(oneExt));
+
+      dlg.addChoosableFileFilter(new ExtensionFileFilter(extensions));
+      for (int i = 0; i < extensions.size(); i++) {
+        String oneExt = extensions.get(i);
+        dlg.addChoosableFileFilter(new ExtensionFileFilter(Collections.singletonList(oneExt)));
       }
     }
 
@@ -118,10 +124,10 @@ public class SwingScoutFileChooser implements ISwingScoutFileChooser {
         // add extension
         if (!folderMode) {
           if (f != null && (dlg.getFileFilter() instanceof ExtensionFileFilter)) {
-            String selectedExt = ((ExtensionFileFilter) dlg.getFileFilter()).getExt();
+            List<String> selectedExtensions = ((ExtensionFileFilter) dlg.getFileFilter()).getExtensions();
             String path = f.getAbsolutePath();
-            if (selectedExt.length() > 0 && !path.toLowerCase().endsWith(selectedExt)) {
-              f = new File(path + "." + selectedExt);
+            if (selectedExtensions.size() == 1 && !dlg.getFileFilter().accept(f)) {
+              f = new File(path + "." + selectedExtensions.get(0));
             }
           }
         }
@@ -141,7 +147,7 @@ public class SwingScoutFileChooser implements ISwingScoutFileChooser {
         break;
       }
     }
-    return f != null ? new File[]{f} : new File[0];
+    return CollectionUtility.arrayList(f);
   }
 
   protected JFileChooser createFileChooserSwing(File curDir) {
@@ -151,8 +157,8 @@ public class SwingScoutFileChooser implements ISwingScoutFileChooser {
     return new JFileChooser();
   }
 
-  protected File[] showFileChooserAWT() {
-    String[] extensions = m_scoutFileChooser.getFileExtensions();
+  protected List<File> showFileChooserAWT() {
+    List<String> extensions = m_scoutFileChooser.getFileExtensions();
     boolean openMode = m_scoutFileChooser.isTypeLoad();
     File curDir = m_scoutFileChooser.getDirectory();
     boolean folderMode = m_scoutFileChooser.isFolderMode();
@@ -166,11 +172,11 @@ public class SwingScoutFileChooser implements ISwingScoutFileChooser {
       //
       StringBuffer buf = new StringBuffer();
       if (extensions != null) {
-        for (int i = 0; i < extensions.length; i++) {
+        for (int i = 0; i < extensions.size(); i++) {
           if (i > 0) {
             buf.append(", ");
           }
-          buf.append("*." + extensions[i]);
+          buf.append("*." + extensions.get(i));
         }
       }
       if (buf.length() == 0) {
@@ -201,26 +207,26 @@ public class SwingScoutFileChooser implements ISwingScoutFileChooser {
       // not implemented in windows dialog
     }
 
-    if (extensions != null && extensions.length > 0) {
-      final String[] extArrayF = extensions;
+    if (extensions != null && extensions.isEmpty()) {
+      final List<String> extListFinal = extensions;
       if (StringUtility.hasText(fileName)) {
         dlg.setFile(fileName);
       }
       else {
         StringBuffer extBuf = new StringBuffer();
-        for (int i = 0; i < extArrayF.length; i++) {
+        for (int i = 0; i < extListFinal.size(); i++) {
           if (extBuf.length() > 0) {
             extBuf.append(";");
           }
-          extBuf.append("*." + extArrayF[i]);
+          extBuf.append("*." + extListFinal.get(i));
         }
         dlg.setFile(extBuf.toString());
       }
       dlg.setFilenameFilter(new FilenameFilter() {
         @Override
         public boolean accept(File dir, String name) {
-          for (int i = 0; i < extArrayF.length; i++) {
-            if (name.toLowerCase().endsWith("." + extArrayF[i])) {
+          for (int i = 0; i < extListFinal.size(); i++) {
+            if (name.toLowerCase().endsWith("." + extListFinal.get(i))) {
               return true;
             }
           }
@@ -237,10 +243,10 @@ public class SwingScoutFileChooser implements ISwingScoutFileChooser {
         f = new File(dlg.getDirectory(), dlg.getFile());
         // add extension
         if (!folderMode) {
-          if (extensions != null && extensions.length == 1) {
+          if (extensions.size() == 1) {
             String path = f.getAbsolutePath();
-            if (!path.toLowerCase().endsWith("." + extensions[0])) {
-              f = new File(path + "." + extensions[0]);
+            if (!path.toLowerCase().endsWith("." + extensions.get(0))) {
+              f = new File(path + "." + extensions.get(0));
             }
           }
         }
@@ -253,7 +259,7 @@ public class SwingScoutFileChooser implements ISwingScoutFileChooser {
         break;
       }
     }
-    return f != null ? new File[]{f} : new File[0];
+    return CollectionUtility.arrayList(f);
   }
 
   protected FileDialog createFileChooserAWT(Window owner) {
@@ -270,32 +276,58 @@ public class SwingScoutFileChooser implements ISwingScoutFileChooser {
     return new FileDialog(new Frame(), title, openMode ? FileDialog.LOAD : FileDialog.SAVE);
   }
 
-  private class ExtensionFileFilter extends javax.swing.filechooser.FileFilter {
-    private String m_ext = "";
+  public static class ExtensionFileFilter extends javax.swing.filechooser.FileFilter {
+    private final List<String> m_extensions;
 
-    public ExtensionFileFilter(String ext) {
-      if (ext != null && !ext.equals("*")) {
-        m_ext = ext.toLowerCase();
+    public ExtensionFileFilter(List<String> extensions) {
+      if (extensions == null) {
+        m_extensions = CollectionUtility.emptyArrayList();
+      }
+      else {
+        ArrayList<String> list = new ArrayList<String>(extensions.size());
+        for (String extension : extensions) {
+          if (extension != null && !extension.equals("*")) {
+            list.add(extension.toLowerCase());
+          }
+        }
+        m_extensions = list;
       }
     }
 
     @Override
     public String getDescription() {
-      if (m_ext.length() > 0) {
-        return "*." + m_ext;
+      if (m_extensions.isEmpty()) {
+        return "*.*";
       }
       else {
-        return "*.*";
+        StringBuilder s = new StringBuilder();
+        for (String extension : m_extensions) {
+          s.append("*.");
+          s.append(extension);
+          s.append(";");
+        }
+        s.deleteCharAt(s.length() - 1);
+        return s.toString();
       }
     }
 
-    public String getExt() {
-      return m_ext;
+    public List<String> getExtensions() {
+      return CollectionUtility.arrayList(m_extensions);
     }
 
     @Override
     public boolean accept(File f) {
-      return f.isDirectory() || m_ext.length() == 0 || f.getName().toLowerCase().endsWith(m_ext);
+      return f.isDirectory() || m_extensions.isEmpty() || fileNameMatches(f);
+    }
+
+    private boolean fileNameMatches(File f) {
+      String name = f.getName().toLowerCase();
+      for (String extension : m_extensions) {
+        if (name.endsWith(extension)) {
+          return true;
+        }
+      }
+      return false;
     }
   }// end private class
 

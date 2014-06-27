@@ -17,7 +17,7 @@ import org.eclipse.scout.rt.ui.swt.extension.IUiDecoration;
 import org.eclipse.swt.SWT;
 
 public class UiDecoration implements IUiDecoration {
-  private static IScoutLogger LOG = ScoutLogManager.getLogger(UiDecoration.class);
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(UiDecoration.class);
 
   private String m_mandatoryFieldBackgroundColor;
   private int m_mandatoryStarMarkerPosition;
@@ -37,6 +37,7 @@ public class UiDecoration implements IUiDecoration {
   private int m_processButtonMinWidth;
   private int m_processButtonMaxWidth;
   private String m_colorForegroundDisabled;
+  private String m_colorBackgroundDisabled;
   private int m_messageBoxMinWidth = 400;
   private int m_messageBoxMinHeight = 100;
   private boolean m_tableMouseMoveSelectionSupportEnabled;
@@ -198,6 +199,15 @@ public class UiDecoration implements IUiDecoration {
 
   public void setLogicalGridLayoutRowHeight(int logicalGridLayoutRowHeight) {
     m_logicalGridLayoutRowHeight = logicalGridLayoutRowHeight;
+  }
+
+  @Override
+  public String getColorBackgroundDisabled() {
+    return m_colorBackgroundDisabled;
+  }
+
+  public void setColorBackgroundDisabled(String colorBackgroundDisabled) {
+    m_colorBackgroundDisabled = colorBackgroundDisabled;
   }
 
   @Override

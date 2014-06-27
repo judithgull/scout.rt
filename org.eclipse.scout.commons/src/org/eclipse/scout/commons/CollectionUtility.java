@@ -11,10 +11,13 @@
 package org.eclipse.scout.commons;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -25,34 +28,295 @@ public final class CollectionUtility {
   private CollectionUtility() {
   }
 
+  /**
+   * compares the two collection of same content in any order. Is overloaded ({@link #equalsCollection(List, List)} for
+   * lists where the order of the list is considered.
+   * 
+   * @param c1
+   * @param c2
+   * @return true if the two collections contains the same elements in any order.
+   */
+  public static <T> boolean equalsCollection(Collection<? extends T> c1, Collection<? extends T> c2) {
+    return equalsCollection(c1, c2, false);
+  }
+
+  /**
+   * @param c1
+   * @param c2
+   * @param considerElementPosition
+   * @return true if the two collections contains the same elements if considerElementPosition in the same order.
+   */
+  public static <T> boolean equalsCollection(Collection<? extends T> c1, Collection<? extends T> c2, boolean considerElementPosition) {
+    if (c1 == c2) {
+      return true;
+    }
+    if (c1 == null || c2 == null) {
+      return false;
+    }
+    if (c1.size() != c2.size()) {
+      return false;
+    }
+    if (considerElementPosition) {
+      Iterator<? extends T> it1 = c1.iterator();
+      Iterator<? extends T> it2 = c2.iterator();
+      while (it1.hasNext()) {
+        if (!CompareUtility.equals(it1.next(), it2.next())) {
+          return false;
+        }
+      }
+      return true;
+    }
+    else {
+      return c1.containsAll(c2);
+    }
+  }
+
+  /**
+   * compares the two lists of same content in the same order. Is an overloaded of (
+   * {@link #equalsCollection(Collection, Collection)}.
+   * 
+   * @param c1
+   * @param c2
+   * @return true if the two lists contains the same elements in the same order.
+   */
+  public static <T> boolean equalsCollection(List<? extends T> c1, List<? extends T> c2) {
+    if (c1 == c2) {
+      return true;
+    }
+    if (c1 == null || c2 == null) {
+      return false;
+    }
+    if (c1.size() != c2.size()) {
+      return false;
+    }
+    return c1.equals(c2);
+  }
+
+  @SuppressWarnings("unchecked")
+  public static <T> T firstElement(Object c) {
+    if (c instanceof Collection<?>) {
+      return (T) firstElement((Collection<?>) c);
+    }
+    return null;
+  }
+
   /*
    * Collection/List handling
    */
   public static <T> T firstElement(Collection<T> c) {
-    if (c == null || c.size() == 0) {
+    if (isEmpty(c)) {
       return null;
     }
-    else {
-      return c.iterator().next();
+    return c.iterator().next();
+  }
+
+  public static <T> T firstElement(List<T> c) {
+    if (isEmpty(c)) {
+      return null;
     }
+    return c.get(0);
   }
 
   public static <T> T lastElement(List<T> c) {
-    if (c == null || c.size() == 0) {
+    if (isEmpty(c)) {
       return null;
     }
-    else {
-      return c.get(c.size() - 1);
-    }
+    return c.get(c.size() - 1);
   }
 
-  public static <T> List<T> copyList(Collection<T> c) {
-    if (c == null || c.size() == 0) {
-      return new ArrayList<T>(0);
+  /**
+   * @param c
+   * @param values
+   * @return <code>true</code> if the collection contains one of the values.
+   */
+  public static <T> boolean containsAny(Collection<T> c, Collection<? extends T> values) {
+    if (values == null || c == null) {
+      return false;
     }
-    else {
+    HashSet<T> set = hashSet(c);
+    for (T value : values) {
+      if (set.contains(value)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * @param c
+   * @param values
+   * @return <code>true</code> if the collection contains one of the values.
+   */
+  public static <T> boolean containsAny(Collection<T> c, T... values) {
+    if (values == null || c == null) {
+      return false;
+    }
+    HashSet<T> set = hashSet(c);
+    for (T value : values) {
+      if (set.contains(value)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * exception safe access of an element of a list by index.
+   * 
+   * @param list
+   * @param index
+   * @return null if the index is out of the list bounds or the element is null by itself.
+   */
+  public static <T> T getElement(List<T> list, int index) {
+    if (index >= 0 && index < list.size()) {
+      return list.get(index);
+    }
+    return null;
+  }
+
+  /**
+   * List factory
+   */
+  public static <T> ArrayList<T> arrayList(T... values) {
+    if (values != null) {
+      ArrayList<T> list = new ArrayList<T>(values.length);
+      for (T v : values) {
+        list.add(v);
+      }
+      return list;
+    }
+    return emptyArrayList();
+  }
+
+  /**
+   * Returns a new empty {@link ArrayList}.<br>
+   * This method differs to {@link Collections#emptyList()} in that way that the {@link ArrayList} returned by this
+   * method can be modified hence is no shared instance.
+   * 
+   * @return An empty but modifiable {@link ArrayList} with an initial capacity of <code>0</code>.
+   */
+  public static <T> ArrayList<T> emptyArrayList() {
+    return new ArrayList<T>(0);
+  }
+
+  public static <T> ArrayList<T> arrayList(T value) {
+    ArrayList<T> list = new ArrayList<T>();
+    if (value != null) {
+      list.add(value);
+    }
+    return list;
+  }
+
+  public static <T> ArrayList<T> truncateList(List<? extends T> input, int maxSize) {
+    if (input == null) {
+      input = new ArrayList<T>();
+    }
+    int endIndex = Math.min(input.size(), maxSize);
+    ArrayList<T> result = new ArrayList<T>(endIndex);
+    for (int i = 0; i < endIndex; i++) {
+      result.add(input.get(i));
+    }
+    return result;
+  }
+
+  /**
+   * Null safe creation of a {@link ArrayList} out of a given collection. The returned {@link ArrayList} is modifiable
+   * and not null.
+   * 
+   * @param c
+   * @return an {@link ArrayList} containing the given collection's elements. Never null.
+   */
+  public static <T> ArrayList<T> arrayList(Collection<? extends T> c) {
+    if (c != null) {
       return new ArrayList<T>(c);
     }
+    return emptyArrayList();
+  }
+
+  /**
+   * Null safe creation of a {@link ArrayList} out of a given collection. The returned {@link ArrayList} is modifiable.
+   * The result list is never null and does not contain any null elements.
+   * 
+   * @param c
+   * @return an {@link ArrayList} containing the given collection's elements. Never null
+   */
+  public static <T> ArrayList<T> arrayListWithoutNullElements(Collection<? extends T> c) {
+    if (c != null) {
+      ArrayList<T> list = new ArrayList<T>(c.size());
+      for (T o : c) {
+        if (o != null) {
+          list.add(o);
+        }
+      }
+      return list;
+    }
+    return emptyArrayList();
+  }
+
+  /**
+   * Null safe creation of a {@link HashSet} out of a given collection. The returned {@link HashSet} is modifiable and
+   * never null.
+   * 
+   * @param c
+   * @return an {@link HashSet} containing the given collection's elements. Never null.
+   */
+  public static <T> HashSet<T> hashSet(Collection<? extends T> c) {
+    if (c != null) {
+      return new HashSet<T>(c);
+    }
+    return new HashSet<T>(0);
+  }
+
+  /**
+   * Null safe creation of a {@link HashSet} out of a given collection without <code>null</code> elements. The returned
+   * {@link HashSet} is modifiable and never null.
+   * 
+   * @param c
+   * @return an {@link HashSet} containing the given collection's elements without <code>null</code> elements. Never
+   *         null.
+   */
+  public static <T> HashSet<T> hashSetWithoutNullElements(Collection<? extends T> c) {
+    HashSet<T> set = hashSet(c);
+    set.remove(null);
+    return set;
+  }
+
+  /**
+   * Null safe creation of a {@link LinkedHashSet} out of a given collection. The returned {@link LinkedHashSet} is
+   * modifiable and
+   * never null.
+   * 
+   * @param c
+   * @return an {@link LinkedHashSet} containing the given collection's elements. Never null.
+   */
+  public static <T> LinkedHashSet<T> orderedHashSet(Collection<? extends T> c) {
+    if (c != null) {
+      return new LinkedHashSet<T>(c);
+    }
+    return new LinkedHashSet<T>(0);
+  }
+
+  /**
+   * Null safe creation of a {@link LinkedHashSet} out of a given collection without <code>null</code> elements. The
+   * returned {@link LinkedHashSet} is modifiable and never null.
+   * 
+   * @param c
+   * @return an {@link LinkedHashSet} containing the given collection's elements without <code>null</code> elements.
+   *         Never
+   *         null.
+   */
+  public static <T> LinkedHashSet<T> orderedHashSetWithoutNullElements(Collection<? extends T> c) {
+    LinkedHashSet<T> set = orderedHashSet(c);
+    set.remove(null);
+    return set;
+  }
+
+  /**
+   * @deprecated Will be removed in Scout 5.0. Use {@link #arrayList(Collection)} instead.
+   */
+  @Deprecated
+  public static <T> List<T> copyList(Collection<T> c) {
+    return arrayList(c);
   }
 
   @SuppressWarnings("unchecked")
@@ -67,9 +331,25 @@ public final class CollectionUtility {
     }
   }
 
+  /**
+   * @deprecated Will be removed in Scout 5.0. Use {@link CollectionUtility#arrayList(Collection)} instead.
+   */
+  @Deprecated
+  public static <T> List<T> toList(Collection<T> c) {
+    if (c == null) {
+      return null;
+    }
+    else if (c instanceof List) {
+      return (List<T>) c;
+    }
+    else {
+      return new ArrayList<T>(c);
+    }
+  }
+
   public static <T, V extends T> List<T> appendList(List<T> list, V o) {
     if (list == null) {
-      list = new ArrayList<T>(1);
+      list = new ArrayList<T>();
     }
     list.add(o);
     return list;
@@ -122,15 +402,7 @@ public final class CollectionUtility {
     return set;
   }
 
-  public static <T> Set<T> removeObjectSet(Set<T> set, int i) {
-    if (set == null) {
-      set = new HashSet<T>(1);
-    }
-    set.remove(i);
-    return set;
-  }
-
-  public static <T> int size(List<T> list) {
+  public static <T> int size(Collection<T> list) {
     if (list == null) {
       return 0;
     }
@@ -167,7 +439,7 @@ public final class CollectionUtility {
 
   public static <T, U> Map<T, U> copyMap(Map<T, U> m) {
     if (m == null || m.size() == 0) {
-      return new HashMap<T, U>();
+      return new HashMap<T, U>(0);
     }
     else {
       return new HashMap<T, U>(m);
@@ -184,14 +456,14 @@ public final class CollectionUtility {
 
   public static <T, U> U getObject(Map<T, U> map, T key) {
     if (map == null) {
-      map = new HashMap<T, U>();
+      return null;
     }
     return map.get(key);
   }
 
   public static <T, U> Map<T, U> removeObject(Map<T, U> map, T key) {
     if (map == null) {
-      map = new HashMap<T, U>();
+      return new HashMap<T, U>();
     }
     map.remove(key);
     return map;
@@ -212,13 +484,23 @@ public final class CollectionUtility {
   }
 
   public static <T, U> Map<T, U> putAllObjects(Map<T, U> targetMap, Map<T, U> sourceMap) {
+    if (targetMap == null && sourceMap == null) {
+      return new HashMap<T, U>();
+    }
     if (targetMap == null) {
-      targetMap = new HashMap<T, U>();
+      return new HashMap<T, U>(sourceMap);
+    }
+    if (sourceMap == null) {
+      return targetMap; // nothing to add
     }
     targetMap.putAll(sourceMap);
     return targetMap;
   }
 
+  /**
+   * @deprecated Will be removed in Scout 5.0. Use {@link #copyMap(Map)} if required.
+   */
+  @Deprecated
   public static <T, U> Map<T, U> getEmptyMap(Map<T, U> m) {
     return new HashMap<T, U>();
   }
@@ -258,27 +540,37 @@ public final class CollectionUtility {
 
   public static <T extends Comparable, U> U getObjectSortedMap(SortedMap<T, U> map, T key) {
     if (map == null) {
-      map = new TreeMap<T, U>();
+      return null;
     }
     return map.get(key);
   }
 
   public static <T extends Comparable, U> SortedMap<T, U> removeObjectSortedMap(SortedMap<T, U> map, T key) {
     if (map == null) {
-      map = new TreeMap<T, U>();
+      return new TreeMap<T, U>();
     }
     map.remove(key);
     return map;
   }
 
   public static <T extends Comparable, U> SortedMap<T, U> putAllObjectsSortedMap(SortedMap<T, U> targetMap, Map<T, U> sourceMap) {
+    if (targetMap == null && sourceMap == null) {
+      return new TreeMap<T, U>();
+    }
     if (targetMap == null) {
-      targetMap = new TreeMap<T, U>();
+      return new TreeMap<T, U>(sourceMap);
+    }
+    if (sourceMap == null) {
+      return targetMap; // nothing to add
     }
     targetMap.putAll(sourceMap);
     return targetMap;
   }
 
+  /**
+   * @deprecated Will be removed in Scout 5.0. Use {@link #copySortedMap(SortedMap)} if required.
+   */
+  @Deprecated
   public static <T, U> SortedMap<T, U> getEmptySortedMap(SortedMap<T, U> m) {
     return new TreeMap<T, U>();
   }
@@ -301,12 +593,178 @@ public final class CollectionUtility {
    * Set factory
    */
   public static <T> HashSet<T> hashSet(T... values) {
-    HashSet<T> set = new HashSet<T>();
     if (values != null) {
+      HashSet<T> set = new HashSet<T>(values.length);
       for (T v : values) {
         set.add(v);
       }
+      return set;
+    }
+    return new HashSet<T>(0);
+  }
+
+  public static <T> HashSet<T> hashSet(T value) {
+    HashSet<T> set = new HashSet<T>();
+    if (value != null) {
+      set.add(value);
     }
     return set;
+  }
+
+  /**
+   * Returns a new empty {@link HashSet}.<br>
+   * This method differs to {@link Collections#emptyList()} in that way that the {@link HashSet} returned by this
+   * method can be modified hence is no shared instance.
+   * 
+   * @return An empty but modifiable {@link HashSet} with an initial capacity of <code>0</code>.
+   */
+  public static <T> HashSet<T> emptyHashSet() {
+    return new HashSet<T>(0);
+  }
+
+  /**
+   * combine all lists into one list containing all elements. the order of the
+   * items is preserved
+   */
+  @SuppressWarnings("unchecked")
+  public static <T> List<T> combine(Collection<?>... collections) {
+    List<T> list = new ArrayList<T>();
+    if (collections != null && collections.length > 0) {
+      for (Collection<?> c : collections) {
+        for (Object t : c) {
+          list.add((T) t);
+        }
+      }
+    }
+    return list;
+  }
+
+  public static boolean isEmpty(Collection<?> c) {
+    return c == null || c.isEmpty();
+  }
+
+  public static boolean hasElements(Collection<?> c) {
+    return !isEmpty(c);
+  }
+
+  public static <T> boolean hasElements(T[] array) {
+    if (array == null) {
+      return false;
+    }
+    return array.length > 0;
+  }
+
+  public static int hashCode(Collection<?> c) {
+    if (c == null) {
+      return 0;
+    }
+    return Arrays.hashCode(c.toArray());
+  }
+
+  public static List<Object> parse(String text) {
+    List<Object> list = null;
+    if (StringUtility.hasText(text)) {
+      String[] a = text.split(",");
+      for (String s : a) {
+        Object o;
+        // remove escaped ','
+        s = s.replaceAll("%2C", ",");
+        if (s.equalsIgnoreCase("null")) {
+          o = null;
+        }
+        else if (s.length() >= 2 && s.startsWith("'") && s.endsWith("'")) {
+          o = s.substring(1, s.length() - 2);
+        }
+        else if (s.length() >= 2 && s.startsWith("\"") && s.endsWith("\"")) {
+          o = s.substring(1, s.length() - 2);
+        }
+        else if (s.indexOf('.') >= 0) {
+          // try to make double
+          try {
+            o = new Double(Double.parseDouble(s));
+          }
+          catch (Exception e) {
+            /* nop */
+            o = s;
+          }
+        }
+        else {
+          // try to make long
+          try {
+            o = new Long(Long.parseLong(s));
+          }
+          catch (Exception e) {
+            /* nop */
+            o = s;
+          }
+        }
+        list = CollectionUtility.appendList(list, o);
+      }
+    }
+    return CollectionUtility.arrayList(list);
+  }
+
+  /**
+   * @see #format(Collection, String, boolean)
+   */
+  public static <T> String format(Collection<T> list, String delimiter) {
+    return format(list, delimiter, false);
+  }
+
+  /**
+   * @see #format(Collection, String, boolean)
+   */
+  public static String format(Collection<?> list) {
+    return format(list, false);
+  }
+
+  /**
+   * @see #format(Collection, String, boolean)
+   */
+  public static <T> String format(Collection<T> c, boolean quoteStrings) {
+    return format(c, ", ", quoteStrings);
+  }
+
+  /**
+   * To get a string representation of a collection.
+   * 
+   * @param list
+   *          input list
+   * @param delimiter
+   *          the separator used between elements
+   * @param quoteStrings
+   *          <code>true</code> to get quoted representations of all not numbers.
+   * @return a string representation of the given collection.
+   */
+  public static <T> String format(Collection<T> list, String delimiter, boolean quoteStrings) {
+    if (isEmpty(list)) {
+      return "";
+    }
+    StringBuilder result = new StringBuilder();
+    Iterator<T> it = list.iterator();
+    // first
+    result.append(objectToString(it.next(), quoteStrings));
+    // rest
+    while (it.hasNext()) {
+      result.append(delimiter);
+      result.append(objectToString(it.next(), quoteStrings));
+    }
+    return result.toString();
+  }
+
+  private static String objectToString(Object o, boolean quoteStrings) {
+    if (o == null) {
+      return "null";
+    }
+    if (o instanceof Number) {
+      return o.toString();
+    }
+    if (quoteStrings) {
+      return "'" + o.toString().replaceAll(",", "%2C") + "'";
+    }
+    else {
+      return o.toString();
+    }
+
   }
 }

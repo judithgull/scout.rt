@@ -30,6 +30,7 @@ import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
 
+import org.eclipse.core.runtime.Platform;
 import org.eclipse.scout.commons.EventListenerList;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
@@ -39,6 +40,7 @@ import org.eclipse.scout.rt.ui.swing.ext.BorderLayoutEx;
 import org.eclipse.scout.rt.ui.swing.ext.ComponentSpyAction;
 import org.eclipse.scout.rt.ui.swing.ext.JDialogEx;
 import org.eclipse.scout.rt.ui.swing.ext.busy.SwingBusyIndicator;
+import org.eclipse.scout.rt.ui.swing.ext.internal.LogicalGridLayoutSpyAction;
 import org.eclipse.scout.rt.ui.swing.focus.SwingScoutFocusTraversalPolicy;
 import org.eclipse.scout.rt.ui.swing.window.DependentCloseListener;
 import org.eclipse.scout.rt.ui.swing.window.ISwingScoutBoundsProvider;
@@ -120,6 +122,10 @@ public class SwingScoutDialog implements ISwingScoutView {
     if (contentPane instanceof JComponent) {
       (contentPane).getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(SwingUtility.createKeystroke("shift alt F1"), "componentSpy");
       (contentPane).getActionMap().put("componentSpy", new ComponentSpyAction());
+      if (Platform.inDevelopmentMode()) {
+        ((JComponent) contentPane).getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(SwingUtility.createKeystroke("shift alt F2"), "layoutSpy");
+        ((JComponent) contentPane).getActionMap().put("layoutSpy", new LogicalGridLayoutSpyAction());
+      }
     }
   }
 
@@ -178,6 +184,16 @@ public class SwingScoutDialog implements ISwingScoutView {
   @Override
   public void openView() {
     m_opened = true;
+    adjustSize();
+    if (m_opened) {
+      m_swingDialog.setVisible(true);
+    }
+  }
+
+  /**
+   * Adjust size and location according to properties and screen size.
+   */
+  protected void adjustSize() {
     // preferred size
     m_swingDialog.pack();
     m_swingDialog.pack();// in case some wrapped fields were not able to
@@ -193,17 +209,10 @@ public class SwingScoutDialog implements ISwingScoutView {
         m_swingDialog.setBounds(c);
       }
     }
-    Rectangle a = m_swingDialog.getBounds();
-    Rectangle b = SwingUtility.validateRectangleOnScreen(a, false, true);
-    if (!b.equals(a)) {
-      m_swingDialog.setLocation(b.getLocation());
-      m_swingDialog.setSize(b.getSize());
-    }
+
+    SwingUtility.adjustBoundsToScreen(m_swingDialog);
     if (m_maximized) {
       setMaximized(m_maximized);
-    }
-    if (m_opened) {
-      m_swingDialog.setVisible(true);
     }
   }
 

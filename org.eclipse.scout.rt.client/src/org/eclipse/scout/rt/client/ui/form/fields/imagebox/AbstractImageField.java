@@ -16,25 +16,33 @@ import java.util.List;
 
 import org.eclipse.scout.commons.ConfigurationUtility;
 import org.eclipse.scout.commons.EventListenerList;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.dnd.TransferObject;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.ui.action.ActionUtility;
+import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.MenuUtility;
+import org.eclipse.scout.rt.client.ui.action.menu.root.IContextMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.root.internal.FormFieldContextMenu;
 import org.eclipse.scout.rt.client.ui.form.fields.AbstractFormField;
 import org.eclipse.scout.rt.shared.data.basic.AffineTransformSpec;
 import org.eclipse.scout.rt.shared.data.basic.BoundsSpec;
+import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
+import org.eclipse.scout.service.SERVICES;
 
+@ClassId("480ea07e-9cec-4591-ba73-4bb9aa45a60d")
 public abstract class AbstractImageField extends AbstractFormField implements IImageField {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractImageField.class);
 
   private IImageFieldUIFacade m_uiFacade;
   private final EventListenerList m_listenerList = new EventListenerList();
-  private IMenu[] m_menus;
+  private IContextMenu m_contextMenu;
   private double m_zoomDelta;
   private double m_panDelta;
   private double m_rotateDelta;
@@ -47,13 +55,11 @@ public abstract class AbstractImageField extends AbstractFormField implements II
     super(callInitializer);
   }
 
-  @ConfigPropertyValue("0")
   @Override
   protected int getConfiguredVerticalAlignment() {
     return 0;
   }
 
-  @ConfigPropertyValue("0")
   @Override
   protected int getConfiguredHorizontalAlignment() {
     return 0;
@@ -61,35 +67,41 @@ public abstract class AbstractImageField extends AbstractFormField implements II
 
   @ConfigProperty(ConfigProperty.ICON_ID)
   @Order(300)
-  @ConfigPropertyValue("null")
   protected String getConfiguredImageId() {
     return null;
   }
 
-  @ConfigProperty(ConfigProperty.BOOLEAN)
+  /**
+   * @deprecated Will be removed in the 5.0 Release. This property never had any effect and can safely be removed
+   *             without replacement.
+   */
   @Order(310)
-  @ConfigPropertyValue("true")
+  @Deprecated
   protected boolean getConfiguredFocusVisible() {
     return true;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(320)
-  @ConfigPropertyValue("null")
   protected boolean getConfiguredAutoFit() {
     return false;
   }
 
   @ConfigProperty(ConfigProperty.DOUBLE)
   @Order(330)
-  @ConfigPropertyValue("1.25")
   protected double getConfiguredZoomDelta() {
     return 1.25;
   }
 
+  @Override
+  @Order(190)
+  @ConfigProperty(ConfigProperty.BOOLEAN)
+  protected boolean getConfiguredFocusable() {
+    return false;
+  }
+
   @ConfigProperty(ConfigProperty.DOUBLE)
   @Order(340)
-  @ConfigPropertyValue("10")
   protected double getConfiguredPanDelta() {
     return 10;
   }
@@ -99,28 +111,24 @@ public abstract class AbstractImageField extends AbstractFormField implements II
    */
   @ConfigProperty(ConfigProperty.DOUBLE)
   @Order(350)
-  @ConfigPropertyValue("10")
   protected double getConfiguredRotateDelta() {
     return 10;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(360)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredScrollBarEnabled() {
     return false;
   }
 
   @ConfigProperty(ConfigProperty.DRAG_AND_DROP_TYPE)
   @Order(400)
-  @ConfigPropertyValue("0")
   protected int getConfiguredDropType() {
     return 0;
   }
 
   @ConfigProperty(ConfigProperty.DRAG_AND_DROP_TYPE)
   @Order(410)
-  @ConfigPropertyValue("0")
   protected int getConfiguredDragType() {
     return 0;
   }
@@ -136,10 +144,16 @@ public abstract class AbstractImageField extends AbstractFormField implements II
   protected void execDropRequest(TransferObject transferObject) throws ProcessingException {
   }
 
-  private Class<? extends IMenu>[] getConfiguredMenus() {
+  protected List<Class<? extends IMenu>> getDeclaredMenus() {
     Class[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
-    Class<IMenu>[] foca = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(dca, IMenu.class);
+    List<Class<IMenu>> filtered = ConfigurationUtility.filterClasses(dca, IMenu.class);
+    List<Class<? extends IMenu>> foca = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(filtered, IMenu.class);
     return ConfigurationUtility.removeReplacedClasses(foca);
+  }
+
+  @Override
+  public List<IKeyStroke> getContributedKeyStrokes() {
+    return MenuUtility.getKeyStrokesFromMenus(getMenus());
   }
 
   @Override
@@ -157,15 +171,13 @@ public abstract class AbstractImageField extends AbstractFormField implements II
     setDropType(getConfiguredDropType());
     setScrollBarEnabled(getConfiguredScrollBarEnabled());
     // menus
-    ArrayList<IMenu> menuList = new ArrayList<IMenu>();
-    Class<? extends IMenu>[] a = getConfiguredMenus();
-    for (int i = 0; i < a.length; i++) {
+    List<IMenu> menuList = new ArrayList<IMenu>();
+    for (Class<? extends IMenu> menuClazz : getDeclaredMenus()) {
       try {
-        IMenu menu = ConfigurationUtility.newInnerInstance(this, a[i]);
-        menuList.add(menu);
+        menuList.add(ConfigurationUtility.newInnerInstance(this, menuClazz));
       }
       catch (Exception e) {
-        LOG.warn(null, e);
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + menuClazz.getName() + "'.", e));
       }
     }
     try {
@@ -174,7 +186,15 @@ public abstract class AbstractImageField extends AbstractFormField implements II
     catch (Exception e) {
       LOG.error("error occured while dynamically contributing menus.", e);
     }
-    m_menus = menuList.toArray(new IMenu[0]);
+    m_contextMenu = new FormFieldContextMenu<IImageField>(this, menuList);
+    m_contextMenu.setContainerInternal(this);
+  }
+
+  @Override
+  protected void initFieldInternal() throws ProcessingException {
+    super.initFieldInternal();
+    // init actions
+    ActionUtility.initActions(getMenus());
   }
 
   /**
@@ -213,21 +233,6 @@ public abstract class AbstractImageField extends AbstractFormField implements II
     fireImageBoxEventInternal(new ImageFieldEvent(this, ImageFieldEvent.TYPE_AUTO_FIT));
   }
 
-  private IMenu[] firePopup() {
-    ImageFieldEvent e = new ImageFieldEvent(this, ImageFieldEvent.TYPE_POPUP);
-    // single observer for table-owned menus
-    IMenu[] a = getMenus();
-    for (int i = 0; i < a.length; i++) {
-      IMenu m = a[i];
-      m.prepareAction();
-      if (m.isVisible()) {
-        e.addPopupMenu(m);
-      }
-    }
-    fireImageBoxEventInternal(e);
-    return e.getPopupMenus();
-  }
-
   private void fireImageBoxEventInternal(ImageFieldEvent e) {
     EventListener[] a = m_listenerList.getListeners(ImageFieldListener.class);
     if (a != null) {
@@ -258,8 +263,13 @@ public abstract class AbstractImageField extends AbstractFormField implements II
   }
 
   @Override
-  public IMenu[] getMenus() {
-    return m_menus;
+  public IContextMenu getContextMenu() {
+    return m_contextMenu;
+  }
+
+  @Override
+  public List<IMenu> getMenus() {
+    return getContextMenu().getChildActions();
   }
 
   @Override
@@ -308,11 +318,13 @@ public abstract class AbstractImageField extends AbstractFormField implements II
   }
 
   @Override
+  @SuppressWarnings("deprecation")
   public boolean isFocusVisible() {
     return propertySupport.getPropertyBool(PROP_FOCUS_VISIBLE);
   }
 
   @Override
+  @SuppressWarnings("deprecation")
   public void setFocusVisible(boolean b) {
     propertySupport.setPropertyBool(PROP_FOCUS_VISIBLE, b);
   }
@@ -451,11 +463,6 @@ public abstract class AbstractImageField extends AbstractFormField implements II
     @Override
     public void setImageTransformFromUI(AffineTransformSpec t) {
       setImageTransform(t);
-    }
-
-    @Override
-    public IMenu[] firePopupFromUI() {
-      return firePopup();
     }
 
     @Override

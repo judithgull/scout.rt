@@ -10,9 +10,9 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.shared.services.common.security;
 
-import java.lang.reflect.Method;
 import java.security.Permission;
 import java.security.Permissions;
+import java.util.Collection;
 
 import org.eclipse.scout.commons.annotations.Priority;
 import org.eclipse.scout.rt.shared.security.BasicHierarchyPermission;
@@ -61,25 +61,11 @@ public interface IAccessControlService extends IService {
   void clearCache();
 
   /**
-   * @deprecated Use {@link #clearCacheOfUserIds(String...)} instead. Will be removed in Release 3.10.
-   */
-  @Deprecated
-  @RemoteServiceAccessDenied
-  void clearCacheOfPrincipals(String... userIds);
-
-  /**
    * Clear cache of specified userIds.<br>
    * This can be useful when some permissions and/or user-role mappings have
    * changed.
    * This method is lenient.
    */
   @RemoteServiceAccessDenied
-  void clearCacheOfUserIds(String... userIds);
-
-  /**
-   * @deprecated
-   *             Will be removed in Release 3.10.
-   */
-  @Deprecated
-  boolean checkServiceTunnelAccess(Class serviceInterfaceClass, Method method, Object[] args);
+  void clearCacheOfUserIds(Collection<String> userIds);
 }

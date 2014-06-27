@@ -10,13 +10,16 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.mobile.ui.form;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
-import java.util.TreeSet;
 
+import org.eclipse.scout.commons.CollectionUtility;
+import org.eclipse.scout.commons.exception.ProcessingException;
+import org.eclipse.scout.commons.logger.IScoutLogger;
+import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.mobile.ui.action.ActionButtonBarUtility;
 import org.eclipse.scout.rt.client.mobile.ui.form.fields.button.IMobileButton;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
@@ -31,6 +34,7 @@ import org.eclipse.scout.rt.client.ui.form.fields.button.IButton;
  * {@link #getRelevantSystemTypesForRightHeader()})
  */
 public class FormHeaderActionFetcher extends AbstractFormActionFetcher {
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(FormHeaderActionFetcher.class);
 
   public FormHeaderActionFetcher(IForm form) {
     super(form);
@@ -70,11 +74,13 @@ public class FormHeaderActionFetcher extends AbstractFormActionFetcher {
       return null;
     }
 
-    IButton[] systemProcessButtons = getForm().getRootGroupBox().getSystemProcessButtons();
-    if (systemProcessButtons == null || systemProcessButtons.length == 0) {
+    List<IButton> systemProcessButtons = getForm().getRootGroupBox().getSystemProcessButtons();
+    if (!CollectionUtility.hasElements(systemProcessButtons)) {
       return null;
     }
 
+    IButton[] array = systemProcessButtons.toArray(new IButton[systemProcessButtons.size()]);
+    // sort
     Comparator<IButton> comparator = new Comparator<IButton>() {
       @Override
       public int compare(IButton button1, IButton button2) {
@@ -88,17 +94,20 @@ public class FormHeaderActionFetcher extends AbstractFormActionFetcher {
         }
       }
     };
+    Arrays.sort(array, comparator);
 
-    Set<IButton> sortedButtons = new TreeSet<IButton>(comparator);
-    sortedButtons.addAll(Arrays.asList(systemProcessButtons));
-    List<IMobileAction> actions = new LinkedList<IMobileAction>();
-    for (IButton button : sortedButtons) {
-      if (relevantSystemTypes.contains(button.getSystemType())) {
-        actions.add(ActionButtonBarUtility.convertButtonToAction(button));
+    List<IMobileAction> sortedActions = new ArrayList<IMobileAction>(array.length);
+    for (IButton scoutButton : array) {
+      if (relevantSystemTypes.contains(scoutButton.getSystemType())) {
+        try {
+          sortedActions.add(ActionButtonBarUtility.convertButtonToAction(scoutButton));
+        }
+        catch (ProcessingException e) {
+          LOG.error("could not initialize actions.", e);
+        }
       }
     }
-
-    return actions;
+    return sortedActions;
   }
 
   protected List<IMobileAction> createLeftActions() {
@@ -113,9 +122,11 @@ public class FormHeaderActionFetcher extends AbstractFormActionFetcher {
       actions.addAll(systemActions);
     }
 
-    List<IMobileAction> customActions = convertCustomProcessButtons();
-    if (customActions != null) {
-      actions.addAll(customActions);
+    try {
+      actions.addAll(convertCustomProcessButtons());
+    }
+    catch (ProcessingException e) {
+      LOG.error("could not initialze actions.", e);
     }
 
     return actions;

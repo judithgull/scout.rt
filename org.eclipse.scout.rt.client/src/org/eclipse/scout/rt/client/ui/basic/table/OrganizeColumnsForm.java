@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.scout.commons.BooleanUtility;
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.dnd.JavaTransferObject;
@@ -74,6 +75,12 @@ public class OrganizeColumnsForm extends AbstractForm {
     super(false);
     m_table = table;
     callInitializer();
+  }
+
+  @Override
+  protected void initConfig() throws ProcessingException {
+    super.initConfig();
+    getRootGroupBox().setScrollable(true);
   }
 
   @Override
@@ -283,7 +290,7 @@ public class OrganizeColumnsForm extends AbstractForm {
           try {
             getTable().setTableChanging(true);
             getTable().discardAllRows();
-            getTable().addRows(rowList.toArray(new ITableRow[rowList.size()]));
+            getTable().addRows(rowList);
           }
           finally {
             getTable().setTableChanging(false);
@@ -304,37 +311,33 @@ public class OrganizeColumnsForm extends AbstractForm {
           }
 
           @Override
-          protected TransferObject execDrag(ITableRow[] rows) throws ProcessingException {
+          protected TransferObject execDrag(List<ITableRow> rows) throws ProcessingException {
             return new JavaTransferObject(rows);
           }
 
           @Override
           protected void execDrop(ITableRow row, TransferObject transfer) throws ProcessingException {
             if (transfer != null && transfer instanceof JavaTransferObject) {
-              Object localObject = ((JavaTransferObject) transfer).getLocalObject();
-              if (localObject != null) {
-                if (localObject instanceof ITableRow[]) {
-                  ITableRow[] draggedRows = (ITableRow[]) localObject;
-                  if (draggedRows != null && draggedRows.length > 0) {
-                    ITableRow draggedRow = draggedRows[0];
-                    if (draggedRow.getRowIndex() != row.getRowIndex()) {
-                      // target row other than source row
-                      try {
-                        getTable().setTableChanging(true);
-                        if (draggedRow.getRowIndex() < row.getRowIndex()) {
-                          moveDown(draggedRow, row.getRowIndex());
-                        }
-                        else {
-                          moveUp(draggedRow, row.getRowIndex());
-                        }
-                        updateColumnVisibilityAndOrder();
-                      }
-                      finally {
-                        getTable().setTableChanging(false);
-                      }
+              List<ITableRow> draggedRows = ((JavaTransferObject) transfer).getLocalObjectAsList(ITableRow.class);
+              if (CollectionUtility.hasElements(draggedRows)) {
+                ITableRow draggedRow = CollectionUtility.firstElement(draggedRows);
+                if (draggedRow.getRowIndex() != row.getRowIndex()) {
+                  // target row other than source row
+                  try {
+                    getTable().setTableChanging(true);
+                    if (draggedRow.getRowIndex() < row.getRowIndex()) {
+                      moveDown(draggedRow, row.getRowIndex());
                     }
+                    else {
+                      moveUp(draggedRow, row.getRowIndex());
+                    }
+                    updateColumnVisibilityAndOrder();
+                  }
+                  finally {
+                    getTable().setTableChanging(false);
                   }
                 }
+
               }
             }
           }
@@ -387,7 +390,7 @@ public class OrganizeColumnsForm extends AbstractForm {
           }
 
           @Override
-          protected void execRowsSelected(ITableRow[] rows) throws ProcessingException {
+          protected void execRowsSelected(List<? extends ITableRow> rows) throws ProcessingException {
             validateButtons();
           }
 
@@ -1043,8 +1046,9 @@ public class OrganizeColumnsForm extends AbstractForm {
   }
 
   private void updateColumnVisibilityAndOrder() {
-    IColumn<?>[] visibleColumns = getColumnsTableField().getTable().getKeyColumn().getValues(getColumnsTableField().getTable().getVisibleColumn().findRows(true));
+    List<IColumn<?>> visibleColumns = getColumnsTableField().getTable().getKeyColumn().getValues(getColumnsTableField().getTable().getVisibleColumn().findRows(true));
     m_table.getColumnSet().setVisibleColumns(visibleColumns);
+    ClientUIPreferences.getInstance().setAllTableColumnPreferences(m_table);
   }
 
   private void setColumnVisible(ITableRow row, Boolean visible) throws ProcessingException {
@@ -1061,7 +1065,6 @@ public class OrganizeColumnsForm extends AbstractForm {
     if (row != null && targetIndex >= 0) {
       getColumnsTableField().getTable().moveRow(row.getRowIndex(), targetIndex);
     }
-
     updateColumnVisibilityAndOrder();
   }
 
@@ -1157,6 +1160,7 @@ public class OrganizeColumnsForm extends AbstractForm {
 
     private byte[] m_tableCustomizerData;
     private List<TableColumnState> m_oldColumns;
+    private Object[][] m_oldData;
 
     @Override
     protected void execLoad() throws ProcessingException {
@@ -1166,6 +1170,7 @@ public class OrganizeColumnsForm extends AbstractForm {
         m_tableCustomizerData = m_table.getTableCustomizer().getSerializedData();
       }
       m_oldColumns = BookmarkUtility.backupTableColumns(m_table);
+      m_oldData = m_table.getTableData();
       getColumnsTableField().reloadTableData();
     }
 
@@ -1186,14 +1191,14 @@ public class OrganizeColumnsForm extends AbstractForm {
         // revert to original state
         try {
           m_table.setTableChanging(true);
-          Object[][] tableData = m_table.getTableData();
           if (m_table.getTableCustomizer() != null) {
             m_table.getTableCustomizer().removeAllColumns();
             m_table.getTableCustomizer().setSerializedData(m_tableCustomizerData);
+            ClientUIPreferences.getInstance().setAllTableColumnPreferences(m_table);
           }
           m_table.resetColumnConfiguration();
           BookmarkUtility.restoreTableColumns(m_table, m_oldColumns);
-          m_table.addRowsByMatrix(tableData);
+          m_table.addRowsByMatrix(m_oldData);
         }
         finally {
           m_table.setTableChanging(false);

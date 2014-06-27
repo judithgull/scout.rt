@@ -11,24 +11,21 @@
 package org.eclipse.scout.rt.client.ui.form.fields.bigdecimalfield;
 
 import java.math.BigDecimal;
-import java.text.DecimalFormat;
-import java.text.NumberFormat;
-import java.text.ParsePosition;
 
-import org.eclipse.scout.commons.LocaleThreadLocal;
-import org.eclipse.scout.commons.StringUtility;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.form.fields.decimalfield.AbstractDecimalField;
-import org.eclipse.scout.rt.shared.ScoutTexts;
 import org.eclipse.scout.rt.shared.data.form.ValidationRule;
 
+@ClassId("68508a2e-690c-46e2-aa78-062e1504c0ac")
 public abstract class AbstractBigDecimalField extends AbstractDecimalField<BigDecimal> implements IBigDecimalField {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractBigDecimalField.class);
+  private static final BigDecimal DEFAULT_MIN_VALUE = new BigDecimal("-999999999999999999999999999999999999999999999999999999999999");
+  private static final BigDecimal DEFAULT_MAX_VALUE = new BigDecimal("999999999999999999999999999999999999999999999999999999999999");
 
   public AbstractBigDecimalField() {
     this(true);
@@ -41,67 +38,28 @@ public abstract class AbstractBigDecimalField extends AbstractDecimalField<BigDe
   /*
    * Configuration
    */
-  @ConfigProperty(ConfigProperty.DOUBLE)
+  @Override
+  @ConfigProperty(ConfigProperty.BIG_DECIMAL)
   @Order(300)
-  @ConfigPropertyValue("null")
   @ValidationRule(ValidationRule.MIN_VALUE)
-  protected Double getConfiguredMinValue() {
-    return null;
-  }
-
-  @ConfigProperty(ConfigProperty.DOUBLE)
-  @Order(310)
-  @ConfigPropertyValue("null")
-  @ValidationRule(ValidationRule.MAX_VALUE)
-  protected Double getConfiguredMaxValue() {
-    return null;
+  protected BigDecimal getConfiguredMinValue() {
+    return AbstractBigDecimalField.DEFAULT_MIN_VALUE;
   }
 
   @Override
-  protected void initConfig() {
-    super.initConfig();
-    setMinValue(getConfiguredMinValue() != null ? BigDecimal.valueOf(getConfiguredMinValue()) : null);
-    setMaxValue(getConfiguredMaxValue() != null ? BigDecimal.valueOf(getConfiguredMaxValue()) : null);
+  @ConfigProperty(ConfigProperty.BIG_DECIMAL)
+  @Order(310)
+  @ValidationRule(ValidationRule.MAX_VALUE)
+  protected BigDecimal getConfiguredMaxValue() {
+    return AbstractBigDecimalField.DEFAULT_MAX_VALUE;
   }
 
-  // convert string to a real long
+  /**
+   * uses {@link #parseToBigDecimalInternal(String)} to parse text
+   */
   @Override
   protected BigDecimal parseValueInternal(String text) throws ProcessingException {
-    BigDecimal retVal = null;
-    if (text == null) {
-      text = "";
-    }
-    else {
-      text = text.trim();
-    }
-    if (text.length() > 0) {
-      NumberFormat numberFormat = createNumberFormat();
-      if (isPercent()) {
-        if (text.endsWith("%")) {
-          text = StringUtility.trim(text.substring(0, text.length() - 1));
-        }
-        String suffix = "%";
-        if (numberFormat instanceof DecimalFormat) {
-          suffix = ((DecimalFormat) numberFormat).getPositiveSuffix();
-        }
-        text = StringUtility.concatenateTokens(text, suffix);
-      }
-      ParsePosition p = new ParsePosition(0);
-      Number n = numberFormat.parse(text, p);
-      if (p.getErrorIndex() >= 0 || p.getIndex() != text.length()) {
-        throw new ProcessingException(ScoutTexts.get("InvalidNumberMessageX", text));
-      }
-      NumberFormat fmt = NumberFormat.getNumberInstance(LocaleThreadLocal.get());
-      /* add/preserve fraction digits for multiplier */
-      int npc = ("" + Math.abs(getMultiplier())).length() - 1;
-      fmt.setMaximumFractionDigits(getFractionDigits() + npc);
-      p = new ParsePosition(0);
-      String fmtText = fmt.format(n.doubleValue());
-      retVal = BigDecimal.valueOf(fmt.parse(fmtText, p).doubleValue());
-      if (p.getErrorIndex() >= 0 || p.getIndex() != fmtText.length()) {
-        throw new ProcessingException(ScoutTexts.get("InvalidNumberMessageX", fmtText));
-      }
-    }
-    return retVal;
+    return parseToBigDecimalInternal(text);
   }
+
 }

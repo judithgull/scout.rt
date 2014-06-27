@@ -12,6 +12,8 @@ package org.eclipse.scout.rt.client.services.common.platform;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
 
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.core.runtime.preferences.IEclipsePreferences;
@@ -92,9 +94,9 @@ public class PlatformService extends AbstractService implements IPlatformService
       }
     }
     File f = null;
-    File[] a = new FileChooser(new File(curPath), new String[]{ext}, open).startChooser();
-    if (a != null && a.length > 0) {
-      f = a[0];
+    List<File> a = new FileChooser(new File(curPath), Collections.singletonList(ext), open).startChooser();
+    if (a.size() > 0) {
+      f = a.get(0);
     }
     //
     if (f == null) {
@@ -103,7 +105,7 @@ public class PlatformService extends AbstractService implements IPlatformService
     else if (f.isDirectory() != folderMode) {
       f = null;
     }
-    else if (f.getAbsolutePath().indexOf("*") >= 0) {
+    else if (f.getAbsolutePath().indexOf('*') >= 0) {
       f = null;
     }
     //

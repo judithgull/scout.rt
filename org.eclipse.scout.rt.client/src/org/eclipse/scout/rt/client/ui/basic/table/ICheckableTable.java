@@ -10,6 +10,8 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.basic.table;
 
+import java.util.Collection;
+
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.IBooleanColumn;
 
@@ -30,7 +32,7 @@ public interface ICheckableTable extends ITable {
   void checkRow(int row, Boolean value) throws ProcessingException;
 
   @Override
-  ITableRow[] getCheckedRows();
+  Collection<ITableRow> getCheckedRows();
 
   ITableRow getCheckedRow();
 

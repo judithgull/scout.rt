@@ -62,11 +62,6 @@ public class ScoutInfoForm extends AbstractForm {
     return ScoutTexts.get("Info");
   }
 
-  @Override
-  protected String getConfiguredDoc() {
-    return "This is the InfoForm form";
-  }
-
   public MainBox getMainBox() {
     return (MainBox) getRootGroupBox();
   }
@@ -276,7 +271,7 @@ public class ScoutInfoForm extends AbstractForm {
       ArrayList<RemoteFile> attachments = new ArrayList<RemoteFile>();
       createHtmlAttachments(attachments);
       if (attachments.size() > 0) {
-        getHtmlField().setAttachments(attachments.toArray(new RemoteFile[attachments.size()]));
+        getHtmlField().setAttachments(attachments);
       }
       StringBuffer buf = new StringBuffer();
       createHtmlBody(buf);

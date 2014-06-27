@@ -9,6 +9,7 @@
 
     Contributors:
         BSI Business Systems Integration AG - initial API and implementation
+        2014, Schweizerische Bundesbahnen SBB - ColorPicker, TristateField
  -->
 
 <plugin>
@@ -21,9 +22,6 @@
               createImmediately="false"
               factory="org.eclipse.scout.rt.client.services.ClientServiceFactory"
               ranking="-1000">
-    </service>
-    <service class="org.eclipse.scout.rt.ui.rap.services.common.patchedclass.PatchedClassService"
-             createImmediately="true">
     </service>
   </extension>
 
@@ -85,8 +83,8 @@
       </formField>
       <formField
             active="true"
-            modelClass="org.eclipse.scout.rt.client.ui.form.fields.smartfield.ISmartField"
-            name="Smart field"
+            modelClass="org.eclipse.scout.rt.client.ui.form.fields.smartfield.IContentAssistField"
+            name="Content Assist Field"
             scope="default">
             <uiClass
               class="org.eclipse.scout.rt.ui.rap.form.fields.smartfield.RwtScoutSmartField">
@@ -144,15 +142,6 @@
             scope="default">
             <uiClass
               class="org.eclipse.scout.rt.ui.rap.form.fields.checkbox.RwtScoutCheckbox">
-            </uiClass>
-      </formField>
-      <formField
-            active="true"
-            modelClass="org.eclipse.scout.rt.client.ui.form.fields.decimalfield.IDecimalField"
-            name="Decimal field"
-            scope="default">
-            <uiClass
-              class="org.eclipse.scout.rt.ui.rap.form.fields.decimalfield.RwtScoutDecimalField">
             </uiClass>
       </formField>
       <formField
@@ -271,6 +260,15 @@
               class="org.eclipse.scout.rt.ui.rap.form.fields.composer.RwtScoutComposerField">
         </uiClass>
       </formField>
+      <formField
+            active="true"
+            modelClass="org.eclipse.scout.rt.client.ui.form.fields.colorpickerfield.IColorField"
+            name="Color field"
+            scope="default">
+            <uiClass
+              class="org.eclipse.scout.rt.ui.rap.form.fields.colorpickerfield.RwtScoutColorField">
+            </uiClass>
+      </formField>
   </extension>
   <extension
         point="org.eclipse.scout.rt.ui.rap.lookAndFeel">
@@ -327,7 +325,7 @@
               value="250">
         </property>
         <property
-              name="color.forground.disabled"
+              name="color.foreground.disabled"
               value="2A5A76">
         </property>
         <property
@@ -366,14 +364,14 @@
       </filter>
   </extension>
 
-  <extension point="org.eclipse.scout.http.servletfilter.filters">
-    <filter aliases="/" class="org.eclipse.scout.http.servletfilter.helper.DevelopmentAuthFilter" ranking="1000000">
+  <extension point="org.eclipse.scout.rt.server.commons.filters">
+    <filter aliases="/" class="org.eclipse.scout.rt.server.commons.servletfilter.helper.DevelopmentAuthFilter" ranking="1000000">
        <init-param
              name="active"
              value="true">
        </init-param>
     </filter>
-    <filter aliases="/" class="org.eclipse.scout.http.servletfilter.helper.HttpAuthJaasFilter" ranking="1000010">
+    <filter aliases="/" class="org.eclipse.scout.rt.server.commons.servletfilter.helper.HttpAuthJaasFilter" ranking="1000010">
        <init-param
              name="active"
              value="true">

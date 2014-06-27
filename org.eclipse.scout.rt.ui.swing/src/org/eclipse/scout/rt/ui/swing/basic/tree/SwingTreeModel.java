@@ -4,7 +4,7 @@
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- * 
+ *
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
@@ -13,6 +13,7 @@ package org.eclipse.scout.rt.ui.swing.basic.tree;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EventListener;
+import java.util.List;
 import java.util.WeakHashMap;
 
 import javax.swing.event.EventListenerList;
@@ -21,6 +22,7 @@ import javax.swing.event.TreeModelListener;
 import javax.swing.tree.TreeModel;
 import javax.swing.tree.TreePath;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
@@ -31,7 +33,7 @@ public class SwingTreeModel implements TreeModel {
   private EventListenerList m_listenerList = new EventListenerList();
   private SwingScoutTree m_swingScoutTree;
   // cache
-  private WeakHashMap<Object, Object[]> m_childMap;
+  private WeakHashMap<Object, List<ITreeNode>> m_childMap;
   private WeakHashMap<Object, Integer> m_childIndexMap;
 
   public SwingTreeModel(SwingScoutTree swingScoutTree) {
@@ -40,24 +42,24 @@ public class SwingTreeModel implements TreeModel {
   }
 
   private void clearCache() {
-    m_childMap = new WeakHashMap<Object, Object[]>();
+    m_childMap = new WeakHashMap<Object, List<ITreeNode>>();
     m_childIndexMap = new WeakHashMap<Object, Integer>();
   }
 
-  private Object[] getCachedChildren(Object parent) {
-    Object[] children = m_childMap.get(parent);
-    if (children == null || children.length == 0) {
+  private List<ITreeNode> getCachedChildren(ITreeNode parent) {
+    List<ITreeNode> children = m_childMap.get(parent);
+    if (!CollectionUtility.hasElements(children)) {
       ITreeNode scoutNode = (ITreeNode) parent;
       children = scoutNode.getFilteredChildNodes();
       m_childMap.put(parent, children);
-      for (int i = 0; i < children.length; i++) {
-        m_childIndexMap.put(children[i], i);
+      for (int i = 0; i < children.size(); i++) {
+        m_childIndexMap.put(children.get(i), i);
       }
     }
-    return children;
+    return CollectionUtility.arrayList(children);
   }
 
-  private int getCachedChildIndex(Object parent, Object child) {
+  private int getCachedChildIndex(ITreeNode parent, ITreeNode child) {
     getCachedChildren(parent);
     Integer index = m_childIndexMap.get(child);
     return index != null ? index.intValue() : -1;
@@ -84,14 +86,18 @@ public class SwingTreeModel implements TreeModel {
 
   @Override
   public int getChildCount(Object parent) {
-    return getCachedChildren(parent).length;
+    List<ITreeNode> cachedChildren = getCachedChildren((ITreeNode) parent);
+    if (cachedChildren != null) {
+      return cachedChildren.size();
+    }
+    return 0;
   }
 
   @Override
   public Object getChild(Object parent, int index) {
-    Object[] cachedChildren = getCachedChildren(parent);
-    if (cachedChildren != null && cachedChildren.length > index) {
-      return cachedChildren[index];
+    List<ITreeNode> cachedChildren = getCachedChildren((ITreeNode) parent);
+    if (cachedChildren != null && cachedChildren.size() > index) {
+      return cachedChildren.get(index);
     }
     return null;
   }
@@ -103,7 +109,7 @@ public class SwingTreeModel implements TreeModel {
 
   @Override
   public int getIndexOfChild(Object parent, Object child) {
-    return getCachedChildIndex(parent, child);
+    return getCachedChildIndex((ITreeNode) parent, (ITreeNode) child);
   }
 
   @Override
@@ -116,33 +122,39 @@ public class SwingTreeModel implements TreeModel {
     m_listenerList.remove(TreeModelListener.class, l);
   }
 
-  protected void fireTreeNodesChanged(ITreeNode scoutParent, ITreeNode[] scoutChildren) {
+  /**
+   * @param scoutParent
+   * @param scoutChildren
+   *          If <code>scoutParam</code> is the root node, <code>scoutChildren</code> can be null to indicate the root
+   *          node has changed
+   */
+  protected void fireTreeNodesChanged(ITreeNode scoutParent, List<ITreeNode> scoutChildren) {
     clearCache();
     EventListener[] listeners = m_listenerList.getListeners(TreeModelListener.class);
     if (listeners != null && listeners.length > 0) {
-      TreeModelEvent e = new TreeModelEvent(this, SwingScoutTree.scoutNodeToTreePath(scoutParent), scoutNodesToSwingIndexes(scoutParent, scoutChildren), scoutChildren);
+      TreeModelEvent e = new TreeModelEvent(this, SwingScoutTree.scoutNodeToTreePath(scoutParent), scoutNodesToSwingIndexes(scoutParent, scoutChildren), (scoutChildren != null) ? scoutChildren.toArray() : null);
       for (int i = 0; i < listeners.length; i++) {
         ((TreeModelListener) listeners[i]).treeNodesChanged(e);
       }
     }
   }
 
-  protected void fireTreeNodesInserted(ITreeNode scoutParent, ITreeNode[] scoutChildren) {
+  protected void fireTreeNodesInserted(ITreeNode scoutParent, List<ITreeNode> scoutChildren) {
     clearCache();
     EventListener[] listeners = m_listenerList.getListeners(TreeModelListener.class);
     if (listeners != null && listeners.length > 0) {
-      TreeModelEvent e = new TreeModelEvent(this, SwingScoutTree.scoutNodeToTreePath(scoutParent), scoutNodesToSwingIndexes(scoutParent, scoutChildren), scoutChildren);
+      TreeModelEvent e = new TreeModelEvent(this, SwingScoutTree.scoutNodeToTreePath(scoutParent), scoutNodesToSwingIndexes(scoutParent, scoutChildren), scoutChildren.toArray());
       for (int i = 0; i < listeners.length; i++) {
         ((TreeModelListener) listeners[i]).treeNodesInserted(e);
       }
     }
   }
 
-  protected void fireTreeNodesRemoved(ITreeNode scoutParent, ITreeNode[] scoutChildren) {
+  protected void fireTreeNodesRemoved(ITreeNode scoutParent, List<ITreeNode> scoutChildren) {
     clearCache();
     EventListener[] listeners = m_listenerList.getListeners(TreeModelListener.class);
     if (listeners != null && listeners.length > 0) {
-      TreeModelEvent e = new TreeModelEvent(this, SwingScoutTree.scoutNodeToTreePath(scoutParent), scoutNodesToSwingIndexes(scoutParent, scoutChildren), scoutChildren);
+      TreeModelEvent e = new TreeModelEvent(this, SwingScoutTree.scoutNodeToTreePath(scoutParent), scoutNodesToSwingIndexes(scoutParent, scoutChildren), scoutChildren.toArray());
       for (int i = 0; i < listeners.length; i++) {
         ((TreeModelListener) listeners[i]).treeNodesRemoved(e);
       }
@@ -160,12 +172,12 @@ public class SwingTreeModel implements TreeModel {
     }
   }
 
-  public int[] scoutNodesToSwingIndexes(Object scoutParent, Object[] scoutChildren) {
-    if (scoutChildren == null || scoutChildren.length == 0) {
+  public int[] scoutNodesToSwingIndexes(ITreeNode scoutParent, List<ITreeNode> scoutChildren) {
+    if (!CollectionUtility.hasElements(scoutChildren)) {
       return new int[0];
     }
-    ArrayList<Integer> indexList = new ArrayList<Integer>(scoutChildren.length);
-    for (Object scoutChild : scoutChildren) {
+    List<Integer> indexList = new ArrayList<Integer>(scoutChildren.size());
+    for (ITreeNode scoutChild : scoutChildren) {
       int i = getCachedChildIndex(scoutParent, scoutChild);
       if (i >= 0) {
         indexList.add(i);
@@ -177,6 +189,26 @@ public class SwingTreeModel implements TreeModel {
     }
     Arrays.sort(a);
     return a;
+  }
+
+  /**
+   * Updates the given node.
+   * 
+   * @since 3.10.0-M5
+   */
+  public void updateNode(ITreeNode node) {
+    if (node != null) {
+      /**
+       * To indicate the root has changed, childIndices and children will be null
+       * http://docs.oracle.com/javase/7/docs/api/javax/swing/event/TreeModelListener.html
+       */
+      if (node.getParentNode() == null) {
+        fireTreeNodesChanged(node, null);
+      }
+      else {
+        fireTreeNodesChanged(node.getParentNode(), CollectionUtility.arrayList(node));
+      }
+    }
   }
 
 }

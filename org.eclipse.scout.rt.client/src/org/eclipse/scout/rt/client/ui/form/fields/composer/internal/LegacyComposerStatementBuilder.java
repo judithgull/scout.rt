@@ -4,15 +4,17 @@
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- * 
+ *
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.form.fields.composer.internal;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.StringUtility.ITagProcessor;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
@@ -24,7 +26,7 @@ import org.eclipse.scout.rt.client.ui.form.fields.composer.node.EntityNode;
 import org.eclipse.scout.rt.shared.services.common.jdbc.LegacySearchFilter;
 
 /**
- * @deprecated processing logic belongs to server
+ * @deprecated processing logic belongs to server. Will be removed in the M-Release.
  */
 @Deprecated
 @SuppressWarnings("deprecation")
@@ -48,7 +50,8 @@ public class LegacyComposerStatementBuilder {
     return new LegacySearchFilter.ComposerConstraint(s, m_attributeRefMap);
   }
 
-  private String visitAndNodes(ITreeNode[] nodes) {
+  private String visitAndNodes(List<? extends ITreeNode> nodeList) {
+    ITreeNode[] nodes = nodeList.toArray(new ITreeNode[nodeList.size()]);
     StringBuilder buf = new StringBuilder();
     int count = 0;
     int i = 0;
@@ -171,7 +174,7 @@ public class LegacyComposerStatementBuilder {
     if (!stm.equals(originalStatement)) {
       // the attribute was of the form: P.PNAME = #S# (contains references to S)
       // this is legacy and is not supported for attribute decoration
-      m_bindMap.put(bindTranslationTable.get("S"), node.getValues() != null && node.getValues().length > 0 ? node.getValues()[0] : null);
+      m_bindMap.put(bindTranslationTable.get("S"), CollectionUtility.firstElement(node.getValues()));
       return stm;
     }
     else {
@@ -187,7 +190,7 @@ public class LegacyComposerStatementBuilder {
         @Override
         public String processTag(String tagName, String attribute) {
           String key = "${attribute" + getNextBindSeqNo() + "}";
-          m_attributeRefMap.put(key, new LegacySearchFilter.ComposerAttributeRef(node.getOp().getOperator(), attribute, bindTranslationTable.get("S"), node.getValues() != null && node.getValues().length > 0 ? node.getValues()[0] : null));
+          m_attributeRefMap.put(key, new LegacySearchFilter.ComposerAttributeRef(node.getOp().getOperator(), attribute, bindTranslationTable.get("S"), CollectionUtility.firstElement(node.getValues())));
           return key;
         }
       };

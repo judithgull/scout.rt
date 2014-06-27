@@ -13,12 +13,15 @@ package org.eclipse.scout.rt.extension.client.ui.desktop.internal;
 import java.beans.PropertyChangeListener;
 import java.security.Permission;
 import java.util.List;
+import java.util.Set;
 
+import org.eclipse.scout.commons.ITypeWithClassId;
 import org.eclipse.scout.commons.annotations.IOrdered;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.ui.action.IActionUIFacade;
 import org.eclipse.scout.rt.client.ui.action.IActionVisitor;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.IMenuType;
 import org.eclipse.scout.rt.extension.client.IWrappedObject;
 
 /**
@@ -44,6 +47,11 @@ public class OrderedMenuWrapper implements IMenu, IOrdered, IWrappedObject<IMenu
   @Override
   public IMenu getWrappedObject() {
     return m_menu;
+  }
+
+  @Override
+  public void initAction() throws ProcessingException {
+    m_menu.initAction();
   }
 
   @Override
@@ -87,6 +95,11 @@ public class OrderedMenuWrapper implements IMenu, IOrdered, IWrappedObject<IMenu
   }
 
   @Override
+  public Set<IMenuType> getMenuTypes() {
+    return m_menu.getMenuTypes();
+  }
+
+  @Override
   public boolean hasChildActions() {
     return m_menu.hasChildActions();
   }
@@ -102,8 +115,28 @@ public class OrderedMenuWrapper implements IMenu, IOrdered, IWrappedObject<IMenu
   }
 
   @Override
-  public void setChildActions(List<IMenu> newList) {
+  public void setChildActions(List<? extends IMenu> newList) {
     m_menu.setChildActions(newList);
+  }
+
+  @Override
+  public void addChildAction(IMenu action) {
+    m_menu.addChildAction(action);
+  }
+
+  @Override
+  public void addChildActions(List<? extends IMenu> actionList) {
+    m_menu.addChildActions(actionList);
+  }
+
+  @Override
+  public void removeChildAction(IMenu action) {
+    m_menu.removeChildAction(action);
+  }
+
+  @Override
+  public void removeChildActions(List<? extends IMenu> actionList) {
+    m_menu.removeChildActions(actionList);
   }
 
   @Override
@@ -144,6 +177,11 @@ public class OrderedMenuWrapper implements IMenu, IOrdered, IWrappedObject<IMenu
   @Override
   public String getText() {
     return m_menu.getText();
+  }
+
+  @Override
+  public String getTextWithMnemonic() {
+    return m_menu.getTextWithMnemonic();
   }
 
   @Override
@@ -251,31 +289,43 @@ public class OrderedMenuWrapper implements IMenu, IOrdered, IWrappedObject<IMenu
     m_menu.setVisibleGranted(b);
   }
 
+  @SuppressWarnings("deprecation")
+  @Deprecated
   @Override
   public boolean isSingleSelectionAction() {
     return m_menu.isSingleSelectionAction();
   }
 
+  @SuppressWarnings("deprecation")
+  @Deprecated
   @Override
   public void setSingleSelectionAction(boolean b) {
     m_menu.setSingleSelectionAction(b);
   }
 
+  @SuppressWarnings("deprecation")
+  @Deprecated
   @Override
   public boolean isMultiSelectionAction() {
     return m_menu.isMultiSelectionAction();
   }
 
+  @SuppressWarnings("deprecation")
+  @Deprecated
   @Override
   public void setMultiSelectionAction(boolean b) {
     m_menu.setMultiSelectionAction(b);
   }
 
+  @SuppressWarnings("deprecation")
+  @Deprecated
   @Override
   public boolean isEmptySpaceAction() {
     return m_menu.isEmptySpaceAction();
   }
 
+  @SuppressWarnings("deprecation")
+  @Deprecated
   @Override
   public void setEmptySpaceAction(boolean b) {
     m_menu.setEmptySpaceAction(b);
@@ -296,6 +346,13 @@ public class OrderedMenuWrapper implements IMenu, IOrdered, IWrappedObject<IMenu
     return m_menu.getMnemonic();
   }
 
+  @Override
+  public void aboutToShow() {
+    m_menu.aboutToShow();
+  }
+
+  @SuppressWarnings("deprecation")
+  @Deprecated
   @Override
   public void prepareAction() {
     m_menu.prepareAction();
@@ -320,4 +377,25 @@ public class OrderedMenuWrapper implements IMenu, IOrdered, IWrappedObject<IMenu
   public boolean isThisAndParentsVisible() {
     return m_menu.isThisAndParentsVisible();
   }
+
+  @Override
+  public String classId() {
+    return m_menu.classId();
+  }
+
+  @Override
+  public ITypeWithClassId getContainer() {
+    return m_menu.getContainer();
+  }
+
+  @Override
+  public void setContainerInternal(ITypeWithClassId container) {
+    m_menu.setContainerInternal(container);
+  }
+
+  @Override
+  public void handleOwnerValueChanged(Object newValue) throws ProcessingException {
+    m_menu.handleOwnerValueChanged(newValue);
+  }
+
 }

@@ -4,13 +4,15 @@
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- * 
+ *
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
 package org.eclipse.scout.rt.server.services.common.code;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.holders.Holder;
@@ -35,14 +37,15 @@ public class CodeTypeCache {
   public CodeTypeCache() {
   }
 
-  public ICodeType findCodeTypeById(Object id) {
+  @SuppressWarnings("unchecked")
+  public <T> ICodeType<T, ?> findCodeTypeById(T id) {
     if (id == null) {
       return null;
     }
     synchronized (m_cacheLock) {
-      for (ICodeType ct : m_cache.values()) {
+      for (ICodeType<?, ?> ct : m_cache.values()) {
         if (id.equals(ct.getId())) {
-          return ct;
+          return (ICodeType<T, ?>) ct;
         }
       }
     }
@@ -59,24 +62,23 @@ public class CodeTypeCache {
           m_cache.put(type, instance);
         }
         catch (Throwable t) {
-          SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("create " + type.getName(), t));
+          SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + type.getName() + "'.", t));
         }
       }
       return instance;
     }
   }
 
-  @SuppressWarnings("unchecked")
-  public ICodeType[] getCodeTypes(Class... types) {
-    ICodeType[] instances = new ICodeType[types.length];
-    for (int i = 0; i < instances.length; i++) {
-      instances[i] = getCodeType(types[i]);
+  public List<ICodeType<?, ?>> getCodeTypes(List<Class<? extends ICodeType<?, ?>>> types) {
+    List<ICodeType<?, ?>> instances = new ArrayList<ICodeType<?, ?>>(types.size());
+    for (Class<? extends ICodeType<?, ?>> codeTypeClazz : types) {
+      instances.add(getCodeType(codeTypeClazz));
     }
     return instances;
   }
 
   @SuppressWarnings("unchecked")
-  public <T extends ICode> T getCode(final Class<T> type) {
+  public <CODE_ID_TYPE, CODE extends ICode<CODE_ID_TYPE>> CODE getCode(final Class<CODE> type) {
     if (type == null) {
       return null;
     }
@@ -94,14 +96,14 @@ public class CodeTypeCache {
         declaringCodeTypeClass = type.newInstance().getCodeType().getClass();
       }
       catch (Throwable t) {
-        LOG.error("find code " + type, t);
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + type.getName() + "'.", t));
       }
     }
-    ICodeType codeType = getCodeType(declaringCodeTypeClass);
-    final Holder<ICode> codeHolder = new Holder<ICode>(ICode.class);
-    ICodeVisitor v = new ICodeVisitor() {
+    ICodeType<?, CODE_ID_TYPE> codeType = getCodeType(declaringCodeTypeClass);
+    final Holder<ICode<CODE_ID_TYPE>> codeHolder = new Holder<ICode<CODE_ID_TYPE>>();
+    ICodeVisitor<ICode<CODE_ID_TYPE>> v = new ICodeVisitor<ICode<CODE_ID_TYPE>>() {
       @Override
-      public boolean visit(ICode code, int treeLevel) {
+      public boolean visit(ICode<CODE_ID_TYPE> code, int treeLevel) {
         if (code.getClass() == type) {
           codeHolder.setValue(code);
           return false;
@@ -110,23 +112,25 @@ public class CodeTypeCache {
       }
     };
     codeType.visit(v);
-    return (T) codeHolder.getValue();
+    return (CODE) codeHolder.getValue();
   }
 
-  public <T extends ICodeType> T reloadCodeType(Class<T> type) {
-    unloadCodeTypes(new Class[]{type});
+  public <T extends ICodeType<?, ?>> T reloadCodeType(Class<T> type) {
+    List<Class<? extends ICodeType<?, ?>>> codeTypeList = new ArrayList<Class<? extends ICodeType<?, ?>>>(1);
+    codeTypeList.add(type);
+    unloadCodeTypes(codeTypeList);
     return getCodeType(type);
   }
 
-  public ICodeType[] reloadCodeTypes(Class... types) {
+  public List<ICodeType<?, ?>> reloadCodeTypes(List<Class<? extends ICodeType<?, ?>>> types) {
     unloadCodeTypes(types);
     return getCodeTypes(types);
   }
 
-  protected void unloadCodeTypes(Class[] types) {
+  protected void unloadCodeTypes(List<Class<? extends ICodeType<?, ?>>> types) {
     synchronized (m_cacheLock) {
-      for (int i = 0; i < types.length; i++) {
-        m_cache.remove(types[i]);
+      for (Class<? extends ICodeType<?, ?>> codeTypeClazz : types) {
+        m_cache.remove(codeTypeClazz);
       }
     }
   }

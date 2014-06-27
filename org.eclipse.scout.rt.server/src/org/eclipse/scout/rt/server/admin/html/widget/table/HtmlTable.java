@@ -4,7 +4,7 @@
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- * 
+ *
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.TreeMap;
 
 import org.eclipse.scout.commons.CompositeObject;
+import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.rt.server.admin.html.AbstractHtmlAction;
 
 public class HtmlTable extends HtmlComponent {
@@ -50,6 +51,8 @@ public class HtmlTable extends HtmlComponent {
       sortId = m_tableId + ".sortCol." + columnIndex;
     }
     startLinkAction(new AbstractHtmlAction(sortId) {
+      private static final long serialVersionUID = -4385730186131757304L;
+
       @Override
       public void run() {
         if (m_sortInfo.getColumnIndex() == columnIndex) {
@@ -64,7 +67,7 @@ public class HtmlTable extends HtmlComponent {
     if (m_sortInfo.getColumnIndex() == columnIndex) {
       out.print("<b>");
     }
-    if (content == null || content.trim().length() == 0) {
+    if (!StringUtility.hasText(content)) {
       out.print("&nbsp;");
     }
     else {

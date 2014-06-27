@@ -10,7 +10,11 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.ui.rap.mobile.window;
 
-import org.eclipse.scout.commons.StringUtility;
+import org.eclipse.scout.rt.client.ui.desktop.IUrlTarget;
+import org.eclipse.scout.rt.client.ui.desktop.UrlTarget;
+import org.eclipse.scout.rt.ui.rap.util.BrowserInfo;
+import org.eclipse.scout.rt.ui.rap.util.BrowserInfo.System;
+import org.eclipse.scout.rt.ui.rap.util.RwtUtility;
 import org.eclipse.scout.rt.ui.rap.window.BrowserWindowHandler;
 
 /**
@@ -19,25 +23,22 @@ import org.eclipse.scout.rt.ui.rap.window.BrowserWindowHandler;
 public class MobileBrowserWindowHandler extends BrowserWindowHandler {
 
   @Override
-  public void openLink(String link) {
+  protected IUrlTarget computeTargetAuto(String link) {
     if (link == null) {
-      return;
+      return super.computeTargetAuto(link);
     }
 
+    BrowserInfo browserInfo = RwtUtility.getBrowserInfo();
+    if (System.IOS.equals(browserInfo.getSystem()) && browserInfo.isStandalone()) {
+      //Home screen mode blocks popups, even though popups are enabled, see https://bugs.eclipse.org/bugs/show_bug.cgi?id=427802
+      return UrlTarget.SELF;
+    }
     if (isMapsLink(link)) {
-      //Open the link in the same browser window to open the maps app. Otherwise the popup gets blocked without notice.
-      openLinkInSameBrowserWindow(link);
-    }
-    else {
-      super.openLink(link);
-    }
-  }
-
-  public boolean isMapsLink(String link) {
-    if ((StringUtility.find(link, "http://maps.google.com") >= 0) || (StringUtility.find(link, "https://maps.google.com") >= 0)) {
-      return true;
+      //Open the link in the same browser window to open the maps app without using a popup.
+      return UrlTarget.SELF;
     }
 
-    return false;
+    return super.computeTargetAuto(link);
   }
+
 }

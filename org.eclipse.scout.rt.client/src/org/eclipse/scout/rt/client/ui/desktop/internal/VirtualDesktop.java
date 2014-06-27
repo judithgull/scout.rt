@@ -11,9 +11,12 @@
 package org.eclipse.scout.rt.client.ui.desktop.internal;
 
 import java.beans.PropertyChangeListener;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.eclipse.scout.commons.EventListenerList;
 import org.eclipse.scout.commons.exception.IProcessingStatus;
@@ -32,6 +35,7 @@ import org.eclipse.scout.rt.client.ui.basic.table.ITable;
 import org.eclipse.scout.rt.client.ui.desktop.DesktopListener;
 import org.eclipse.scout.rt.client.ui.desktop.IDesktop;
 import org.eclipse.scout.rt.client.ui.desktop.IDesktopUIFacade;
+import org.eclipse.scout.rt.client.ui.desktop.IUrlTarget;
 import org.eclipse.scout.rt.client.ui.desktop.outline.IOutline;
 import org.eclipse.scout.rt.client.ui.desktop.outline.IOutlineTableForm;
 import org.eclipse.scout.rt.client.ui.desktop.outline.pages.IPage;
@@ -225,6 +229,17 @@ public class VirtualDesktop implements IDesktop {
   }
 
   @Override
+  public void openUrlInBrowser(String url) {
+    throw createUnsupportedOperationException();
+  }
+
+  @Override
+  public void openUrlInBrowser(String url, IUrlTarget target) {
+    throw createUnsupportedOperationException();
+  }
+
+  @SuppressWarnings("deprecation")
+  @Override
   public void openBrowserWindow(String path) {
     throw createUnsupportedOperationException();
   }
@@ -280,7 +295,7 @@ public class VirtualDesktop implements IDesktop {
   }
 
   @Override
-  public <T extends IForm> T[] findForms(Class<T> formType) {
+  public <T extends IForm> List<T> findForms(Class<T> formType) {
     throw createUnsupportedOperationException();
   }
 
@@ -310,17 +325,17 @@ public class VirtualDesktop implements IDesktop {
   }
 
   @Override
-  public IOutline[] getAvailableOutlines() {
+  public List<IOutline> getAvailableOutlines() {
     throw createUnsupportedOperationException();
   }
 
   @Override
-  public void setAvailableOutlines(IOutline[] availableOutlines) {
+  public void setAvailableOutlines(List<? extends IOutline> availableOutlines) {
     throw createUnsupportedOperationException();
   }
 
   @Override
-  public IForm[] getDialogStack() {
+  public List<IForm> getDialogStack() {
     throw createUnsupportedOperationException();
   }
 
@@ -330,12 +345,12 @@ public class VirtualDesktop implements IDesktop {
   }
 
   @Override
-  public IKeyStroke[] getKeyStrokes() {
+  public Set<IKeyStroke> getKeyStrokes() {
     throw createUnsupportedOperationException();
   }
 
   @Override
-  public IMenu[] getMenus() {
+  public List<IMenu> getMenus() {
     throw createUnsupportedOperationException();
   }
 
@@ -345,7 +360,7 @@ public class VirtualDesktop implements IDesktop {
   }
 
   @Override
-  public IMessageBox[] getMessageBoxStack() {
+  public List<IMessageBox> getMessageBoxStack() {
     throw createUnsupportedOperationException();
   }
 
@@ -405,7 +420,7 @@ public class VirtualDesktop implements IDesktop {
   }
 
   @Override
-  public IForm[] getSimilarViewForms(IForm form) {
+  public List<IForm> getSimilarViewForms(IForm form) {
     throw createUnsupportedOperationException();
   }
 
@@ -420,17 +435,17 @@ public class VirtualDesktop implements IDesktop {
   }
 
   @Override
-  public IAction[] getActions() {
+  public List<IAction> getActions() {
     throw createUnsupportedOperationException();
   }
 
   @Override
-  public IViewButton[] getViewButtons() {
+  public List<IViewButton> getViewButtons() {
     throw createUnsupportedOperationException();
   }
 
   @Override
-  public IToolButton[] getToolButtons() {
+  public List<IToolButton> getToolButtons() {
     throw createUnsupportedOperationException();
   }
 
@@ -440,7 +455,7 @@ public class VirtualDesktop implements IDesktop {
   }
 
   @Override
-  public IForm[] getViewStack() {
+  public List<IForm> getViewStack() {
     throw createUnsupportedOperationException();
   }
 
@@ -471,6 +486,11 @@ public class VirtualDesktop implements IDesktop {
   }
 
   @Override
+  public void refreshPages(List<Class<? extends IPage>> pages) {
+    throw createUnsupportedOperationException();
+  }
+
+  @Override
   public void refreshPages(Class... pageTypes) {
     throw createUnsupportedOperationException();
   }
@@ -496,7 +516,7 @@ public class VirtualDesktop implements IDesktop {
   }
 
   @Override
-  public void setKeyStrokes(IKeyStroke[] ks) {
+  public void setKeyStrokes(Collection<? extends IKeyStroke> ks) {
     throw createUnsupportedOperationException();
   }
 
@@ -533,6 +553,19 @@ public class VirtualDesktop implements IDesktop {
   @Override
   public boolean doBeforeClosingInternal() {
     throw createUnsupportedOperationException();
+  }
+
+  @Override
+  public void traverseFocusNext() {
+  }
+
+  @Override
+  public void traverseFocusPrevious() {
+  }
+
+  @Override
+  public List<IForm> getUnsavedForms() {
+    return null;
   }
 
 }

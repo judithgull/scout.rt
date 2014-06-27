@@ -308,7 +308,7 @@ public abstract class AbstractSqlStyle implements ISqlStyle, ISqlStyle2 {
     else if (Clob.class.isAssignableFrom(c)) {
       return new SqlBind(Types.CLOB, o);
     }
-    else if (c.isArray()) {
+    else if (c != null && c.isArray()) {
       return new SqlBind(Types.ARRAY, o);
     }
     else {
@@ -415,15 +415,7 @@ public abstract class AbstractSqlStyle implements ISqlStyle, ISqlStyle2 {
     // General Number
       case Types.DECIMAL:
       case Types.NUMERIC: {
-        BigDecimal bd = rs.getBigDecimal(jdbcBindIndex);
-        if (bd != null) {
-          if (bd.scale() == 0) {
-            o = new Long(bd.longValue());
-          }
-          else {
-            o = new Double(bd.doubleValue());
-          }
-        }
+        o = getConfiguredDecimalConversionStrategy().convertDecimalType(rs.getBigDecimal(jdbcBindIndex));
         break;
       }
       // Long
@@ -619,7 +611,7 @@ public abstract class AbstractSqlStyle implements ISqlStyle, ISqlStyle2 {
 
   @Override
   public String createDateTimeBetween(String attribute, String bindName1, String bindName2) {
-    return attribute + " BETWEEN TRUNC(" + adaptBindNameTimeDateOp(bindName1) + ",'MI') AND (TRUNC(" + adaptBindNameTimeDateOp(bindName2) + ",'MI')+(59/1440)) ";
+    return attribute + " BETWEEN TRUNC(" + adaptBindNameTimeDateOp(bindName1) + ",'MI') AND (TRUNC(" + adaptBindNameTimeDateOp(bindName2) + ",'MI')+(59/86400)) ";
   }
 
   @Override
@@ -904,7 +896,7 @@ public abstract class AbstractSqlStyle implements ISqlStyle, ISqlStyle2 {
 
   @Override
   public String createDateTimeLE(String attribute, String bindName) {
-    return attribute + "<=(TRUNC(" + adaptBindNameTimeDateOp(bindName) + ",'MI')+(59/1440))";
+    return attribute + "<=(TRUNC(" + adaptBindNameTimeDateOp(bindName) + ",'MI')+(59/86400))";
   }
 
   @Override
@@ -1060,4 +1052,45 @@ public abstract class AbstractSqlStyle implements ISqlStyle, ISqlStyle2 {
   @Override
   public void rollback() {
   }
+
+  /**
+   * Gets the strategy to convert a decimal / numeric DB type into a data type in Java.
+   * <code>DecimalConversion.NONE</code> means that nothing is converted. <code>DecimalConversion.LEGACY</code> means
+   * that the old implementation (prior to Scout 3.10.0-M2) will be used: Numeric / decimal types without a scale are
+   * converted to <code>java.lang.Long</code>, with a scale they are converted to <code>java.lang.Double</code>.
+   * By default <code>DecimalConversion.NONE</code> will be returned.
+   * 
+   * @since 3.10.0-M2
+   * @return strategy for the decimal conversion
+   */
+  protected DecimalConversion getConfiguredDecimalConversionStrategy() {
+    return DecimalConversion.NONE;
+  }
+
+  /**
+   * @since 3.10.0-M2
+   */
+  public enum DecimalConversion {
+    NONE {
+      @Override
+      public Object convertDecimalType(BigDecimal bd) {
+        return bd;
+      }
+    },
+    LEGACY {
+      @Override
+      public Object convertDecimalType(BigDecimal bd) {
+        if (bd == null) {
+          return null;
+        }
+        if (bd.scale() == 0) {
+          return bd.longValue();
+        }
+        return bd.doubleValue();
+      }
+    };
+
+    public abstract Object convertDecimalType(BigDecimal bd);
+  }
+
 }

@@ -25,7 +25,8 @@ import javax.servlet.http.HttpServletResponse;
 import org.eclipse.core.runtime.Path;
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.scout.commons.FileUtility;
-import org.eclipse.scout.http.servletfilter.HttpServletEx;
+import org.eclipse.scout.commons.StringUtility;
+import org.eclipse.scout.rt.server.commons.servletfilter.HttpServletEx;
 import org.osgi.framework.Bundle;
 
 /**
@@ -64,7 +65,7 @@ public class ResourceServlet extends HttpServletEx {
     if (m_warPath == null) {
       m_warPath = config.getInitParameter("war-path"); //$NON-NLS-1$
     }
-    if (m_warPath == null || m_warPath.trim().length() == 0) {
+    if (!StringUtility.hasText(m_warPath)) {
       m_warPath = null;
     }
     if (m_warPath != null && m_warPath.endsWith("/")) {
@@ -72,12 +73,12 @@ public class ResourceServlet extends HttpServletEx {
     }
     //
     m_bundleName = config.getInitParameter("bundle-name"); //$NON-NLS-1$
-    if (m_bundleName == null || m_bundleName.trim().length() == 0) {
+    if (!StringUtility.hasText(m_bundleName)) {
       m_bundleName = null;
     }
     //
     m_bundlePath = config.getInitParameter("bundle-path"); //$NON-NLS-1$
-    if (m_bundlePath == null || m_bundlePath.trim().length() == 0) {
+    if (!StringUtility.hasText(m_bundlePath)) {
       m_bundlePath = null;
     }
     if (m_bundlePath != null && m_bundlePath.endsWith("/")) {
@@ -182,7 +183,7 @@ public class ResourceServlet extends HttpServletEx {
   protected int setResponseParameters(final HttpServletRequest req, final HttpServletResponse resp, String contentType, long lastModified, int contentLength) {
     String etag = null;
     if (lastModified != -1 && contentLength != -1)
-     {
+    {
       etag = "W/\"" + contentLength + "-" + lastModified + "\""; //$NON-NLS-1$//$NON-NLS-2$//$NON-NLS-3$
     }
 

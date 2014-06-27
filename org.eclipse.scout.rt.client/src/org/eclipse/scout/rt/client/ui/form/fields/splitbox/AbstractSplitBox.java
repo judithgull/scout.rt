@@ -10,8 +10,8 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.form.fields.splitbox;
 
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.rt.client.ui.form.fields.AbstractCompositeField;
 import org.eclipse.scout.rt.client.ui.form.fields.splitbox.internal.SplitBoxGrid;
@@ -21,6 +21,7 @@ import org.eclipse.scout.rt.client.ui.form.fields.splitbox.internal.SplitBoxGrid
  * 
  * @since 3.1.12 16.07.2008
  */
+@ClassId("2b156923-e659-4993-8d5d-559f140ec59d")
 public abstract class AbstractSplitBox extends AbstractCompositeField implements ISplitBox {
 
   private SplitBoxGrid m_grid;
@@ -38,7 +39,6 @@ public abstract class AbstractSplitBox extends AbstractCompositeField implements
 
   // configuration
 
-  @ConfigPropertyValue("true")
   @Override
   protected boolean getConfiguredGridUseUiHeight() {
     return true;
@@ -46,35 +46,30 @@ public abstract class AbstractSplitBox extends AbstractCompositeField implements
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(250)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredSplitHorizontal() {
     return true;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(300)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredSplitterEnabled() {
     return true;
   }
 
   @ConfigProperty(ConfigProperty.DOUBLE)
   @Order(340)
-  @ConfigPropertyValue("0.5")
   protected double getConfiguredSplitterPosition() {
     return 0.5;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(355)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredCacheSplitterPosition() {
     return true;
   }
 
   @ConfigProperty(ConfigProperty.STRING)
   @Order(360)
-  @ConfigPropertyValue("getClass().getName")
   protected String getConfiguredCacheSplitterPositionPropertyName() {
     return getClass().getName();
   }

@@ -12,12 +12,15 @@ package org.eclipse.scout.rt.client.ui.form.fields.htmlfield;
 
 import java.io.InputStreamReader;
 import java.net.URL;
+import java.util.Collection;
+import java.util.Set;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.HTMLUtility;
 import org.eclipse.scout.commons.IOUtility;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
@@ -38,13 +41,14 @@ import org.eclipse.scout.service.SERVICES;
  * See also {@link AbstractBrowserField} for html viewing and {@link AbstractDocumentField} for html editing (requires a
  * fragment such as microsoft word editor)
  */
+@ClassId("99301bfb-cccc-431f-b687-dc0bf73ff789")
 public abstract class AbstractHtmlField extends AbstractValueField<String> implements IHtmlField {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractHtmlField.class);
 
   private IHtmlFieldUIFacade m_uiFacade;
   private boolean m_htmlEditor;
   private boolean m_scrollBarEnabled;
-  private RemoteFile[] m_attachments;
+  private Set<RemoteFile> m_attachments;
   private Boolean m_monitorSpelling = null; // If null the application-wide
 
   public AbstractHtmlField() {
@@ -60,7 +64,6 @@ public abstract class AbstractHtmlField extends AbstractValueField<String> imple
    */
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(230)
-  @ConfigPropertyValue("Integer.MAX_VALUE")
   @ValidationRule(ValidationRule.MAX_LENGTH)
   protected int getConfiguredMaxLength() {
     return Integer.MAX_VALUE;
@@ -68,14 +71,12 @@ public abstract class AbstractHtmlField extends AbstractValueField<String> imple
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(240)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredHtmlEditor() {
     return false;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(250)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredScrollBarEnabled() {
     return false;
   }
@@ -97,7 +98,6 @@ public abstract class AbstractHtmlField extends AbstractValueField<String> imple
   @Override
   protected void initConfig() {
     m_uiFacade = new P_UIFacade();
-    setAttachments(new RemoteFile[0]);
     super.initConfig();
     m_htmlEditor = getConfiguredHtmlEditor();
     m_scrollBarEnabled = getConfiguredScrollBarEnabled();
@@ -200,13 +200,13 @@ public abstract class AbstractHtmlField extends AbstractValueField<String> imple
    * local images and local resources bound to the html text
    */
   @Override
-  public RemoteFile[] getAttachments() {
-    return m_attachments;
+  public Set<RemoteFile> getAttachments() {
+    return CollectionUtility.hashSet(m_attachments);
   }
 
   @Override
-  public void setAttachments(RemoteFile[] attachments) {
-    m_attachments = attachments;
+  public void setAttachments(Collection<? extends RemoteFile> attachments) {
+    m_attachments = CollectionUtility.<RemoteFile> hashSetWithoutNullElements(attachments);
   }
 
   @Override
@@ -229,7 +229,7 @@ public abstract class AbstractHtmlField extends AbstractValueField<String> imple
     }
 
     @Override
-    public void setAttachmentsFromUI(RemoteFile[] attachments) {
+    public void setAttachmentsFromUI(Collection<? extends RemoteFile> attachments) {
       setAttachments(attachments);
     }
 

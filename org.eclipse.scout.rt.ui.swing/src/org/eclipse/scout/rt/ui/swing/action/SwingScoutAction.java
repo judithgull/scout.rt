@@ -4,7 +4,7 @@
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- * 
+ *
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
@@ -104,7 +104,6 @@ public class SwingScoutAction<T extends IAction> extends SwingScoutComposite<T> 
   }
 
   private void setKeyStrokeFromScout(String s) {
-
     if (s != null) {
       getSwingAction().putValue(Action.ACCELERATOR_KEY, SwingUtility.createKeystroke(new org.eclipse.scout.rt.client.ui.action.keystroke.KeyStroke(s)));
     }
@@ -119,6 +118,7 @@ public class SwingScoutAction<T extends IAction> extends SwingScoutComposite<T> 
 
   private void setMnemonicFromScout(char ch) {
     if (ch != 0x0) {
+      ch = Character.toUpperCase(ch); //mnemonics in Swing must be upper case
       getSwingAction().putValue(Action.MNEMONIC_KEY, new Integer(ch));
     }
   }
@@ -136,6 +136,8 @@ public class SwingScoutAction<T extends IAction> extends SwingScoutComposite<T> 
   }
 
   private void handleSwingAction() {
+    // runInputVerifier() must be called in order to validate the FormField and to write its value into the scout model.
+    // This is necessary here because the FormField may not has lost its focus (e.g. on a KeyStroke)
     if (SwingUtility.runInputVerifier()) {
       if (!m_handleActionPending) {
         m_handleActionPending = true;

@@ -10,22 +10,18 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.form.fields.doublefield;
 
-import java.text.DecimalFormat;
-import java.text.NumberFormat;
-import java.text.ParsePosition;
+import java.math.BigDecimal;
 
-import org.eclipse.scout.commons.LocaleThreadLocal;
-import org.eclipse.scout.commons.StringUtility;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.form.fields.decimalfield.AbstractDecimalField;
-import org.eclipse.scout.rt.shared.ScoutTexts;
 import org.eclipse.scout.rt.shared.data.form.ValidationRule;
 
+@ClassId("65251930-63db-4da4-ae28-9a25d75dcafb")
 public abstract class AbstractDoubleField extends AbstractDecimalField<Double> implements IDoubleField {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractDoubleField.class);
 
@@ -40,20 +36,41 @@ public abstract class AbstractDoubleField extends AbstractDecimalField<Double> i
   /*
    * Configuration
    */
+
+  /**
+   * @deprecated Will be removed in the 5.0 Release., use {@link #getConfiguredMinValue()}.<br>
+   *             As long as this deprecated version is overridden in subclasses. This setting wins over
+   *             {@link #getConfiguredMinValue()} in {@link #initConfig()}.
+   */
+  @Deprecated
+  protected Double getConfiguredMinimumValue() {
+    return getConfiguredMinValue();
+  }
+
+  /**
+   * @deprecated Will be removed in the 5.0 Release., use {@link #getConfiguredMaxValue()}.<br>
+   *             As long as this deprecated version is overridden in subclasses. This setting wins over
+   *             {@link #getConfiguredMaxValue()} in {@link #initConfig()}.
+   */
+  @Deprecated
+  protected Double getConfiguredMaximumValue() {
+    return getConfiguredMaxValue();
+  }
+
   @ConfigProperty(ConfigProperty.DOUBLE)
   @Order(300)
-  @ConfigPropertyValue("null")
   @ValidationRule(ValidationRule.MIN_VALUE)
-  protected Double getConfiguredMinimumValue() {
-    return null;
+  @Override
+  protected Double getConfiguredMinValue() {
+    return -Double.MAX_VALUE;
   }
 
   @ConfigProperty(ConfigProperty.DOUBLE)
   @Order(310)
-  @ConfigPropertyValue("null")
   @ValidationRule(ValidationRule.MAX_VALUE)
-  protected Double getConfiguredMaximumValue() {
-    return null;
+  @Override
+  protected Double getConfiguredMaxValue() {
+    return Double.MAX_VALUE;
   }
 
   @Override
@@ -63,44 +80,32 @@ public abstract class AbstractDoubleField extends AbstractDecimalField<Double> i
     setMaxValue(getConfiguredMaximumValue());
   }
 
+  /**
+   * Set the minimum value for this field. If value is <code>null</code>, it is replaced by Double.MIN_VALUE.
+   */
+  @Override
+  public void setMinValue(Double value) {
+    super.setMinValue(value == null ? -Double.MAX_VALUE : value);
+  }
+
+  /**
+   * Set the maximum value for this field. If value is <code>null</code>, it is replaced by -Double.MAX_VALUE.
+   */
+  @Override
+  public void setMaxValue(Double value) {
+    super.setMaxValue(value == null ? Double.MAX_VALUE : value);
+  }
+
+  /**
+   * uses {@link #parseToBigDecimalInternal(String)} to parse text and returns the result as Double
+   */
   @Override
   protected Double parseValueInternal(String text) throws ProcessingException {
     Double retVal = null;
-    if (text == null) {
-      text = "";
-    }
-    else {
-      text = text.trim();
-    }
-    if (text.length() > 0) {
-      NumberFormat numberFormat = createNumberFormat();
-      if (isPercent()) {
-        if (text.endsWith("%")) {
-          text = StringUtility.trim(text.substring(0, text.length() - 1));
-        }
-        String suffix = "%";
-        if (numberFormat instanceof DecimalFormat) {
-          suffix = ((DecimalFormat) numberFormat).getPositiveSuffix();
-        }
-        text = StringUtility.concatenateTokens(text, suffix);
-      }
-      ParsePosition p = new ParsePosition(0);
-      Number n = numberFormat.parse(text, p);
-      if (p.getErrorIndex() >= 0 || p.getIndex() != text.length()) {
-        throw new ProcessingException(ScoutTexts.get("InvalidNumberMessageX", text));
-      }
-      NumberFormat fmt = NumberFormat.getNumberInstance(LocaleThreadLocal.get());
-      /* add/preserve fraction digits for multiplier */
-      int npc = ("" + Math.abs(getMultiplier())).length() - 1;
-      fmt.setMaximumFractionDigits(getFractionDigits() + npc);
-      p = new ParsePosition(0);
-      String fmtText = fmt.format(n.doubleValue());
-      retVal = new Double(fmt.parse(fmtText, p).doubleValue());
-      if (p.getErrorIndex() >= 0 || p.getIndex() != fmtText.length()) {
-        throw new ProcessingException(ScoutTexts.get("InvalidNumberMessageX", fmtText));
-      }
+    BigDecimal parsedVal = parseToBigDecimalInternal(text);
+    if (parsedVal != null) {
+      retVal = Double.valueOf(parsedVal.doubleValue());
     }
     return retVal;
   }
-
 }

@@ -74,28 +74,33 @@ public class SwtScoutTabBox extends SwtScoutFieldComposite<ITabBox> implements I
       public void widgetDisposed(DisposeEvent e) {
         if (m_scoutTabMapping != null) {
           IGroupBox selectedGroupBox = getScoutObject().getSelectedTab();
-          IGroupBox[] groupBoxes = getScoutObject().getGroupBoxes();
+          IGroupBox[] groupBoxes = getScoutObject().getGroupBoxes().toArray(new IGroupBox[getScoutObject().getGroupBoxes().size()]);
           //reverse order to avoid flickering
           for (int i = groupBoxes.length - 1; i >= 0; i--) {
-            if (groupBoxes[i] != selectedGroupBox) {
-              SwtScoutTabItem swtScoutTabItem = m_scoutTabMapping.remove(groupBoxes[i]);
-              if (swtScoutTabItem != null) {
-                m_tabs.remove(swtScoutTabItem.getTabItem());
-                swtScoutTabItem.getTabItem().dispose();
-                swtScoutTabItem.dispose();
-              }
+            IGroupBox groupBox = groupBoxes[i];
+            if (groupBox != selectedGroupBox) {
+              disposeGroupBoxWithTabs(groupBox);
             }
           }
           if (selectedGroupBox != null) {
-            SwtScoutTabItem swtScoutTabItem = m_scoutTabMapping.remove(selectedGroupBox);
-            if (swtScoutTabItem != null) {
-              m_tabs.remove(swtScoutTabItem.getTabItem());
-              swtScoutTabItem.getTabItem().dispose();
-              swtScoutTabItem.dispose();
-            }
+            disposeGroupBoxWithTabs(selectedGroupBox);
           }
           m_scoutTabMapping = null;
           m_tabs = null;
+        }
+      }
+
+      /**
+       * Removes the group box and containing tabs from the local maps and disposes the tab items.
+       * 
+       * @param groupBox
+       */
+      private void disposeGroupBoxWithTabs(IGroupBox groupBox) {
+        SwtScoutTabItem swtScoutTabItem = m_scoutTabMapping.remove(groupBox);
+        if (swtScoutTabItem != null) {
+          m_tabs.remove(swtScoutTabItem.getTabItem());
+          swtScoutTabItem.getTabItem().dispose();
+          swtScoutTabItem.dispose();
         }
       }
     });

@@ -11,7 +11,10 @@
 package org.eclipse.scout.rt.client.ui.basic.table.columns;
 
 import java.security.Permission;
+import java.util.Collection;
+import java.util.List;
 
+import org.eclipse.scout.commons.ITypeWithClassId;
 import org.eclipse.scout.commons.beans.IPropertyObserver;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.ui.basic.table.ColumnSet;
@@ -21,7 +24,7 @@ import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.shared.data.basic.FontSpec;
 
-public interface IColumn<T> extends IPropertyObserver {
+public interface IColumn<T> extends IPropertyObserver, ITypeWithClassId {
   /**
    * type boolean
    */
@@ -94,7 +97,7 @@ public interface IColumn<T> extends IPropertyObserver {
 
   T getValue(ITableRow r);
 
-  T[] getValues(ITableRow[] rows);
+  List<T> getValues(Collection<? extends ITableRow> rows);
 
   /**
    * <p>
@@ -129,15 +132,19 @@ public interface IColumn<T> extends IPropertyObserver {
    */
   void fill(T rawValue) throws ProcessingException;
 
-  T[] getValues();
+  List<T> getValues();
 
-  T[] getSelectedValues();
+  List<T> getValues(boolean includeDeleted);
 
-  T[] getInsertedValues();
+  List<T> getSelectedValues();
 
-  T[] getUpdatedValues();
+  List<T> getInsertedValues();
 
-  T[] getDeletedValues();
+  List<T> getUpdatedValues();
+
+  List<T> getDeletedValues();
+
+  List<T> getNotDeletedValues();
 
   /**
    * @return display text for this row's cell on this column
@@ -147,7 +154,7 @@ public interface IColumn<T> extends IPropertyObserver {
   /**
    * @return display texts for all row's cells on this column
    */
-  String[] getDisplayTexts();
+  List<String> getDisplayTexts();
 
   /**
    * @return display text for selected row's cell on this column
@@ -157,7 +164,7 @@ public interface IColumn<T> extends IPropertyObserver {
   /**
    * @return display texts for all selected row's cells on this column
    */
-  String[] getSelectedDisplayTexts();
+  List<String> getSelectedDisplayTexts();
 
   Class<T> getDataType();
 
@@ -166,9 +173,9 @@ public interface IColumn<T> extends IPropertyObserver {
    */
   T getSelectedValue();
 
-  ITableRow[] findRows(T[] values);
+  List<ITableRow> findRows(Collection<? extends T> values);
 
-  ITableRow[] findRows(T value);
+  List<ITableRow> findRows(T value);
 
   ITableRow findRow(T value);
 
@@ -410,7 +417,7 @@ public interface IColumn<T> extends IPropertyObserver {
   void setAutoOptimizeWidth(boolean optimize);
 
   boolean isMandatory();
-  
+
   void setMandatory(boolean mandatory);
 
 }

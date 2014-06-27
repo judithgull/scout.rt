@@ -19,11 +19,13 @@ import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
@@ -31,7 +33,9 @@ import java.io.Writer;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.List;
 
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
@@ -48,6 +52,40 @@ public final class IOUtility {
    */
   public static byte[] getContent(InputStream stream) throws ProcessingException {
     return getContent(stream, true);
+  }
+
+  /**
+   * Gets the content of the given {@link InputStream} as {@link String}. The {@link Byte}s coming from the
+   * {@link InputStream} are interpreted using the given charsetName.<br>
+   * The {@link InputStream} is automatically closed.
+   * 
+   * @param stream
+   *          The stream to read from.
+   * @param charsetName
+   *          The name of the {@link Charset}.
+   * @return A {@link String} containing the content of the given {@link InputStream}.
+   * @throws ProcessingException
+   */
+  public static String getContent(InputStream stream, String charsetName) throws ProcessingException {
+    try {
+      return new String(IOUtility.getContent(stream), charsetName);
+    }
+    catch (UnsupportedEncodingException e) {
+      throw new ProcessingException("Unsupported encoding: '" + charsetName + "'.", e);
+    }
+  }
+
+  /**
+   * Gets the content of the given {@link InputStream} as {@link String}. The content coming from the
+   * {@link InputStream} must have the UTF-8 {@link Charset}.
+   * 
+   * @param stream
+   *          The {@link InputStream} to read from.
+   * @return The content of the given {@link InputStream}.
+   * @throws ProcessingException
+   */
+  public static String getContentUtf8(InputStream stream) throws ProcessingException {
+    return getContent(stream, "UTF-8");
   }
 
   public static byte[] getContent(InputStream stream, boolean autoClose) throws ProcessingException {
@@ -197,7 +235,7 @@ public final class IOUtility {
   }
 
   /**
-   * retrieve content as string (correct charcter conversion)
+   * retrieve content as string (correct character conversion)
    */
   public static String getContent(Reader stream) throws ProcessingException {
     return getContent(stream, true);
@@ -276,13 +314,24 @@ public final class IOUtility {
     }
   }
 
+  /**
+   * Convenience method for creating temporary files with content. Note, the temporary file will be automatically
+   * deleted when the virtual machine terminates.
+   * 
+   * @param fileName
+   *          If no or an empty filename is given, a random fileName will be created.
+   * @param content
+   *          If no content is given, an empty file will be created
+   * @return A new temporary file with specified content
+   * @throws ProcessingException
+   */
   public static File createTempFile(String fileName, byte[] content) throws ProcessingException {
     try {
       if (fileName != null) {
         fileName = fileName.replaceAll("[\\\\/:*?\\\"<>|]*", "");
       }
       if (fileName == null || fileName.length() == 0) {
-        fileName = getTempFileName("tmp");
+        fileName = getTempFileName(".tmp");
       }
       File f = File.createTempFile("tmp", ".tmp");
       File f2 = new File(f.getParentFile(), new File(fileName).getName());
@@ -307,6 +356,19 @@ public final class IOUtility {
     }
   }
 
+  /**
+   * Convenience method for creating temporary files with content. Note, the temporary file will be automatically
+   * deleted when the virtual machine terminates. The temporary file will look like this:
+   * <i>prefix</i>2093483323922923<i>.suffix</i>
+   * 
+   * @param prefix
+   *          The prefix of the temporary file
+   * @param suffix
+   *          The suffix of the temporary file. Don't forget the colon, for example <b>.tmp</b>
+   * @param content
+   * @return A new temporary file with the specified content
+   * @throws ProcessingException
+   */
   public static File createTempFile(String prefix, String suffix, byte[] content) throws ProcessingException {
     File f = null;
     try {
@@ -322,6 +384,14 @@ public final class IOUtility {
     }
   }
 
+  /**
+   * Delete a directory and all containing files and directories
+   * 
+   * @param directory
+   * @return true if the directory is successfully deleted or does not exists; false otherwise
+   * @throws SecurityException
+   *           - If a security manager exists and its check methods deny read or delete access
+   */
   public static boolean deleteDirectory(File dir) {
     if (dir != null && dir.exists()) {
       File[] a = dir.listFiles();
@@ -462,7 +532,7 @@ public final class IOUtility {
     if (filename == null) {
       return null;
     }
-    int i = filename.lastIndexOf(".");
+    int i = filename.lastIndexOf('.');
     if (i < 0) {
       return null;
     }
@@ -503,38 +573,58 @@ public final class IOUtility {
     }
   }
 
-  public static String urlEncode(String o) throws ProcessingException {
-    String s;
-    if (o == null) {
-      s = "";
+  /**
+   * A null-safe variant for calling {@link URLEncoder#encode(String, String)}. This method returns null if the given
+   * <code>url</code> is null or an empty string respectively. Any leading / trailing whitespaces are omitted.
+   * Furthermore, "%20" is used to represent spaces instead of "+".
+   * 
+   * @param url
+   *          the URL string which shall be encoded
+   * @return the encoded URL string
+   */
+  public static String urlEncode(String url) {
+    if (url == null) {
+      return null;
     }
-    else {
-      s = o.toString().trim();
-    }
+
+    String s = url.toString().trim();
     if (s.length() == 0) {
-      s = " ";
+      return "";
     }
+
     try {
-      s = URLEncoder.encode(s, "UTF-8");// Build 158 needed an encoding
+      s = URLEncoder.encode(s, "UTF-8");
       s = StringUtility.replace(s, "+", "%20");
     }
     catch (UnsupportedEncodingException e) {
+      LOG.error("Unsupported encoding", e);
     }
     return s;
   }
 
-  public static String urlDecode(String o) throws ProcessingException {
-    String s;
-    if (o == null) {
-      s = "";
+  /**
+   * a null-safe variant for calling {@link URLDecoder#decode(String, String)}. This method returns null if the given
+   * <code>url</code> is null or an empty string respectively. Any leading / trailing whitespaces are omitted.
+   * 
+   * @param encodedUrl
+   *          the encoded URL string which shall be decoded
+   * @return the decoded URL string
+   */
+  public static String urlDecode(String encodedUrl) {
+    if (encodedUrl == null) {
+      return null;
     }
-    else {
-      s = o.toString().trim();
+
+    String s = encodedUrl.toString().trim();
+    if (s.length() == 0) {
+      return "";
     }
+
     try {
-      s = URLDecoder.decode(s, "UTF-8");// Build 158 needed an encoding
+      s = URLDecoder.decode(s, "UTF-8");
     }
     catch (UnsupportedEncodingException e) {
+      LOG.error("Unsupported encoding", e);
     }
     return s;
   }
@@ -568,5 +658,78 @@ public final class IOUtility {
       }
     }
     return url;
+  }
+
+  /**
+   * Append a file to another. The provided {@link PrintWriter} will neither be flushed nor closed.
+   * <p>
+   * ATTENTION: Appending a file to itself using an autoflushing PrintWriter, will lead to an endless loop. (Appending a
+   * file to itself using a Printwriter without autoflushing is safe.)
+   * 
+   * @param writer
+   *          a PrintWriter for the destination file
+   * @param file
+   *          source file
+   * @throws ProcessingException
+   *           if an {@link IOException} occurs (e.g. if file does not exists)
+   */
+  public static void appendFile(PrintWriter writer, File file) throws ProcessingException {
+    BufferedReader reader = null;
+    try {
+      reader = new BufferedReader(new FileReader(file));
+      String line;
+      while ((line = reader.readLine()) != null) {
+        writer.println(line);
+      }
+    }
+    catch (IOException e) {
+      throw new ProcessingException("Error appending file: " + file.getName(), e);
+    }
+    finally {
+      if (reader != null) {
+        try {
+          reader.close();
+        }
+        catch (IOException e) {
+          // ignore
+        }
+      }
+    }
+
+  }
+
+  /**
+   * @param file
+   * @param charsetName
+   *          The name of a supported {@link java.nio.charset.Charset </code>charset<code>}
+   * @return List containing all lines of the file as Strings
+   * @throws ProcessingException
+   *           if an {@link IOException} occurs (e.g. if file does not exists)
+   */
+  public static List<String> readLines(File file, String charsetName) throws ProcessingException {
+    ArrayList<String> lines;
+    lines = new ArrayList<String>();
+    BufferedReader bufferedReader = null;
+    try {
+      bufferedReader = new BufferedReader(new InputStreamReader(new FileInputStream(file), charsetName));
+      String line;
+      while ((line = bufferedReader.readLine()) != null) {
+        lines.add(line);
+      }
+    }
+    catch (IOException e) {
+      throw new ProcessingException("Error reading config file.", e);
+    }
+    finally {
+      if (bufferedReader != null) {
+        try {
+          bufferedReader.close();
+        }
+        catch (IOException e) {
+          // ignore
+        }
+      }
+    }
+    return lines;
   }
 }

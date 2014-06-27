@@ -41,4 +41,5 @@ public class FileUtilityTest {
       TestUtility.deleteTempFile(noZipFile);
     }
   }
+
 }

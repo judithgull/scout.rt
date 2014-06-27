@@ -10,13 +10,16 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.shared.data.model;
 
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.CompareUtility;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.logger.IScoutLogger;
@@ -219,9 +222,9 @@ public final class DataModelUtility {
    * @return the entity for an external id part (no '/' characters) using
    *         {@link IDataModel#getMetaDataOfAttribute(IDataModelAttribute)}
    */
-  public static IDataModelEntity findEntity(IDataModelEntity[] array, String simpleName, Map<String, String> metaData) {
-    if (array != null) {
-      for (IDataModelEntity e : array) {
+  public static IDataModelEntity findEntity(List<? extends IDataModelEntity> entities, String simpleName, Map<String, String> metaData) {
+    if (entities != null) {
+      for (IDataModelEntity e : entities) {
         if (e.getClass().getSimpleName().equals(simpleName)) {
           if (CompareUtility.equals(e.getMetaDataOfEntity(), metaData)) {
             return e;
@@ -236,9 +239,9 @@ public final class DataModelUtility {
    * @return the attribute for an external id part (no '/' characters) using
    *         {@link IDataModel#getMetaDataOfAttribute(IDataModelAttribute)}
    */
-  public static IDataModelAttribute findAttribute(IDataModelAttribute[] array, String simpleName, Map<String, String> metaData) {
-    if (array != null) {
-      for (IDataModelAttribute a : array) {
+  public static IDataModelAttribute findAttribute(List<? extends IDataModelAttribute> attributes, String simpleName, Map<String, String> metaData) {
+    if (attributes != null) {
+      for (IDataModelAttribute a : attributes) {
         if (a.getClass().getSimpleName().equals(simpleName)) {
           if (CompareUtility.equals(a.getMetaDataOfAttribute(), metaData)) {
             return a;
@@ -300,11 +303,12 @@ public final class DataModelUtility {
    * @return Returns the the sorted array of entities.
    * @since 3.8.0
    */
-  public static IDataModelEntity[] sortEntities(IDataModelEntity[] array) {
-    if (array == null) {
-      return null;
+  public static List<? extends IDataModelEntity> sortEntities(List<? extends IDataModelEntity> entities) {
+    if (CollectionUtility.isEmpty(entities)) {
+      return CollectionUtility.emptyArrayList();
     }
-    Arrays.sort(array, new Comparator<IDataModelEntity>() {
+    entities = new ArrayList<IDataModelEntity>(entities);
+    Collections.sort(entities, new Comparator<IDataModelEntity>() {
       @Override
       public int compare(IDataModelEntity o1, IDataModelEntity o2) {
         if (o1 == null && o2 == null) {
@@ -319,7 +323,7 @@ public final class DataModelUtility {
         return StringUtility.compareIgnoreCase(o1.getText(), o2.getText());
       }
     });
-    return array;
+    return entities;
   }
 
   /**
@@ -330,11 +334,12 @@ public final class DataModelUtility {
    * @return Returns the sorted array of attributes.
    * @since 3.8.0
    */
-  public static IDataModelAttribute[] sortAttributes(IDataModelAttribute[] array) {
-    if (array == null) {
-      return null;
+  public static List<? extends IDataModelAttribute> sortAttributes(List<? extends IDataModelAttribute> attributes) {
+    if (CollectionUtility.isEmpty(attributes)) {
+      return CollectionUtility.emptyArrayList();
     }
-    Arrays.sort(array, new Comparator<IDataModelAttribute>() {
+    attributes = new ArrayList<IDataModelAttribute>(attributes);
+    Collections.sort(attributes, new Comparator<IDataModelAttribute>() {
       @Override
       public int compare(IDataModelAttribute o1, IDataModelAttribute o2) {
         if (o1 == null && o2 == null) {
@@ -355,154 +360,6 @@ public final class DataModelUtility {
         return StringUtility.compareIgnoreCase(o1.getText(), o2.getText());
       }
     });
-    return array;
+    return attributes;
   }
-
-  /*
-   * deprecated methods as of 3.8
-   */
-
-  /**
-   * @deprecated use {@link #entityPathToExternalId(IDataModel, EntityPath)} instead. Will be removed in Release 3.10.
-   */
-  @SuppressWarnings("deprecation")
-  @Deprecated
-  public static String entityToExternalId(IDataModelEntity e) {
-    //loop detection (for example CompanyCompanyEntity)
-    IDataModelEntity t = e.getParentEntity();
-    for (int i = 0; i < 5 && t != null; i++) {
-      if (t == e) {
-        return null;
-      }
-      t = t.getParentEntity();
-    }
-    if (e.getParentEntity() != null) {
-      return entityToExternalId(e.getParentEntity()) + "/" + e.getClass().getSimpleName() + exportMetaData(e.getMetaDataOfEntity());
-    }
-    else {
-      return e.getClass().getSimpleName() + exportMetaData(e.getMetaDataOfEntity());
-    }
-  }
-
-  /**
-   * @deprecated use {@link #attributePathToExternalId(IDataModel, AttributePath)} instead. Will be removed in Release
-   *             3.10.
-   */
-  @SuppressWarnings("deprecation")
-  @Deprecated
-  public static String attributeToExternalId(IDataModelAttribute a) {
-    if (a.getParentEntity() != null) {
-      return entityToExternalId(a.getParentEntity()) + "/" + a.getClass().getSimpleName() + exportMetaData(a.getMetaDataOfAttribute());
-    }
-    else {
-      return a.getClass().getSimpleName() + exportMetaData(a.getMetaDataOfAttribute());
-    }
-  }
-
-  /**
-   * @deprecated use {@link #externalIdToEntityPath(IDataModel, String)} instead. Will be removed in Release 3.10.
-   */
-  @Deprecated
-  public static IDataModelEntity externalIdToEntity(IDataModel f, String externalId, IDataModelEntity parentEntity) {
-    if (externalId == null) {
-      return null;
-    }
-    Matcher m = PAT_EXTERNAL_ID.matcher(externalId);
-    if (!m.matches()) {
-      throw new IllegalArgumentException("externalId is invalid: " + externalId);
-    }
-    String folderName = m.group(2);
-    String elemName = m.group(3);
-    Map<String, String> meta = importMetaData(m.group(5));
-    if (folderName != null) {
-      parentEntity = externalIdToEntity(f, folderName, parentEntity);
-      if (parentEntity == null) {
-        return null;
-      }
-    }
-    if (parentEntity != null) {
-      return findEntity(parentEntity.getEntities(), elemName, meta);
-    }
-    else {
-      return findEntity(f.getEntities(), elemName, meta);
-    }
-  }
-
-  /**
-   * @deprecated use {@link #externalIdToAttributePath(IDataModel, String)} instead. Will be removed in Release 3.10.
-   */
-  @Deprecated
-  public static IDataModelAttribute externalIdToAttribute(IDataModel f, String externalId, IDataModelEntity parentEntity) {
-    if (externalId == null) {
-      return null;
-    }
-    Matcher m = PAT_EXTERNAL_ID.matcher(externalId);
-    if (!m.matches()) {
-      throw new IllegalArgumentException("externalId is invalid: " + externalId);
-    }
-    String folderName = m.group(2);
-    String elemName = m.group(3);
-    Map<String, String> meta = importMetaData(m.group(5));
-    if (folderName != null) {
-      parentEntity = externalIdToEntity(f, folderName, parentEntity);
-      if (parentEntity == null) {
-        return null;
-      }
-    }
-    if (parentEntity != null) {
-      return findAttribute(parentEntity.getAttributes(), elemName, meta);
-    }
-    else {
-      return findAttribute(f.getAttributes(), elemName, meta);
-    }
-  }
-
-  /**
-   * @deprecated use {@link #findEntity(IDataModelEntity[], String, Map)} instead. Will be removed in Release 3.10.
-   */
-  @Deprecated
-  public static IDataModelEntity findEntity(IDataModelEntity[] array, String simpleName) {
-    return findEntity(array, simpleName, null);
-  }
-
-  /**
-   * @deprecated use {@link #attributePathToExternalId(IDataModel, AttributePath)} instead. Will be removed in Release
-   *             3.10.
-   */
-  @Deprecated
-  public static String attributeToExternalId(IDataModelAttribute a, IDataModelEntity... entityPath) {
-    String id = a.getClass().getSimpleName() + exportMetaData(a.getMetaDataOfAttribute());
-    for (int i = entityPath.length - 1; i >= 0; i--) {
-      IDataModelEntity e = entityPath[i];
-      id = e.getClass().getSimpleName() + "/" + id;
-    }
-    return id;
-  }
-
-  /**
-   * @deprecated use {@link #externalIdToEntityPath(IDataModel, String)} instead. Will be removed in Release 3.10.
-   */
-  @Deprecated
-  public static IDataModelEntity[] externalIdToEntityPath(IDataModel f, String externalId, IDataModelEntity parentEntity) {
-    EntityPath ePath = null;
-    try {
-      //try attribute
-      AttributePath aPath = externalIdToAttributePath(f, externalId);
-      if (aPath != null) {
-        ePath = aPath.getEntityPath();
-      }
-    }
-    catch (Throwable t) {
-      //nop
-    }
-    if (ePath == null) {
-      //try entity
-      ePath = externalIdToEntityPath(f, externalId);
-    }
-    if (ePath != null) {
-      return ePath.elements().toArray(new IDataModelEntity[ePath.size()]);
-    }
-    return new IDataModelEntity[0];
-  }
-
 }

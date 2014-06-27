@@ -24,18 +24,21 @@ import java.util.Map.Entry;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Platform;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.scout.commons.CompareUtility;
 import org.eclipse.scout.commons.EventListenerList;
 import org.eclipse.scout.commons.HTMLUtility;
 import org.eclipse.scout.commons.HTMLUtility.DefaultFont;
+import org.eclipse.scout.commons.ITypeWithClassId;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.beans.AbstractPropertyObserver;
 import org.eclipse.scout.commons.exception.IProcessingStatus;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.holders.Holder;
 import org.eclipse.scout.commons.holders.IHolder;
+import org.eclipse.scout.commons.internal.runtime.CompatibilityUtility;
 import org.eclipse.scout.commons.job.JobEx;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
@@ -45,12 +48,13 @@ import org.eclipse.scout.rt.client.IClientSession;
 import org.eclipse.scout.rt.client.busy.IBusyManagerService;
 import org.eclipse.scout.rt.client.services.common.exceptionhandler.ErrorHandler;
 import org.eclipse.scout.rt.client.services.common.session.IClientSessionRegistryService;
+import org.eclipse.scout.rt.client.ui.action.IActionFilter;
 import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
+import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 import org.eclipse.scout.rt.client.ui.basic.filechooser.IFileChooser;
 import org.eclipse.scout.rt.client.ui.desktop.DesktopEvent;
 import org.eclipse.scout.rt.client.ui.desktop.DesktopListener;
 import org.eclipse.scout.rt.client.ui.desktop.IDesktop;
-import org.eclipse.scout.rt.client.ui.form.FormEvent;
 import org.eclipse.scout.rt.client.ui.form.IForm;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.htmlfield.IHtmlField;
@@ -60,12 +64,15 @@ import org.eclipse.scout.rt.shared.data.basic.FontSpec;
 import org.eclipse.scout.rt.shared.ui.UiDeviceType;
 import org.eclipse.scout.rt.shared.ui.UiLayer;
 import org.eclipse.scout.rt.shared.ui.UserAgent;
+import org.eclipse.scout.rt.ui.swt.action.menu.ISwtScoutMenuItem;
+import org.eclipse.scout.rt.ui.swt.action.menu.SwtScoutMenuItem;
 import org.eclipse.scout.rt.ui.swt.basic.WidgetPrinter;
 import org.eclipse.scout.rt.ui.swt.busy.SwtBusyHandler;
 import org.eclipse.scout.rt.ui.swt.concurrency.SwtScoutSynchronizer;
 import org.eclipse.scout.rt.ui.swt.form.ISwtScoutForm;
 import org.eclipse.scout.rt.ui.swt.form.SwtScoutForm;
 import org.eclipse.scout.rt.ui.swt.form.fields.ISwtScoutFormField;
+import org.eclipse.scout.rt.ui.swt.internal.debug.layout.spy.LogicalGridLayoutSpy;
 import org.eclipse.scout.rt.ui.swt.keystroke.ISwtKeyStroke;
 import org.eclipse.scout.rt.ui.swt.keystroke.ISwtKeyStrokeFilter;
 import org.eclipse.scout.rt.ui.swt.keystroke.KeyStrokeManager;
@@ -106,6 +113,7 @@ import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Listener;
+import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.MessageBox;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.ToolTip;
@@ -119,6 +127,7 @@ import org.eclipse.ui.IViewReference;
 import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.IWorkbenchListener;
 import org.eclipse.ui.IWorkbenchPage;
+import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.PartInitException;
 import org.eclipse.ui.PerspectiveAdapter;
 import org.eclipse.ui.PlatformUI;
@@ -126,15 +135,17 @@ import org.eclipse.ui.forms.widgets.Form;
 import org.eclipse.ui.forms.widgets.FormToolkit;
 import org.eclipse.ui.views.IViewDescriptor;
 import org.osgi.framework.Bundle;
-import org.osgi.framework.Version;
 
 /**
  * <h3>SwtEnvironment</h3> ...
  * 
  * @since 1.0.0 06.03.2008
  */
+@SuppressWarnings("restriction")
 public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver implements ISwtEnvironment {
-  private static IScoutLogger LOG = ScoutLogManager.getLogger(AbstractSwtEnvironment.class);
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractSwtEnvironment.class);
+  public static final String PROP_WIDGET_IDS_ENABLED = "org.eclipse.scout.rt.widgetIdsEnabled";
+  public static final String WIDGET_ID_KEY = "TEST_COMP_NAME";
 
   private final Bundle m_applicationBundle;
 
@@ -172,8 +183,8 @@ public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver im
 
   private EventListenerList m_environmentListeners;
 
-  private HashMap<String, String> m_scoutPartIdToUiPartId;
-  private HashMap<IForm, ISwtScoutPart> m_openForms;
+  private Map<String, String> m_scoutPartIdToUiPartId;
+  private Map<IForm, ISwtScoutPart> m_openForms;
   private P_ScoutDesktopListener m_scoutDesktopListener;
   private P_ScoutDesktopPropertyListener m_desktopPropertyListener;
 
@@ -224,6 +235,10 @@ public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver im
         m_formToolkit.dispose();
         m_formToolkit = null;
       }
+      if (m_trayComposite != null) {
+        m_trayComposite.disposeTray();
+        m_trayComposite = null;
+      }
       detachScoutListeners();
       detachSWTListeners();
       if (m_synchronizer != null) {
@@ -263,10 +278,6 @@ public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver im
           }
         };
         sendShutdownEventJob.schedule();
-      }
-      else {
-        m_status = SwtEnvironmentEvent.STARTED;
-        fireEnvironmentChanged(new SwtEnvironmentEvent(this, SwtEnvironmentEvent.STARTED));
       }
     }
   }
@@ -336,11 +347,11 @@ public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver im
           view = findViewPart(viewId);
 
           if (view == null) {
-            view = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().showView(viewId);
+            view = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().showView(viewId, null, IWorkbenchPage.VIEW_VISIBLE);
           }
         }
         else {
-          view = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().showView(viewId, secondaryId, IWorkbenchPage.VIEW_ACTIVATE);
+          view = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().showView(viewId, secondaryId, IWorkbenchPage.VIEW_VISIBLE);
         }
         if (!(view instanceof AbstractScoutView)) {
           LOG.warn("views used in scout's enviromnent must be extensions of AbstractScoutView");
@@ -459,6 +470,9 @@ public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver im
           addGlobalKeyStroke(swtStroke);
         }
       }
+
+      // developmentKeyStroke
+      initGlobalKeyStrokes();
       // environment shutdownhook
       m_workbenchListener = new P_WorkbenchListener();
       PlatformUI.getWorkbench().addWorkbenchListener(m_workbenchListener);
@@ -472,6 +486,10 @@ public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver im
       };
       invokeScoutLater(job, 0);
 
+      // init scout props
+      updateWindowTitle();
+      updateStatusFromScout();
+
       m_status = SwtEnvironmentEvent.STARTED;
       fireEnvironmentChanged(new SwtEnvironmentEvent(this, m_status));
       attachBusyHandler();
@@ -481,6 +499,29 @@ public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver im
         m_status = SwtEnvironmentEvent.STOPPED;
         fireEnvironmentChanged(new SwtEnvironmentEvent(this, m_status));
       }
+    }
+  }
+
+  protected void initGlobalKeyStrokes() {
+    if (Platform.inDevelopmentMode()) {
+      addGlobalKeyStroke(new ISwtKeyStroke() {
+
+        @Override
+        public void handleSwtAction(Event e) {
+          new LogicalGridLayoutSpy(getDisplay().getActiveShell()).activate();
+
+        }
+
+        @Override
+        public int getStateMask() {
+          return SWT.ALT | SWT.SHIFT;
+        }
+
+        @Override
+        public int getKeyCode() {
+          return SWT.F2;
+        }
+      });
     }
   }
 
@@ -654,27 +695,6 @@ public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver im
     return defaultFont;
   }
 
-  /**
-   * @deprecated replaced by {@link SwtBusyHandler}. Will be removed in Release 3.10.
-   */
-  @SuppressWarnings("deprecation")
-  @Override
-  @Deprecated
-  public boolean isBusy() {
-    //replaced by SwtBusyHandler
-    return false;
-  }
-
-  /**
-   * @deprecated replaced by {@link SwtBusyHandler}. Will be removed in Release 3.10.
-   */
-  @SuppressWarnings("deprecation")
-  @Override
-  @Deprecated
-  public void setBusyFromSwt(boolean b) {
-    //replaced by SwtBusyHandler
-  }
-
   @Override
   public void setClipboardText(String text) {
     m_clipboard.setContents(new Object[]{text}, new Transfer[]{TextTransfer.getInstance()});
@@ -846,13 +866,11 @@ public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver im
       m_trayComposite = createTray(desktop);
     }
     // dialogs
-    IForm[] dialogs = desktop.getDialogStack();
-    for (IForm dialog : dialogs) {
+    for (IForm dialog : desktop.getDialogStack()) {
       // showDialogFromScout(dialogs[i]);
       showStandaloneForm(dialog);
     }
-    IMessageBox[] messageBoxes = desktop.getMessageBoxStack();
-    for (IMessageBox messageBoxe : messageBoxes) {
+    for (IMessageBox messageBoxe : desktop.getMessageBoxStack()) {
       showMessageBoxFromScout(messageBoxe);
     }
   }
@@ -1000,6 +1018,11 @@ public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver im
             viewPart.showForm(form);
             part = viewPart;
             m_openForms.put(form, viewPart);
+            // activate first view
+            IWorkbenchPage page = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage();
+            if (page != null && page.getActivePart() == null) {
+              page.activate(viewPart);
+            }
           }
           catch (ProcessingException e) {
             LOG.error(e.getMessage(), e);
@@ -1145,11 +1168,14 @@ public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver im
 
   protected void handleDesktopPropertyChanged(String propertyName, Object oldVal, Object newValue) {
     if (IDesktop.PROP_STATUS.equals(propertyName)) {
-      setStatusFromScout();
+      updateStatusFromScout();
+    }
+    else if (IDesktop.PROP_TITLE.equals(propertyName)) {
+      updateWindowTitle();
     }
   }
 
-  protected void setStatusFromScout() {
+  protected void updateStatusFromScout() {
     if (getScoutDesktop() != null) {
       IProcessingStatus newValue = getScoutDesktop().getStatus();
       //when a tray item is available, use it, otherwise set status on views/dialogs
@@ -1173,9 +1199,7 @@ public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver im
             }
             case IProcessingStatus.CANCEL: {
               //Necessary for backward compatibility to Eclipse 3.4 needed for Lotus Notes 8.5.2
-              Version frameworkVersion = new Version(Activator.getDefault().getBundle().getBundleContext().getProperty("osgi.framework.version"));
-              if (frameworkVersion.getMajor() == 3
-                  && frameworkVersion.getMinor() <= 4) {
+              if (CompatibilityUtility.isEclipseVersionLessThan35()) {
                 iconId = SWT.ICON_INFORMATION;
               }
               else {
@@ -1205,6 +1229,23 @@ public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver im
           message = newValue.getMessage();
         }
         setStatusLineMessage(null, message);
+      }
+    }
+  }
+
+  protected void updateWindowTitle() {
+    if (getScoutDesktop() != null) {
+      final String title = getScoutDesktop().getTitle();
+      for (IWorkbenchWindow w : PlatformUI.getWorkbench().getWorkbenchWindows()) {
+        final Shell s = w.getShell();
+        if (!s.isDisposed()) {
+          s.getDisplay().asyncExec(new Runnable() {
+            @Override
+            public void run() {
+              s.setText(title);
+            }
+          });
+        }
       }
     }
   }
@@ -1308,6 +1349,26 @@ public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver im
             @Override
             public void run() {
               handleScoutPrintInSwt(e);
+            }
+          };
+          invokeSwtLater(t);
+          break;
+        }
+        case DesktopEvent.TYPE_TRAVERSE_FOCUS_NEXT: {
+          Runnable t = new Runnable() {
+            @Override
+            public void run() {
+              handleTraverseFocusFromScout(true);
+            }
+          };
+          invokeSwtLater(t);
+          break;
+        }
+        case DesktopEvent.TYPE_TRAVERSE_FOCUS_PREVIOUS: {
+          Runnable t = new Runnable() {
+            @Override
+            public void run() {
+              handleTraverseFocusFromScout(false);
             }
           };
           invokeSwtLater(t);
@@ -1454,7 +1515,27 @@ public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver im
   public ISwtScoutForm createForm(Composite parent, IForm scoutForm) {
     SwtScoutForm uiForm = new SwtScoutForm();
     uiForm.createField(parent, scoutForm, this);
+    assignWidgetId(scoutForm, uiForm.getSwtField(), uiForm.getSwtContainer());
     return uiForm;
+  }
+
+  protected void assignWidgetId(ITypeWithClassId model, Widget swtField, Widget swtContainer) {
+    if (swtField != null) {
+      assignWidgetId(model, swtField);
+    }
+    else {
+      assignWidgetId(model, swtContainer);
+    }
+  }
+
+  protected void assignWidgetId(ITypeWithClassId model, Widget widget) {
+    if (isWidgetIdsEnabled() && widget != null) {
+      widget.setData(WIDGET_ID_KEY, model.classId());
+    }
+  }
+
+  protected boolean isWidgetIdsEnabled() {
+    return StringUtility.parseBoolean(System.getProperty(PROP_WIDGET_IDS_ENABLED));
   }
 
   @Override
@@ -1463,7 +1544,15 @@ public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver im
       m_formFieldFactory = new FormFieldFactory(m_applicationBundle);
     }
     ISwtScoutFormField<IFormField> uiField = m_formFieldFactory.createFormField(parent, model, this);
+    assignWidgetId(model, uiField.getSwtField(), uiField.getSwtContainer());
     return uiField;
+  }
+
+  @Override
+  public ISwtScoutMenuItem createMenuItem(Menu uiMenu, IMenu scoutMenu, IActionFilter filter) {
+    SwtScoutMenuItem swtScoutMenuItem = new SwtScoutMenuItem(scoutMenu, uiMenu, filter, this);
+    assignWidgetId(scoutMenu, swtScoutMenuItem.getSwtMenuItem(), swtScoutMenuItem.getParentMenu());
+    return swtScoutMenuItem;
   }
 
   @Override
@@ -1573,8 +1662,19 @@ public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver im
     return called;
   }
 
-  protected void handleScoutPrintInSwt(DesktopEvent e) {
+  protected void handleTraverseFocusFromScout(boolean forward) {
+    Control comp = getDisplay().getFocusControl();
+    if (comp != null) {
+      if (forward) {
+        comp.traverse(SWT.TRAVERSE_TAB_NEXT);
+      }
+      else {
+        comp.traverse(SWT.TRAVERSE_TAB_PREVIOUS);
+      }
+    }
+  }
 
+  protected void handleScoutPrintInSwt(DesktopEvent e) {
     final WidgetPrinter wp = new WidgetPrinter(PlatformUI.getWorkbench().getActiveWorkbenchWindow().getShell());//getParentShellIgnoringPopups(SWT.SYSTEM_MODAL | SWT.APPLICATION_MODAL | SWT.MODELESS));
     try {
       wp.print(e.getPrintDevice(), e.getPrintParameters());
@@ -1677,16 +1777,6 @@ public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver im
   @Override
   public String getPerspectiveId() {
     return m_perspectiveId;
-  }
-
-  /**
-   * @deprecated use {@link IForm#getEventHistory()}. Will be removed in Release 3.10
-   */
-  @SuppressWarnings("deprecation")
-  @Override
-  @Deprecated
-  public FormEvent[] fetchPendingPrintEvents(IForm form) {
-    return new FormEvent[0];
   }
 
   /**

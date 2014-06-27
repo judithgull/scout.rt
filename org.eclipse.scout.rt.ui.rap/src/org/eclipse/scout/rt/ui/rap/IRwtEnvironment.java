@@ -18,6 +18,7 @@ import org.eclipse.scout.rt.client.ClientJob;
 import org.eclipse.scout.rt.client.IClientSession;
 import org.eclipse.scout.rt.client.ui.basic.filechooser.IFileChooser;
 import org.eclipse.scout.rt.client.ui.desktop.IDesktop;
+import org.eclipse.scout.rt.client.ui.desktop.IUrlTarget;
 import org.eclipse.scout.rt.client.ui.form.IForm;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.client.ui.messagebox.IMessageBox;
@@ -87,7 +88,7 @@ public interface IRwtEnvironment {
   ScoutFormToolkit getFormToolkit();
 
   /**
-   * Called from scout job/thread to post an immediate swt job into the waiting queue.
+   * Called from scout job/thread to post an immediate rwt job into the waiting queue.
    * <p>
    * These jobs are run when calling {@link #dispatchImmediateUiJobs()}. Normally this kind of code is only used to
    * early apply visible and enabled properties in {@link RwtScoutFieldComposite#handleUiInputVerifier()} in order to
@@ -137,6 +138,12 @@ public interface IRwtEnvironment {
   boolean removeKeyStrokes(Control control);
 
   /**
+   * @see IKeyStrokeManager#hasKeyStroke(Widget, IRwtKeyStroke)
+   * @since 3.10.0-M3
+   */
+  boolean hasKeyStroke(Control control, IRwtKeyStroke stroke);
+
+  /**
    * @return a font based on templateFont with style, name and size from scoutFont (if not null).
    *         The result is cached for re-use. Dispose is done automatically and must not be done by the caller
    */
@@ -176,7 +183,7 @@ public interface IRwtEnvironment {
    * <p>
    * If the address is a file path, this will trigger a file download from the browser.
    */
-  void openBrowserWindowFromScout(String path);
+  void openBrowserWindowFromScout(String path, IUrlTarget target);
 
   void showMessageBoxFromScout(IMessageBox messageBox);
 
@@ -200,9 +207,9 @@ public interface IRwtEnvironment {
   String adaptHtmlCell(IRwtScoutComposite<?> uiComposite, String rawHtml);
 
   /**
-   * Convenience for {@link HtmlAdapter#convertLinksWithLocalUrlsInHtmlCell(IRwtScoutComposite, String)}
+   * Convenience for {@link HtmlAdapter#convertLinksInHtmlCell(IRwtScoutComposite, String)}
    */
-  String convertLinksWithLocalUrlsInHtmlCell(IRwtScoutComposite<?> uiComposite, String rawHtml);
+  String convertLinksInHtmlCell(IRwtScoutComposite<?> uiComposite, String rawHtml);
 
   /**
    * Convenience for {@link HtmlAdapter#styleHtmlText(IRwtScoutFormField, String)}.
@@ -232,4 +239,5 @@ public interface IRwtEnvironment {
   void addEnvironmentListener(IRwtEnvironmentListener listener);
 
   void removeEnvironmentListener(IRwtEnvironmentListener listener);
+
 }

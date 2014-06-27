@@ -13,12 +13,13 @@ package org.eclipse.scout.rt.server.services.common.workflow;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 
 import org.eclipse.scout.commons.ConfigurationUtility;
 import org.eclipse.scout.commons.TypeCastUtility;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
@@ -232,28 +233,29 @@ public abstract class AbstractWorkflowService<T extends AbstractWorkflowData> ex
    * Configuration
    */
 
-  private Class<? extends IWorkflowStep>[] getConfiguredSteps() {
+  private List<Class<? extends IWorkflowStep>> getConfiguredSteps() {
     Class[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
-    return ConfigurationUtility.sortFilteredClassesByOrderAnnotation(dca, IWorkflowStep.class);
+    List<Class<IWorkflowStep>> filtered = ConfigurationUtility.filterClasses(dca, IWorkflowStep.class);
+    return ConfigurationUtility.sortFilteredClassesByOrderAnnotation(filtered, IWorkflowStep.class);
   }
 
   @ConfigProperty(ConfigProperty.TEXT)
   @Order(50)
-  @ConfigPropertyValue("null")
   protected String getConfiguredDefinitionText() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(60)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredDefinitionActive() {
     return false;
   }
 
-  @ConfigProperty(ConfigProperty.DOC)
+  /**
+   * @deprecated: Use a {@link ClassId} annotation as key for Doc-Text. Will be removed in the 5.0 Release.
+   */
+  @Deprecated
   @Order(10)
-  @ConfigPropertyValue("null")
   protected String getConfiguredDoc() {
     return null;
   }
@@ -344,7 +346,7 @@ public abstract class AbstractWorkflowService<T extends AbstractWorkflowData> ex
         m_stepMap.put(c, step);
       }
       catch (Exception e) {
-        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("create instance of " + c, e));
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + c.getName() + "'.", e));
       }
     }
   }

@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.StringUtility.ITagProcessor;
 import org.eclipse.scout.commons.logger.IScoutLogger;
@@ -240,7 +241,7 @@ public class TokenBasedStatementBuilder {
     //default
     String s = getTokenMapping(key);
     if (s == null && !hasTokenMapping(key)) {
-      LOG.warn("null BsiCrmFieldMapping for key " + key);
+      LOG.warn("null FieldMapping for key " + key);
     }
     if (s != null && s.length() > 0 && !"1=1".equals(s)) {
       Object sValue = (args != null && args.length > 0 ? args[0] : null);
@@ -360,8 +361,7 @@ public class TokenBasedStatementBuilder {
       LOG.warn("no token defined for attribute " + aNode.getTokenId());
       return null;
     }
-    Object[] args = aNode.getValues();
-    final Object sValue = (args != null && args.length > 0 ? args[0] : null);
+    final Object sValue = CollectionUtility.firstElement(aNode.getValues());
     // replace the S in the string by the generated unique bind name
     String sql = prepareWhereToken(baseStatement, sValue);
     if (!sql.equals(baseStatement)) {

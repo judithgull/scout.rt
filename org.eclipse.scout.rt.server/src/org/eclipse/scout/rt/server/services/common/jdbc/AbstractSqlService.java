@@ -25,7 +25,6 @@ import org.eclipse.scout.commons.BundleContextUtility;
 import org.eclipse.scout.commons.NumberUtility;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.holders.IHolder;
@@ -47,6 +46,7 @@ import org.eclipse.scout.rt.server.transaction.ITransaction;
 import org.eclipse.scout.rt.server.transaction.ITransactionMember;
 import org.eclipse.scout.rt.shared.ScoutTexts;
 import org.eclipse.scout.rt.shared.services.common.code.ICodeService;
+import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.rt.shared.services.common.jdbc.ILegacySqlQueryService;
 import org.eclipse.scout.rt.shared.services.common.jdbc.LegacySearchFilter;
 import org.eclipse.scout.rt.shared.services.common.jdbc.LegacySearchFilter.WhereToken;
@@ -55,7 +55,9 @@ import org.eclipse.scout.rt.shared.services.common.security.IPermissionService;
 import org.eclipse.scout.service.AbstractService;
 import org.eclipse.scout.service.IServiceInventory;
 import org.eclipse.scout.service.SERVICES;
+import org.osgi.framework.ServiceRegistration;
 
+@SuppressWarnings("deprecation")
 public abstract class AbstractSqlService extends AbstractService implements ISqlService, ILegacySqlQueryService, IAdaptable {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractSqlService.class);
   public static final int DEFAULT_MEMORY_PREFETCH_SIZE = 1048576; // = 1MB default
@@ -88,10 +90,9 @@ public abstract class AbstractSqlService extends AbstractService implements ISql
     initConfig();
   }
 
-  @SuppressWarnings("deprecation")
   @Override
-  public void initializeService() {
-    super.initializeService();
+  public void initializeService(ServiceRegistration registration) {
+    super.initializeService(registration);
 
     // load code and permission names
     m_permissionNameToDescriptor = new HashMap<String, List<BundleClassDescriptor>>();
@@ -140,127 +141,102 @@ public abstract class AbstractSqlService extends AbstractService implements ISql
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(10)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredDirectJdbcConnection() {
     return true;
   }
 
   @ConfigProperty(ConfigProperty.STRING)
   @Order(20)
-  @ConfigPropertyValue("null")
   protected String getConfiguredUsername() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.STRING)
   @Order(30)
-  @ConfigPropertyValue("null")
   protected String getConfiguredPassword() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.NLS_PROVIDER)
   @Order(70)
-  @ConfigPropertyValue("null")
   protected Class<? extends ScoutTexts> getConfiguredNlsProvider() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.SQL_STYLE)
   @Order(80)
-  @ConfigPropertyValue("null")
   protected Class<? extends ISqlStyle> getConfiguredSqlStyle() {
     return null;
   }
 
-  /**
-   * @deprecated use {@link #getConfiguredTransactionMemberId()} Will be removed in Release 3.10.
-   */
-  @Deprecated
-  protected String getConfiguredXAResourceId() {
-    return getConfiguredTransactionMemberId();
-  }
-
   @ConfigProperty(ConfigProperty.STRING)
   @Order(90)
-  @ConfigPropertyValue("null")
   protected String getConfiguredTransactionMemberId() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.STRING)
   @Order(100)
-  @ConfigPropertyValue("\"oracle.jdbc.OracleDriver\"")
   protected String getConfiguredJdbcDriverName() {
     return "oracle.jdbc.OracleDriver";
   }
 
   @ConfigProperty(ConfigProperty.STRING)
   @Order(110)
-  @ConfigPropertyValue("\"jdbc:oracle:thin:@localhost:1521:ORCL\"")
   protected String getConfiguredJdbcMappingName() {
     return "jdbc:oracle:thin:@localhost:1521:ORCL";
   }
 
   @ConfigProperty(ConfigProperty.STRING)
   @Order(120)
-  @ConfigPropertyValue("null")
   protected String getConfiguredJdbcProperties() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(130)
-  @ConfigPropertyValue("25")
   protected int getConfiguredJdbcPoolSize() {
     return 25;
   }
 
   @ConfigProperty(ConfigProperty.LONG)
   @Order(140)
-  @ConfigPropertyValue("300000L")
   protected long getConfiguredJdbcPoolConnectionLifetime() {
     return 300000L;
   }
 
   @ConfigProperty(ConfigProperty.LONG)
   @Order(150)
-  @ConfigPropertyValue("21600000L")
   protected long getConfiguredJdbcPoolConnectionBusyTimeout() {
     return 21600000L;
   }
 
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(160)
-  @ConfigPropertyValue("25")
   protected int getConfiguredJdbcStatementCacheSize() {
     return 25;
   }
 
   @ConfigProperty(ConfigProperty.STRING)
   @Order(170)
-  @ConfigPropertyValue("null")
   protected String getConfiguredJndiName() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.STRING)
   @Order(180)
-  @ConfigPropertyValue("null")
   protected String getConfiguredJndiInitialContextFactory() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.STRING)
   @Order(190)
-  @ConfigPropertyValue("null")
   protected String getConfiguredJndiProviderUrl() {
     return null;
   }
 
   @ConfigProperty(ConfigProperty.STRING)
   @Order(200)
-  @ConfigPropertyValue("null")
   protected String getConfiguredJndiUrlPkgPrefixes() {
     return null;
   }
@@ -395,7 +371,7 @@ public abstract class AbstractSqlService extends AbstractService implements ISql
       }
     }
     catch (Exception e) {
-      throw new ProcessingException("getLevel of permission '" + permissionClass + "'", e);
+      throw new ProcessingException("getLevel of permission '" + permissionClass.getName() + "'.", e);
     }
   }
 
@@ -437,7 +413,7 @@ public abstract class AbstractSqlService extends AbstractService implements ISql
         setSqlStyle(styleClass.newInstance());
       }
       catch (Exception e) {
-        LOG.warn(null, e);
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + styleClass.getName() + "'.", e));
       }
     }
     else {
@@ -877,7 +853,7 @@ public abstract class AbstractSqlService extends AbstractService implements ISql
           try {
             Class c = Platform.getBundle(desc.getBundleSymbolicName()).loadClass(desc.getClassName());
             if (suffix.length() > 0) {
-              c = Platform.getBundle(desc.getBundleSymbolicName()).loadClass(desc.getClassName() + suffix.replace(".", "$"));
+              c = Platform.getBundle(desc.getBundleSymbolicName()).loadClass(desc.getClassName() + suffix.replace('.', '$'));
               return c;
             }
             else {

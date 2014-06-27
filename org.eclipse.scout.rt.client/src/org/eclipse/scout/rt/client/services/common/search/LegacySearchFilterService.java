@@ -24,6 +24,8 @@ import org.eclipse.scout.rt.shared.services.common.jdbc.LegacySearchFilter;
 import org.eclipse.scout.rt.shared.services.common.jdbc.SearchFilter;
 
 /**
+ * Deprecated Will be removed in the M-Release.
+ * 
  * @deprecated
  */
 @SuppressWarnings("deprecation")

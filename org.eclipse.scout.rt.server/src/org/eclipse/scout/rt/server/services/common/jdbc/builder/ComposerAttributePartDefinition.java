@@ -19,9 +19,10 @@ import org.eclipse.scout.rt.shared.data.form.fields.composer.ComposerAttributeNo
 import org.eclipse.scout.rt.shared.data.model.IDataModelAttribute;
 
 /**
- * @deprecated use {@link DataModelAttributePartDefinition}
+ * @deprecated use {@link DataModelAttributePartDefinition}. Will be removed in the M-Release
  */
 @Deprecated
+@SuppressWarnings("deprecation")
 public class ComposerAttributePartDefinition extends DataModelAttributePartDefinition {
 
   public ComposerAttributePartDefinition(Class<? extends IDataModelAttribute> attributeType, String whereClause, boolean plainBind) {
@@ -37,7 +38,7 @@ public class ComposerAttributePartDefinition extends DataModelAttributePartDefin
   }
 
   /**
-   * @deprecated use {@link #getWhereClause() }
+   * @deprecated use {@link #getWhereClause() } Will be removed in the 5.0 Release.
    */
   @Deprecated
   public String getSqlAttribute() {

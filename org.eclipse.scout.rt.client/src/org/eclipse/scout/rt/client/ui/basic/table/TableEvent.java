@@ -13,9 +13,11 @@ package org.eclipse.scout.rt.client.ui.basic.table;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.dnd.TransferObject;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.IColumn;
@@ -70,23 +72,7 @@ public class TableEvent extends java.util.EventObject {
    * Filter has changed
    */
   public static final int TYPE_ROW_FILTER_CHANGED = 210;
-  /**
-   * Broadcast request to add actions for popup on selected rows valid
-   * properties: rows, firstRow, lastRow add actions to: popupActions
-   */
-  public static final int TYPE_ROW_POPUP = 700;
-  /**
-   * Broadcast request to add actions for popup on empty space (not on rows)
-   * <p>
-   * valid properties: add actions to: popupActions
-   */
-  public static final int TYPE_EMPTY_SPACE_POPUP = 701;
-  /**
-   * Broadcast request to add actions for header popup
-   * <p>
-   * valid properties: add actions to: popupActions
-   */
-  public static final int TYPE_HEADER_POPUP = 750;
+
   /**
    * Broadcast request to get drag object
    * <p>
@@ -147,26 +133,23 @@ public class TableEvent extends java.util.EventObject {
   //next 840, check method AbstractTable.processEventBuffer
 
   private final int m_type;
-  private ITableRow[] m_rows = new ITableRow[0];
+  private List<? extends ITableRow> m_rows;
   private List<IMenu> m_popupMenus;
   private boolean m_consumed;
   private TransferObject m_dragObject;
   private TransferObject m_dropObject;
   private TransferObject m_copyObject;
-  private IColumn[] m_columns;
+  private Collection<? extends IColumn<?>> m_columns;
   private boolean m_sortInMemoryAllowed;
 
   public TableEvent(ITable source, int type) {
-    super(source);
-    m_type = type;
+    this(source, type, null);
   }
 
-  public TableEvent(ITable source, int type, ITableRow[] rows) {
+  public TableEvent(ITable source, int type, List<? extends ITableRow> rows) {
     super(source);
     m_type = type;
-    if (rows != null && rows.length > 0) {
-      m_rows = rows;
-    }
+    m_rows = CollectionUtility.arrayList(rows);
   }
 
   public ITable getTable() {
@@ -177,24 +160,24 @@ public class TableEvent extends java.util.EventObject {
     return m_type;
   }
 
-  public ITableRow[] getRows() {
-    return m_rows;
+  public List<ITableRow> getRows() {
+    return CollectionUtility.arrayList(m_rows);
   }
 
-  protected void setRows(ITableRow[] rows) {
-    m_rows = rows;
+  protected void setRows(List<? extends ITableRow> rows) {
+    m_rows = CollectionUtility.arrayList(rows);
   }
 
   public int getRowCount() {
-    return m_rows != null ? m_rows.length : 0;
+    return m_rows.size();
   }
 
   public ITableRow getFirstRow() {
-    return m_rows.length > 0 ? m_rows[0] : null;
+    return CollectionUtility.firstElement(m_rows);
   }
 
   public ITableRow getLastRow() {
-    return m_rows.length > 0 ? m_rows[m_rows.length - 1] : null;
+    return CollectionUtility.lastElement(m_rows);
   }
 
   /**
@@ -212,25 +195,20 @@ public class TableEvent extends java.util.EventObject {
   /**
    * used by TYPE_ROW_POPUP to add actions
    */
-  public void addPopupMenus(IMenu[] menus) {
+  public void addPopupMenus(List<IMenu> menus) {
     if (menus != null) {
       if (m_popupMenus == null) {
         m_popupMenus = new ArrayList<IMenu>();
       }
-      m_popupMenus.addAll(Arrays.asList(menus));
+      m_popupMenus.addAll(menus);
     }
   }
 
   /**
    * used by TYPE_ROW_POPUP to add actions
    */
-  public IMenu[] getPopupMenus() {
-    if (m_popupMenus != null) {
-      return m_popupMenus.toArray(new IMenu[0]);
-    }
-    else {
-      return new IMenu[0];
-    }
+  public List<IMenu> getPopupMenus() {
+    return CollectionUtility.arrayList(m_popupMenus);
   }
 
   /**
@@ -290,15 +268,15 @@ public class TableEvent extends java.util.EventObject {
    * used by
    * TYPE_COLUMN_ORDER_CHANGED,TYPE_SORT_REQUEST,TYPE_COLUMN_HEADERS_CHANGED
    */
-  public IColumn[] getColumns() {
-    return m_columns;
+  public Collection<IColumn<?>> getColumns() {
+    return CollectionUtility.arrayList(m_columns);
   }
 
   public IColumn getFirstColumn() {
-    return m_columns.length > 0 ? m_columns[0] : null;
+    return CollectionUtility.firstElement(m_columns);
   }
 
-  protected void setColumns(IColumn[] columns) {
+  protected void setColumns(Collection<? extends IColumn<?>> columns) {
     m_columns = columns;
   }
 
@@ -315,7 +293,7 @@ public class TableEvent extends java.util.EventObject {
 
   @Override
   public String toString() {
-    StringBuffer buf = new StringBuffer();
+    StringBuilder buf = new StringBuilder();
     buf.append(getClass().getSimpleName() + "[");
     // decode type
     try {
@@ -334,17 +312,17 @@ public class TableEvent extends java.util.EventObject {
     }
     buf.append(" ");
     // rows
-    if (m_rows != null && m_rows.length > 0 && getTable() != null) {
-      if (m_rows.length == 1) {
-        buf.append("row " + m_rows[0]);
+    if (CollectionUtility.hasElements(m_rows) && getTable() != null) {
+      if (m_rows.size() == 1) {
+        buf.append("row ").append(m_rows.get(0));
       }
       else {
         buf.append("rows {");
-        for (int i = 0; i < m_rows.length; i++) {
-          if (i >= 0) {
-            buf.append(",");
-          }
-          buf.append("" + m_rows[i]);
+        Iterator<? extends ITableRow> rowIt = m_rows.iterator();
+        buf.append("" + rowIt.next());
+        while (rowIt.hasNext()) {
+          buf.append(",");
+          buf.append("" + rowIt.next());
         }
         buf.append("}");
       }

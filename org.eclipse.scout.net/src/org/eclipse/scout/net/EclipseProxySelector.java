@@ -163,13 +163,10 @@ public final class EclipseProxySelector extends ProxySelector {
     ServiceReference ref = context.getServiceReference(IProxyService.class.getName());
     if (ref != null) {
       try {
-        @SuppressWarnings("unchecked")
         IProxyService service = (IProxyService) context.getService(ref);
 
         //Necessary for backward compatibility to Eclipse 3.4 needed for Lotus Notes 8.5.2
-        Version frameworkVersion = new Version(NetActivator.getDefault().getBundle().getBundleContext().getProperty("osgi.framework.version"));
-        if (frameworkVersion.getMajor() == 3
-            && frameworkVersion.getMinor() <= 4) {
+        if (isOsgiFramework34()) {
           return new IProxyData[0];
         }
         else {
@@ -188,4 +185,17 @@ public final class EclipseProxySelector extends ProxySelector {
     }
     return new IProxyData[0];
   }
+
+  /**
+   * @return true, if the version of osgi.framework.version is 3.4.x, false otherwise
+   */
+  private boolean isOsgiFramework34() {
+    String osgiFrameworkVersion = NetActivator.getDefault().getBundle().getBundleContext().getProperty("osgi.framework.version");
+    if (osgiFrameworkVersion != null) {
+      Version frameworkVersion = new Version(osgiFrameworkVersion);
+      return frameworkVersion.getMajor() == 3 && frameworkVersion.getMinor() <= 4;
+    }
+    return false;
+  }
+
 }

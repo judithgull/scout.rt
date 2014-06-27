@@ -21,7 +21,7 @@ import org.eclipse.swt.layout.RowData;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
 
-public class RwtScoutToolButton extends RwtScoutComposite<IAction> implements IRwtScoutToolButtonForPatch {
+public class RwtScoutToolButton extends RwtScoutComposite<IAction> implements IRwtScoutToolButton {
 
   private final boolean m_iconVisible;
   private final boolean m_textVisible;
@@ -58,6 +58,7 @@ public class RwtScoutToolButton extends RwtScoutComposite<IAction> implements IR
     updateTextFromScout();
     updateEnabledFormScout();
     updateVisibleFromScout();
+    updateTooltipTextFromScout();
   }
 
   @Override
@@ -67,11 +68,9 @@ public class RwtScoutToolButton extends RwtScoutComposite<IAction> implements IR
 
   protected void handleUiSelection() {
     //notify Scout
-    final boolean selected = getUiField().getSelection();
     Runnable t = new Runnable() {
       @Override
       public void run() {
-        getScoutObject().getUIFacade().setSelectedFromUI(selected);
         getScoutObject().getUIFacade().fireActionFromUI();
       }
     };
@@ -106,11 +105,11 @@ public class RwtScoutToolButton extends RwtScoutComposite<IAction> implements IR
     }
   }
 
-  private void updateEnabledFormScout() {
+  protected void updateEnabledFormScout() {
     getUiField().setEnabled(getScoutObject().isEnabled());
   }
 
-  private void updateVisibleFromScout() {
+  protected void updateVisibleFromScout() {
     getUiField().setVisible(getScoutObject().isVisible());
     // Instruct layout to exclude button when invisible
     RowData data = new RowData();
@@ -120,6 +119,13 @@ public class RwtScoutToolButton extends RwtScoutComposite<IAction> implements IR
     }
     data.exclude = !getScoutObject().isVisible();
     getUiField().setLayoutData(data);
+  }
+
+  /**
+   * @since 4.1.0 (backported)
+   */
+  protected void updateTooltipTextFromScout() {
+    getUiField().setToolTipText(getScoutObject().getTooltipText());
   }
 
   @Override
@@ -139,6 +145,9 @@ public class RwtScoutToolButton extends RwtScoutComposite<IAction> implements IR
     }
     else if (IToolButton.PROP_VISIBLE.equals(name)) {
       updateVisibleFromScout();
+    }
+    else if (IToolButton.PROP_TOOLTIP_TEXT.equals(name)) {
+      updateTooltipTextFromScout();
     }
   }
 

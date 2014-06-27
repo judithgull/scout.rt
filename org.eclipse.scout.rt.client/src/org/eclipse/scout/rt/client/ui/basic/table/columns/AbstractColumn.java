@@ -12,20 +12,22 @@ package org.eclipse.scout.rt.client.ui.basic.table.columns;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-import java.lang.reflect.Array;
 import java.security.Permission;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.CompareUtility;
+import org.eclipse.scout.commons.ConfigurationUtility;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.TypeCastUtility;
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.annotations.Replace;
 import org.eclipse.scout.commons.beans.AbstractPropertyObserver;
@@ -59,6 +61,7 @@ import org.eclipse.scout.rt.shared.data.form.AbstractFormData;
 import org.eclipse.scout.rt.shared.services.common.security.IAccessControlService;
 import org.eclipse.scout.service.SERVICES;
 
+@ClassId("ebe15e4d-017b-4ac0-9a5a-2c9e07c8ad6f")
 public abstract class AbstractColumn<T> extends AbstractPropertyObserver implements IColumn<T> {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractColumn.class);
 
@@ -85,7 +88,7 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    * Used for mutable tables to keep last valid value per row and column.
    */
   // TODO: Move cache to AbstractTable with bug 414646
-  private Map<InternalTableRow, T> m_validatedValues = new HashMap<InternalTableRow, T>();
+  private final Map<InternalTableRow, T> m_validatedValues = new HashMap<InternalTableRow, T>();
 
   public AbstractColumn() {
     m_headerCell = new HeaderCell();
@@ -142,7 +145,6 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(10)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredVisible() {
     return true;
   }
@@ -156,7 +158,6 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.TEXT)
   @Order(20)
-  @ConfigPropertyValue("null")
   protected String getConfiguredHeaderText() {
     return null;
   }
@@ -170,7 +171,6 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.TEXT)
   @Order(30)
-  @ConfigPropertyValue("null")
   protected String getConfiguredHeaderTooltipText() {
     return null;
   }
@@ -184,7 +184,6 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.COLOR)
   @Order(40)
-  @ConfigPropertyValue("null")
   protected String getConfiguredHeaderForegroundColor() {
     return null;
   }
@@ -198,7 +197,6 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.COLOR)
   @Order(50)
-  @ConfigPropertyValue("null")
   protected String getConfiguredHeaderBackgroundColor() {
     return null;
   }
@@ -212,7 +210,6 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.STRING)
   @Order(60)
-  @ConfigPropertyValue("null")
   protected String getConfiguredHeaderFont() {
     return null;
   }
@@ -229,7 +226,6 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(70)
-  @ConfigPropertyValue("60")
   protected int getConfiguredWidth() {
     return 60;
   }
@@ -242,7 +238,6 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(75)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredFixedWidth() {
     return false;
   }
@@ -257,7 +252,6 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(80)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredDisplayable() {
     return true;
   }
@@ -265,7 +259,7 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
   /**
    * Configures whether this column value belongs to the primary key of the surrounding table. The table's primary key
    * might consist of several columns. The primary key can be used to find the appropriate row by calling
-   * {@link AbstractTable#findRowByKey(Object[])}.
+   * {@link AbstractTable#findRowByKey(List)}.
    * <p>
    * Subclasses can override this method. Default is {@code false}.
    * 
@@ -274,7 +268,6 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(90)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredPrimaryKey() {
     return false;
   }
@@ -289,7 +282,6 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(95)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredEditable() {
     return false;
   }
@@ -305,7 +297,6 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(100)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredSummary() {
     return false;
   }
@@ -320,7 +311,6 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.COLOR)
   @Order(110)
-  @ConfigPropertyValue("null")
   protected String getConfiguredForegroundColor() {
     return null;
   }
@@ -335,7 +325,6 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.COLOR)
   @Order(120)
-  @ConfigPropertyValue("null")
   protected String getConfiguredBackgroundColor() {
     return null;
   }
@@ -350,7 +339,6 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.STRING)
   @Order(130)
-  @ConfigPropertyValue("null")
   protected String getConfiguredFont() {
     return null;
   }
@@ -366,7 +354,6 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(140)
-  @ConfigPropertyValue("-1")
   protected int getConfiguredSortIndex() {
     return -1;
   }
@@ -382,7 +369,6 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.DOUBLE)
   @Order(145)
-  @ConfigPropertyValue("-1")
   protected double getConfiguredViewOrder() {
     return -1;
   }
@@ -397,7 +383,6 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(150)
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredSortAscending() {
     return true;
   }
@@ -412,7 +397,6 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(160)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredAlwaysIncludeSortAtBegin() {
     return false;
   }
@@ -427,7 +411,6 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(170)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredAlwaysIncludeSortAtEnd() {
     return false;
   }
@@ -441,7 +424,6 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.INTEGER)
   @Order(180)
-  @ConfigPropertyValue("-1")
   protected int getConfiguredHorizontalAlignment() {
     return -1;
   }
@@ -460,7 +442,6 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(190)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredAutoOptimizeWidth() {
     return false;
   }
@@ -471,11 +452,11 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    * <p>
    * Subclasses can override this method. Default is {@code null}.
    * 
+   * @deprecated: Use a {@link ClassId} annotation as key for Doc-Text. Will be removed in the 5.0 Release.
    * @return a documentation text, suitable to be included in external documents
    */
-  @ConfigProperty(ConfigProperty.DOC)
+  @Deprecated
   @Order(200)
-  @ConfigPropertyValue("null")
   protected String getConfiguredDoc() {
     return null;
   }
@@ -490,7 +471,6 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(210)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredMandatory() {
     return false;
   }
@@ -731,13 +711,7 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
     setInitialAlwaysIncludeSortAtBegin(getConfiguredAlwaysIncludeSortAtBegin());
     setInitialAlwaysIncludeSortAtEnd(getConfiguredAlwaysIncludeSortAtEnd());
     //
-    double viewOrder = getConfiguredViewOrder();
-    if (viewOrder < 0) {
-      if (getClass().isAnnotationPresent(Order.class)) {
-        Order order = (Order) getClass().getAnnotation(Order.class);
-        viewOrder = order.value();
-      }
-    }
+    double viewOrder = calculateViewOrder();
     setViewOrder(viewOrder);
     //
     setWidth(getConfiguredWidth());
@@ -756,6 +730,27 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
     if (getConfiguredFont() != null) {
       setFont(FontSpec.parse(getConfiguredFont()));
     }
+  }
+
+  /**
+   * Calculates the column's view order, e.g. if the @Order annotation is set to 30.0, the method will
+   * return 30.0. If no {@link Order} annotation is set, the method checks its super classes for an @Order annotation.
+   * 
+   * @since 3.10.0-M4
+   */
+  protected double calculateViewOrder() {
+    double viewOrder = getConfiguredViewOrder();
+    Class<?> cls = getClass();
+    if (viewOrder < 0) {
+      while (cls != null && IColumn.class.isAssignableFrom(cls)) {
+        if (cls.isAnnotationPresent(Order.class)) {
+          Order order = (Order) cls.getAnnotation(Order.class);
+          return order.value();
+        }
+        cls = cls.getSuperclass();
+      }
+    }
+    return viewOrder;
   }
 
   /*
@@ -895,6 +890,15 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
     return s;
   }
 
+  /**
+   * Needs to consider the class id of the container to account for columns in templates.
+   */
+  @Override
+  public String classId() {
+    String simpleClassId = ConfigurationUtility.getAnnotatedClassIdWithFallback(getClass(), false);
+    return simpleClassId + ID_CONCAT_SYMBOL + getTable().classId();
+  }
+
   @Override
   public T getValue(ITableRow r) {
     T validatedValue = m_validatedValues.get(r);
@@ -944,8 +948,7 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
 
   @Override
   public void fill(T rawValue) throws ProcessingException {
-    ITableRow[] rows = getTable().getRows();
-    for (ITableRow row : rows) {
+    for (ITableRow row : getTable().getRows()) {
       setValue(row, rawValue);
     }
   }
@@ -957,32 +960,41 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
   }
 
   @Override
-  @SuppressWarnings("unchecked")
-  public T[] getValues() {
-    T[] values = (T[]) Array.newInstance(getDataType(), m_table.getRowCount());
-    for (int i = 0, ni = m_table.getRowCount(); i < ni; i++) {
-      values[i] = getValue(m_table.getRow(i));
+  public List<T> getValues() {
+    int rowCount = m_table.getRowCount();
+    List<T> values = new ArrayList<T>(rowCount);
+    for (int i = 0; i < rowCount; i++) {
+      values.add(getValue(m_table.getRow(i)));
     }
     return values;
   }
 
   @Override
-  @SuppressWarnings("unchecked")
-  public T[] getValues(ITableRow[] rows) {
-    T[] values = (T[]) Array.newInstance(getDataType(), rows.length);
-    for (int i = 0; i < rows.length; i++) {
-      values[i] = getValue(rows[i]);
+  public List<T> getValues(boolean includeDeleted) {
+    List<T> values = new ArrayList<T>();
+    for (ITableRow row : m_table.getRows()) {
+      if (includeDeleted || (row.getStatus() != ITableRow.STATUS_DELETED)) {
+        values.add(getValue(row));
+      }
     }
     return values;
   }
 
   @Override
-  @SuppressWarnings("unchecked")
-  public T[] getSelectedValues() {
-    ITableRow[] rows = m_table.getSelectedRows();
-    T[] values = (T[]) Array.newInstance(getDataType(), rows.length);
-    for (int i = 0; i < rows.length; i++) {
-      values[i] = getValue(rows[i]);
+  public List<T> getValues(Collection<? extends ITableRow> rows) {
+    List<T> values = new ArrayList<T>(rows.size());
+    for (ITableRow row : rows) {
+      values.add(getValue(row));
+    }
+    return values;
+  }
+
+  @Override
+  public List<T> getSelectedValues() {
+    List<ITableRow> selectedRows = m_table.getSelectedRows();
+    List<T> values = new ArrayList<T>(selectedRows.size());
+    for (ITableRow row : selectedRows) {
+      values.add(getValue(row));
     }
     return values;
   }
@@ -1004,10 +1016,10 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
   }
 
   @Override
-  public String[] getDisplayTexts() {
-    String[] values = new String[m_table.getRowCount()];
-    for (int i = 0, ni = m_table.getRowCount(); i < ni; i++) {
-      values[i] = getDisplayText(m_table.getRow(i));
+  public List<String> getDisplayTexts() {
+    List<String> values = new ArrayList<String>(m_table.getRowCount());
+    for (int i = 0; i < m_table.getRowCount(); i++) {
+      values.add(getDisplayText(m_table.getRow(i)));
     }
     return values;
   }
@@ -1024,72 +1036,80 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
   }
 
   @Override
-  public String[] getSelectedDisplayTexts() {
-    ITableRow[] rows = m_table.getSelectedRows();
-    String[] values = new String[rows.length];
-    for (int i = 0; i < rows.length; i++) {
-      values[i] = getDisplayText(rows[i]);
+  public List<String> getSelectedDisplayTexts() {
+    List<ITableRow> selectedRows = m_table.getSelectedRows();
+    List<String> values = new ArrayList<String>(selectedRows.size());
+    for (ITableRow row : selectedRows) {
+      values.add(getDisplayText(row));
     }
     return values;
   }
 
   @Override
-  @SuppressWarnings("unchecked")
-  public T[] getInsertedValues() {
-    ITableRow[] rows = m_table.getInsertedRows();
-    T[] values = (T[]) Array.newInstance(getDataType(), rows.length);
-    for (int i = 0; i < rows.length; i++) {
-      values[i] = getValue(rows[i]);
+  public List<T> getInsertedValues() {
+    List<ITableRow> insertedRows = m_table.getInsertedRows();
+    List<T> values = new ArrayList<T>(insertedRows.size());
+    for (ITableRow row : insertedRows) {
+      values.add(getValue(row));
     }
     return values;
   }
 
   @Override
-  @SuppressWarnings("unchecked")
-  public T[] getUpdatedValues() {
-    ITableRow[] rows = m_table.getUpdatedRows();
-    T[] values = (T[]) Array.newInstance(getDataType(), rows.length);
-    for (int i = 0; i < rows.length; i++) {
-      values[i] = getValue(rows[i]);
+  public List<T> getUpdatedValues() {
+    List<ITableRow> updatedRows = m_table.getUpdatedRows();
+    List<T> values = new ArrayList<T>(updatedRows.size());
+    for (ITableRow row : updatedRows) {
+      values.add(getValue(row));
     }
     return values;
   }
 
   @Override
-  @SuppressWarnings("unchecked")
-  public T[] getDeletedValues() {
-    ITableRow[] rows = m_table.getDeletedRows();
-    T[] values = (T[]) Array.newInstance(getDataType(), rows.length);
-    for (int i = 0; i < rows.length; i++) {
-      values[i] = getValue(rows[i]);
+  public List<T> getDeletedValues() {
+    List<ITableRow> deletedRows = m_table.getDeletedRows();
+    List<T> values = new ArrayList<T>(deletedRows.size());
+    for (ITableRow row : deletedRows) {
+      values.add(getValue(row));
     }
     return values;
   }
 
   @Override
-  public ITableRow[] findRows(T[] values) {
-    ArrayList<ITableRow> rowList = new ArrayList<ITableRow>();
-    if (values != null) {
-      for (int i = 0; i < values.length; i++) {
-        ITableRow row = findRow(values[i]);
+  public List<T> getNotDeletedValues() {
+    List<ITableRow> notDeletedRows = m_table.getNotDeletedRows();
+    List<T> values = new ArrayList<T>(notDeletedRows.size());
+    for (ITableRow row : notDeletedRows) {
+      values.add(getValue(row));
+    }
+    return values;
+  }
+
+  @Override
+  public List<ITableRow> findRows(Collection<? extends T> keys) {
+    if (keys != null) {
+      List<ITableRow> values = new ArrayList<ITableRow>(keys.size());
+      for (T t : keys) {
+        ITableRow row = findRow(t);
         if (row != null) {
-          rowList.add(row);
+          values.add(row);
         }
       }
+      return values;
     }
-    return rowList.toArray(new ITableRow[0]);
+    return CollectionUtility.emptyArrayList();
   }
 
   @Override
-  public ITableRow[] findRows(T value) {
-    ArrayList<ITableRow> rowList = new ArrayList<ITableRow>();
-    for (int i = 0, ni = m_table.getRowCount(); i < ni; i++) {
+  public List<ITableRow> findRows(T value) {
+    List<ITableRow> values = new ArrayList<ITableRow>();
+    for (int i = 0; i < m_table.getRowCount(); i++) {
       ITableRow row = m_table.getRow(i);
       if (CompareUtility.equals(value, getValue(row))) {
-        rowList.add(row);
+        values.add(row);
       }
     }
-    return rowList.toArray(new ITableRow[0]);
+    return values;
   }
 
   @Override
@@ -1116,7 +1136,7 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
 
   @Override
   public boolean containsDuplicateValues() {
-    return new HashSet<T>(Arrays.asList(getValues())).size() < getValues().length;
+    return new HashSet<T>(getValues()).size() < getValues().size();
   }
 
   @Override
@@ -1258,13 +1278,16 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
    */
   protected IFormField prepareEditInternal(ITableRow row) throws ProcessingException {
     AbstractValueField<T> f = new AbstractValueField<T>() {
-      @Override
-      protected void initConfig() {
-        super.initConfig();
-        propertySupport.putPropertiesMap(AbstractColumn.this.propertySupport.getPropertiesMap());
-      }
     };
+    mapEditorFieldProperties(f);
     return f;
+  }
+
+  protected void mapEditorFieldProperties(IFormField f) {
+    f.setBackgroundColor(getBackgroundColor());
+    f.setForegroundColor(getForegroundColor());
+    f.setFont(getFont());
+    f.setMandatory(isMandatory());
   }
 
   /**
@@ -1322,6 +1345,10 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
     decorateHeaderCellInternal(cell);
     try {
       execDecorateHeaderCell(cell);
+
+      if (getTable() != null && getTable().getColumnSet() != null) {
+        getTable().getColumnSet().updateColumn(this);
+      }
     }
     catch (ProcessingException e) {
       LOG.warn(null, e);
@@ -1545,12 +1572,22 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
       return;
     }
     for (ITableRow row : getTable().getRows()) {
-      validateColumnValue(row, null, true, getValue(row));
+      validateColumnValue(row, null, true, getValueOfCell(row));
     }
   }
 
   public void validateColumnValue(ITableRow row) {
-    validateColumnValue(row, null, false, getValue(row));
+    validateColumnValue(row, null, false, getValueOfCell(row));
+  }
+
+  /**
+   * @return The real value of the cell that belongs to the given {@link ITableRow}. Does not consider
+   *         {@link #m_validatedValues}.
+   * @see https://bugs.eclipse.org/bugs/show_bug.cgi?id=424511
+   */
+  @SuppressWarnings("unchecked")
+  protected T getValueOfCell(ITableRow row) {
+    return (T) row.getCell(this).getValue();
   }
 
   /**
@@ -1588,11 +1625,15 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
       try {
         if (editor == null) {
           m_isValidating = true;
-          editor = prepareEdit(row);
-          if (editor instanceof IValueField<?>) {
-            ((IValueField<T>) editor).setValue(value);
+          try {
+            editor = prepareEdit(row);
+            if (editor instanceof IValueField<?>) {
+              ((IValueField<T>) editor).setValue(value);
+            }
           }
-          m_isValidating = false;
+          finally {
+            m_isValidating = false;
+          }
         }
         if (editor != null) {
           IProcessingStatus errorStatus = editor.getErrorStatus();
@@ -1617,7 +1658,7 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
             /*
              * Workaround for bugs 396848 & 408741
              * Currently, we set the error status and value directly on the cell before calling the decorator.
-             * A cleaner way is to fire a table update event like in {@link AbstractTable#fireRowsUpdated(ITableRow[] rows)}
+             * A cleaner way is to fire a table update event like in {@link AbstractTable#fireRowsUpdated(List<ITableRow> rows)}
              * to propagate the new error status and value.
              */
             cell.clearErrorStatus();
@@ -1642,4 +1683,5 @@ public abstract class AbstractColumn<T> extends AbstractPropertyObserver impleme
     }
 
   }
+
 }

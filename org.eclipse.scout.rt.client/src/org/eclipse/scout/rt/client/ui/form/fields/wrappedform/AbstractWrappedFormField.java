@@ -13,8 +13,8 @@ package org.eclipse.scout.rt.client.ui.form.fields.wrappedform;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
@@ -25,7 +25,10 @@ import org.eclipse.scout.rt.client.ui.form.IForm;
 import org.eclipse.scout.rt.client.ui.form.IFormFieldVisitor;
 import org.eclipse.scout.rt.client.ui.form.fields.AbstractFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
+import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
+import org.eclipse.scout.service.SERVICES;
 
+@ClassId("535cfd11-39cf-4804-beef-2bc1bc3d34cc")
 public abstract class AbstractWrappedFormField<T extends IForm> extends AbstractFormField implements IWrappedFormField<T> {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractWrappedFormField.class);
 
@@ -41,7 +44,6 @@ public abstract class AbstractWrappedFormField<T extends IForm> extends Abstract
     super(callInitializer);
   }
 
-  @ConfigPropertyValue("false")
   @Override
   protected boolean getConfiguredLabelVisible() {
     return false;
@@ -49,19 +51,16 @@ public abstract class AbstractWrappedFormField<T extends IForm> extends Abstract
 
   @ConfigProperty(ConfigProperty.FORM)
   @Order(200)
-  @ConfigPropertyValue("null")
   protected Class<? extends IForm> getConfiguredInnerForm() {
     return null;
   }
 
-  @ConfigPropertyValue("1")
   @Override
   protected double getConfiguredGridWeightY() {
     return 1;
   }
 
   @Override
-  @ConfigPropertyValue("true")
   protected boolean getConfiguredGridUseUiHeight() {
     return true;
   }
@@ -92,7 +91,7 @@ public abstract class AbstractWrappedFormField<T extends IForm> extends Abstract
         setInnerForm((T) getConfiguredInnerForm().newInstance());
       }
       catch (Exception e) {
-        LOG.warn(null, e);
+        SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + getConfiguredInnerForm().getName() + "'.", e));
       }
     }
   }

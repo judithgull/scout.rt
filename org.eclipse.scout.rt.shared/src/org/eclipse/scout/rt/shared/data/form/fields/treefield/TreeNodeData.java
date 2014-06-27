@@ -14,6 +14,8 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.eclipse.scout.commons.CollectionUtility;
+
 /**
  * Transfer object representing a node in a tree, used with a {@link AbstractTreeFieldData}
  */
@@ -22,8 +24,8 @@ public class TreeNodeData implements Serializable, Cloneable {
 
   private TreeNodeData m_parentNode;
   private List<TreeNodeData> m_childNodes;
-  private Object[] m_values;
-  private String[] m_texts;
+  private List<? extends Object> m_values;
+  private List<String> m_texts;
 
   public TreeNodeData() {
     m_childNodes = new ArrayList<TreeNodeData>(2);
@@ -67,20 +69,20 @@ public class TreeNodeData implements Serializable, Cloneable {
     }
   }
 
-  public Object[] getValues() {
-    return m_values;
+  public List<Object> getValues() {
+    return CollectionUtility.arrayList(m_values);
   }
 
-  public void setValues(Object[] a) {
-    m_values = a;
+  public void setValues(List<? extends Object> a) {
+    m_values = CollectionUtility.arrayList(a);
   }
 
-  public String[] getTexts() {
-    return m_texts;
+  public List<String> getTexts() {
+    return CollectionUtility.arrayList(m_texts);
   }
 
-  public void setTexts(String[] a) {
-    m_texts = a;
+  public void setTexts(List<String> a) {
+    m_texts = CollectionUtility.arrayList(a);
   }
 
 }

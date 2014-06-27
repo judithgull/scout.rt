@@ -16,7 +16,7 @@
   <parent>
     <groupId>org.eclipse.scout.rt</groupId>
     <artifactId>org.eclipse.scout.rt.parent</artifactId>
-    <version>3.9.2-SNAPSHOT</version>
+    <version>4.0.0-SNAPSHOT</version>
     <relativePath>../org.eclipse.scout.rt.parent</relativePath>
   </parent>
 
@@ -38,6 +38,7 @@
             <groupId>org.eclipse.tycho</groupId>
             <artifactId>tycho-surefire-plugin</artifactId>
             <configuration>
+              <!-- <debugPort>18081</debugPort> -->
               <excludes>
                 <exclude>**/Mail*Test.java</exclude>
               </excludes>
@@ -58,6 +59,7 @@
             <groupId>org.eclipse.tycho</groupId>
             <artifactId>tycho-surefire-plugin</artifactId>
             <configuration>
+               <!-- <debugPort>18081</debugPort> -->
               <includes>
                 <include>**/*Test.java</include>
               </includes>

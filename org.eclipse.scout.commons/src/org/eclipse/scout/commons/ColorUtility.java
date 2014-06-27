@@ -11,8 +11,11 @@
 package org.eclipse.scout.commons;
 
 import java.awt.Color;
+import java.util.regex.Pattern;
 
 public final class ColorUtility {
+
+  public static final Pattern HEX_COLOR_PATTERN = Pattern.compile("^(\\#|0X|0x)?([0-9A-Fa-f]{6})$");
 
   // public constants
   public static final String RED = "ff0000";
@@ -36,6 +39,20 @@ public final class ColorUtility {
 
   public static int hsb2rgb(float hue, float saturation, float brightness) {
     return Color.HSBtoRGB(hue, saturation, brightness);
+  }
+
+  /**
+   * Converts a color's RGB presentation to a textual hexadecimal representation.
+   * <p>
+   * Example: r = 255, g = 0, b = 0 --> "#ff0000"
+   * <p>
+   * Note: the hexadecimal representation is lowercase
+   * 
+   * @return hexadecimal representation of RGB in lowercase.
+   * @since 4.0-M7
+   */
+  public static String rgbToText(int red, int green, int blue) {
+    return String.format("#%02x%02x%02x", red, green, blue);
   }
 
 }

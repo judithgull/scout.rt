@@ -12,9 +12,9 @@ package org.eclipse.scout.rt.client.ui.form.fields.browserfield;
 
 import java.net.URL;
 
+import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
-import org.eclipse.scout.commons.annotations.ConfigPropertyValue;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
@@ -24,6 +24,7 @@ import org.eclipse.scout.rt.client.ui.form.fields.AbstractValueField;
 import org.eclipse.scout.rt.shared.services.common.file.RemoteFile;
 import org.eclipse.scout.rt.shared.services.common.jdbc.SearchFilter;
 
+@ClassId("6402e68c-abd1-42b8-8da2-b4a12f910c98")
 public abstract class AbstractBrowserField extends AbstractValueField<RemoteFile> implements IBrowserField {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractBrowserField.class);
 
@@ -40,8 +41,14 @@ public abstract class AbstractBrowserField extends AbstractValueField<RemoteFile
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
   @Order(250)
-  @ConfigPropertyValue("false")
   protected boolean getConfiguredScrollBarEnabled() {
+    return false;
+  }
+
+  @Override
+  @Order(210)
+  @ConfigProperty(ConfigProperty.BOOLEAN)
+  protected boolean getConfiguredAutoAddDefaultMenus() {
     return false;
   }
 

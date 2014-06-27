@@ -34,11 +34,12 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 
+import org.eclipse.scout.commons.CollectionUtility;
+import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.nls.NlsUtility;
 
@@ -78,7 +79,7 @@ public class CsvHelper {
    * @return column headers
    */
   public List<String> getColumnNames() {
-    return Collections.unmodifiableList(m_colNames);
+    return CollectionUtility.arrayList(m_colNames);
   }
 
   public void setColumnNames(List<String> list) {
@@ -94,7 +95,7 @@ public class CsvHelper {
    * @return column data types
    */
   public List<String> getColumnTypes() {
-    return Collections.unmodifiableList(m_colTypes);
+    return CollectionUtility.arrayList(m_colTypes);
   }
 
   public void setColumnTypes(List<String> list) {
@@ -102,15 +103,15 @@ public class CsvHelper {
     m_colFormat = new ArrayList<Format>(list.size());
     for (Iterator<String> it = list.iterator(); it.hasNext();) {
       String s = it.next();
-      String sLow = (s != null ? s.toLowerCase() : null);
+      String sLow = StringUtility.lowercase(s);
       Format f = null;
       if (s == null) {
         f = null;
       }
-      else if (sLow.equals("string")) {
+      else if ("string".equals(sLow)) {
         f = null;
       }
-      else if (sLow.startsWith("integer")) {
+      else if ("integer".startsWith(sLow)) {
         if (s.length() >= 8) {// integer_<format>
           f = new DecimalFormat(s.substring(8), new DecimalFormatSymbols(m_locale));
           ((DecimalFormat) f).setParseIntegerOnly(true);
@@ -119,7 +120,7 @@ public class CsvHelper {
           f = NumberFormat.getIntegerInstance(m_locale);
         }
       }
-      else if (sLow.startsWith("float")) {
+      else if ("float".startsWith(sLow)) {
         if (s.length() >= 6) {// float_<format>
           f = new DecimalFormat(s.substring(6), new DecimalFormatSymbols(m_locale));
         }
@@ -127,7 +128,7 @@ public class CsvHelper {
           f = NumberFormat.getNumberInstance(m_locale);
         }
       }
-      else if (sLow.startsWith("date")) {
+      else if ("date".startsWith(sLow)) {
         if (s.length() >= 5) {
           f = new SimpleDateFormat(s.substring(5), m_locale);
         }
@@ -185,7 +186,6 @@ public class CsvHelper {
    * @throws ProcessingException
    */
   public void importData(IDataConsumer dataConsumer, Reader reader, boolean readNameHeader, boolean readTypeHeader, int headerRowCount, int rowCount, boolean allowVariableColumnCount) throws ProcessingException {
-    String line = null;
     String cell = null;
     int colIndex = 0;
     int lineNr = -1;
@@ -224,7 +224,12 @@ public class CsvHelper {
         for (colIndex = 0; colIndex < cellList.size(); colIndex++) {
           if (m_ignoredColumns == null || m_ignoredColumns.length == 0 || m_ignoredColumns.length < colIndex || !m_ignoredColumns[colIndex]) {
             cell = cellList.get(colIndex);
-            objList.add(importCell(cell, getColumnFormat(colIndex)));
+            try {
+              objList.add(importCell(cell, getColumnFormat(colIndex)));
+            }
+            catch (ProcessingException e) {
+              throw new ProcessingException("colIndex=" + colIndex + " cell=" + cell, e);
+            }
           }
         }
         // add row to data
@@ -233,7 +238,8 @@ public class CsvHelper {
       }
     }
     catch (Exception e) {
-      throw new ProcessingException("line=" + line + " colIndex=" + colIndex + " cell=" + cell, e);
+      String previousMessage = (!StringUtility.isNullOrEmpty(e.getMessage())) ? " " + e.getMessage() : "";
+      throw new ProcessingException("lineNr=" + lineNr + previousMessage, e);
     }
   }
 

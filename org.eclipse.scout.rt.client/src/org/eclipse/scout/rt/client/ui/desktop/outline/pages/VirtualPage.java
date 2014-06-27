@@ -10,10 +10,11 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.desktop.outline.pages;
 
+import java.util.List;
+
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.exception.IProcessingStatus;
 import org.eclipse.scout.commons.exception.ProcessingException;
-import org.eclipse.scout.commons.logger.IScoutLogger;
-import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.basic.tree.IVirtualTreeNode;
 import org.eclipse.scout.rt.client.ui.basic.tree.VirtualTreeNode;
 import org.eclipse.scout.rt.client.ui.desktop.outline.IOutline;
@@ -31,19 +32,12 @@ import org.eclipse.scout.rt.client.ui.form.IForm;
  * {@link AbstractPageWithNodes#execCreateChildPages(java.util.Collection)}
  */
 public class VirtualPage extends VirtualTreeNode implements IPage, IVirtualTreeNode {
-  private static final IScoutLogger LOG = ScoutLogManager.getLogger(VirtualPage.class);
 
   public VirtualPage() {
   }
 
   @Override
   public void initPage() throws ProcessingException {
-  }
-
-  @Override
-  @SuppressWarnings("deprecation")
-  public String getBookmarkIdentifier() {
-    return null;
   }
 
   @Override
@@ -67,8 +61,8 @@ public class VirtualPage extends VirtualTreeNode implements IPage, IVirtualTreeN
   }
 
   @Override
-  public IPage[] getChildPages() {
-    return new IPage[0];
+  public List<IPage> getChildPages() {
+    return CollectionUtility.emptyArrayList();
   }
 
   @Override
@@ -112,5 +106,18 @@ public class VirtualPage extends VirtualTreeNode implements IPage, IVirtualTreeN
 
   @Override
   public void setPagePopulateStatus(IProcessingStatus status) {
+  }
+
+  /**
+   * not defined on a virtual pages.
+   */
+  @Override
+  public String classId() {
+    return null;
+  }
+
+  @Override
+  public <T> T getAdapter(Class<T> clazz) {
+    return null;
   }
 }

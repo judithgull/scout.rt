@@ -21,7 +21,7 @@ import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 
-public class RwtScoutFormButton extends RwtScoutComposite<IAction> implements IRwtScoutFormButtonForPatch {
+public class RwtScoutFormButton extends RwtScoutComposite<IAction> implements IRwtScoutFormButton {
   private final boolean m_iconVisible;
   private final boolean m_textVisible;
   private String m_variantInActive;
@@ -78,11 +78,9 @@ public class RwtScoutFormButton extends RwtScoutComposite<IAction> implements IR
 
   protected void handleUiSelection() {
     //notify Scout
-    final boolean selected = getUiField().getSelection();
     Runnable t = new Runnable() {
       @Override
       public void run() {
-        getScoutObject().getUIFacade().setSelectedFromUI(selected);
         getScoutObject().getUIFacade().fireActionFromUI();
       }
     };
@@ -97,7 +95,11 @@ public class RwtScoutFormButton extends RwtScoutComposite<IAction> implements IR
 
   protected void updateTextFromScout() {
     if (m_textVisible) {
-      getUiField().setText(getScoutObject().getText());
+      String text = getScoutObject().getText();
+      if (text == null) {
+        text = "";
+      }
+      getUiField().setText(text);
     }
   }
 

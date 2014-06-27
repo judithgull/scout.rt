@@ -37,6 +37,8 @@ import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceReference;
 
 public class ServicesView extends DefaultView {
+  private static final long serialVersionUID = -3977567784149624349L;
+
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(ServicesView.class);
 
   private ServiceInspector[] m_serviceInspectors;
@@ -65,7 +67,6 @@ public class ServicesView extends DefaultView {
           try {
             ArrayList<ServiceInspector> list = new ArrayList<ServiceInspector>(refs.length);
             for (ServiceReference ref : refs) {
-              @SuppressWarnings("unchecked")
               Object s = context.getService(ref);
               if (s != null) {
                 list.add(new ServiceInspector(s));
@@ -173,6 +174,8 @@ public class ServicesView extends DefaultView {
     p.p(sectionName);
     p.startListBox("listBox", 1, true);
     p.listBoxOption(" ", new AbstractHtmlAction("selectService.choose") {
+      private static final long serialVersionUID = 2126137524925087564L;
+
       @Override
       public void run() {
       }
@@ -181,6 +184,8 @@ public class ServicesView extends DefaultView {
       boolean selected = m_selectedService != null && (m_selectedService.getService() == serviceInspector.getService());
       final ServiceInspector finalServiceInspector = serviceInspector;
       p.listBoxOption(serviceInspector.getService().getClass().getName(), new AbstractHtmlAction("selectService2." + serviceInspector.getService().getClass().getName()) {
+        private static final long serialVersionUID = 3643643702743331388L;
+
         @Override
         public void run() {
           m_selectedService = finalServiceInspector;
@@ -207,6 +212,8 @@ public class ServicesView extends DefaultView {
     }
     else {
       p.linkAction(serviceId, new AbstractHtmlAction("selectService." + service.getService().getClass().getName()) {
+        private static final long serialVersionUID = 950604742249675832L;
+
         @Override
         public void run() {
           m_selectedService = service;
@@ -313,6 +320,8 @@ public class ServicesView extends DefaultView {
           final PropertyDescriptor finalDesc = desc;
           p.startForm(
               new AbstractHtmlAction("changeProp." + service.getService().getClass().getName() + "." + desc.getName()) {
+                private static final long serialVersionUID = -915477562914478525L;
+
                 @Override
                 public void run() {
                   String propText = getFormParameter("value", "");

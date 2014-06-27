@@ -2,9 +2,11 @@
 <feature
       id="org.eclipse.scout.rt"
       label="%featureName"
-      version="3.9.2.qualifier"
+      version="4.0.0.qualifier"
       provider-name="%providerName"
-      plugin="org.eclipse.scout.rt.feature.about">
+      plugin="org.eclipse.scout.rt.feature.about"
+      license-feature="org.eclipse.license"
+      license-feature-version="0.0.0">
 
    <description url="http://www.eclipse.org/scout/">
       %description
@@ -19,8 +21,8 @@
    </license>
 
    <url>
-      <update label="%updateSiteName" url="http://download.eclipse.org/releases/kepler"/>
-      <discovery label="%updateSiteName" url="http://download.eclipse.org/releases/kepler"/>
+      <update label="%updateSiteName" url="http://download.eclipse.org/releases/luna"/>
+      <discovery label="%updateSiteName" url="http://download.eclipse.org/releases/luna"/>
    </url>
 
    <includes

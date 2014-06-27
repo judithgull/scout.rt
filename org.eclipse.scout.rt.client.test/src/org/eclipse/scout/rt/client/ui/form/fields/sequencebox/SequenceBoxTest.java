@@ -13,8 +13,10 @@ package org.eclipse.scout.rt.client.ui.form.fields.sequencebox;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
+import java.util.Calendar;
 import java.util.Date;
 
+import org.eclipse.scout.commons.DateUtility;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.ui.form.AbstractForm;
@@ -99,6 +101,28 @@ public class SequenceBoxTest {
   }
 
   /**
+   * Test that searchFilter's getDisplayText does not contain 'null' as String if a SequenceBox's child has its label
+   * configured to 'null'. See bugzilla 432481
+   */
+  @Test
+  public void testSearchFilterText() throws ProcessingException {
+    Calendar cal = Calendar.getInstance();
+    cal.set(2014, Calendar.JANUARY, 1, 8, 0);
+
+    SequenceTestForm f = new SequenceTestForm();
+    f.getStartField().setValue(cal.getTime());
+
+    f.resetSearchFilter();
+    String searchFilterText = f.getSearchFilter().getDisplayTextsPlain();
+    assertEquals("baseLabel from = " + DateUtility.formatTime(cal.getTime()), searchFilterText);
+
+    f.getStartField().setLabel(null);
+    f.resetSearchFilter();
+    searchFilterText = f.getSearchFilter().getDisplayTextsPlain();
+    assertEquals("baseLabel = " + DateUtility.formatTime(cal.getTime()), searchFilterText);
+  }
+
+  /**
    * Form with some sequence boxes for testing.
    */
   public static class SequenceTestForm extends AbstractForm {
@@ -138,7 +162,7 @@ public class SequenceBoxTest {
           /**
            * force field check
            */
-          public void execCheckFromTo(int changedIndex) throws ProcessingException {
+          protected void execCheckFromTo(int changedIndex) throws ProcessingException {
             super.execCheckFromTo(new AbstractDateField[]{getStartField(), getEndField()}, changedIndex);
           }
 

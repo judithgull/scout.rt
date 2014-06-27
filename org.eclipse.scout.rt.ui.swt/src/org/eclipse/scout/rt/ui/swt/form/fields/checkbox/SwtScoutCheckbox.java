@@ -16,11 +16,11 @@ import org.eclipse.scout.rt.client.ui.form.fields.booleanfield.IBooleanField;
 import org.eclipse.scout.rt.ui.swt.LogicalGridData;
 import org.eclipse.scout.rt.ui.swt.LogicalGridLayout;
 import org.eclipse.scout.rt.ui.swt.ext.ILabelComposite;
+import org.eclipse.scout.rt.ui.swt.ext.MultilineCheckbox;
 import org.eclipse.scout.rt.ui.swt.ext.StatusLabelEx;
 import org.eclipse.scout.rt.ui.swt.form.fields.LogicalGridDataBuilder;
 import org.eclipse.scout.rt.ui.swt.form.fields.SwtScoutValueFieldComposite;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Listener;
@@ -35,8 +35,6 @@ public class SwtScoutCheckbox extends SwtScoutValueFieldComposite<IBooleanField>
   private P_SwtButtonListener m_swtButtonListener;
   private boolean m_mandatoryCached;
   private StatusLabelEx m_labelPlaceholder;
-  //ticket 86811: avoid double-action in queue
-  private boolean m_handleActionPending;
 
   @Override
   protected void initializeSwt(Composite parent) {
@@ -46,7 +44,7 @@ public class SwtScoutCheckbox extends SwtScoutValueFieldComposite<IBooleanField>
     getEnvironment().getFormToolkit().getFormToolkit().adapt(m_labelPlaceholder, false, false);
     m_labelPlaceholder.setLayoutData(LogicalGridDataBuilder.createLabel(getScoutObject().getGridData()));
 
-    Button checkbox = getEnvironment().getFormToolkit().createButton(container, "", SWT.CHECK);
+    MultilineCheckbox checkbox = getEnvironment().getFormToolkit().createMultilineCheckBox(container);
 
     LogicalGridData checkboxData = LogicalGridDataBuilder.createField(getScoutObject().getGridData());
     checkboxData.fillHorizontal = false;
@@ -123,8 +121,8 @@ public class SwtScoutCheckbox extends SwtScoutValueFieldComposite<IBooleanField>
   }
 
   @Override
-  public Button getSwtField() {
-    return (Button) super.getSwtField();
+  public MultilineCheckbox getSwtField() {
+    return (MultilineCheckbox) super.getSwtField();
   }
 
   @Override
@@ -150,31 +148,35 @@ public class SwtScoutCheckbox extends SwtScoutValueFieldComposite<IBooleanField>
   }
 
   @Override
-  protected void setValueFromScout() {
+  protected void updateValueFromScout() {
     getSwtField().setSelection(BooleanUtility.nvl(getScoutObject() == null ? null : getScoutObject().getValue()));
   }
 
   protected void handleSwtAction() {
-    if (getSwtField().isEnabled()) {
-      final boolean b = getSwtField().getSelection();
-      if (!m_handleActionPending) {
-        m_handleActionPending = true;
-        // notify Scout
-        Runnable t = new Runnable() {
-          @Override
-          public void run() {
-            try {
-              getScoutObject().getUIFacade().setSelectedFromUI(b);
-            }
-            finally {
-              m_handleActionPending = false;
-            }
-          }
-        };
-        getEnvironment().invokeScoutLater(t, 0);
-        // end notify
-      }
+    if (!getSwtField().isEnabled()) {
+      return;
     }
+    // notify Scout
+    Runnable t = new Runnable() {
+      @Override
+      public void run() {
+        final boolean oldSelection = getScoutObject().isChecked();
+        final boolean newSelection = getScoutObject().getUIFacade().setSelectedFromUI();
+        if (oldSelection == newSelection) {
+          // ensure that the UI has the same value as the Scout model
+          // oldSelection != newSelection case is handled by the value property change listener.
+          Runnable r = new Runnable() {
+            @Override
+            public void run() {
+              getSwtField().setSelection(newSelection);
+            }
+          };
+          getEnvironment().invokeSwtLater(r);
+        }
+      }
+    };
+    getEnvironment().invokeScoutLater(t, 0);
+    // end notify
   }
 
   private class P_SwtButtonListener implements Listener {

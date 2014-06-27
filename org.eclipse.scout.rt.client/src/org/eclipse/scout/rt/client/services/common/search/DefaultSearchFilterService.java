@@ -10,6 +10,7 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.services.common.search;
 
+import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
 import org.eclipse.scout.rt.client.ui.form.fields.AbstractFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.AbstractValueField;
@@ -43,7 +44,7 @@ public class DefaultSearchFilterService extends AbstractService implements ISear
     if (field.getParentField() instanceof ISequenceBox && field.getParentField() instanceof AbstractFormField) {
       AbstractFormField range = (AbstractFormField) field.getParentField();
       if (range.getInitialLabel() != null) {
-        label = range.getInitialLabel() + " " + label;
+        label = range.getInitialLabel() + (StringUtility.isNullOrEmpty(label) ? "" : " " + label);
       }
     }
     //
@@ -52,10 +53,10 @@ public class DefaultSearchFilterService extends AbstractService implements ISear
       AbstractComposerField composerField = (AbstractComposerField) field;
       ITreeNode rootNode = composerField.getTree().getRootNode();
       if (rootNode != null) {
-        StringBuffer buf = new StringBuffer();
+        StringBuilder buf = new StringBuilder();
         new ComposerDisplayTextBuilder().build(rootNode, buf, "");
         String s = buf.toString();
-        if (s.trim().length() > 0) {
+        if (StringUtility.hasText(s)) {
           search.addDisplayText(s);
         }
       }
@@ -64,7 +65,7 @@ public class DefaultSearchFilterService extends AbstractService implements ISear
     //list box
     if (field instanceof AbstractListBox<?>) {
       AbstractListBox<?> valueField = (AbstractListBox<?>) field;
-      if (valueField.getValue() != null) {
+      if (!valueField.getValue().isEmpty()) {
         search.addDisplayText(label + " " + ScoutTexts.get("LogicIn") + " " + valueField.getDisplayText());
       }
       return;
@@ -72,7 +73,7 @@ public class DefaultSearchFilterService extends AbstractService implements ISear
     //tree box
     if (field instanceof AbstractTreeBox<?>) {
       AbstractTreeBox<?> valueField = (AbstractTreeBox<?>) field;
-      if (valueField.getValue() != null) {
+      if (!valueField.getValue().isEmpty()) {
         search.addDisplayText(label + " " + ScoutTexts.get("LogicIn") + " " + valueField.getDisplayText());
       }
       return;

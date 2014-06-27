@@ -13,26 +13,27 @@ package org.eclipse.scout.rt.server;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.Date;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.exception.VetoException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.commons.serialization.SerializationUtility;
 import org.eclipse.scout.rt.server.admin.inspector.CallInspector;
 import org.eclipse.scout.rt.server.admin.inspector.ProcessInspector;
 import org.eclipse.scout.rt.server.admin.inspector.SessionInspector;
 import org.eclipse.scout.rt.server.internal.Activator;
 import org.eclipse.scout.rt.server.services.common.clientnotification.IClientNotificationService;
+import org.eclipse.scout.rt.server.transaction.AbstractTransactionMember;
 import org.eclipse.scout.rt.server.transaction.ITransaction;
 import org.eclipse.scout.rt.shared.ScoutTexts;
-import org.eclipse.scout.rt.shared.WebClientState;
 import org.eclipse.scout.rt.shared.security.RemoteServiceAccessPermission;
 import org.eclipse.scout.rt.shared.services.common.clientnotification.IClientNotification;
 import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.rt.shared.services.common.security.ACCESS;
 import org.eclipse.scout.rt.shared.servicetunnel.RemoteServiceAccessDenied;
-import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelAccessDenied;
 import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelRequest;
 import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelResponse;
 import org.eclipse.scout.rt.shared.servicetunnel.VersionMismatchException;
@@ -166,31 +167,20 @@ public class DefaultTransactionDelegate {
         return serviceRes;
       }
     }
+    Set<String> consumedNotifications = serviceReq.getConsumedNotifications();
+    if (consumedNotifications != null && consumedNotifications.size() > 0) {
+      IClientNotificationService notificationService = SERVICES.getService(IClientNotificationService.class);
+      notificationService.ackNotifications(consumedNotifications);
+    }
     CallInspector callInspector = null;
     SessionInspector sessionInspector = ProcessInspector.getDefault().getSessionInspector(serverSession, true);
     if (sessionInspector != null) {
       callInspector = sessionInspector.requestCallInspector(serviceReq);
     }
     ServiceTunnelResponse serviceRes = null;
-    boolean backupIsWebClientCurrentThread = WebClientState.isWebClientInCurrentThread();
     try {
-      String virtualSessionId = serviceReq.getVirtualSessionId();
-      WebClientState.setWebClientInCurrentThread(virtualSessionId != null);
       //do checks
-      Class<?> serviceInterfaceClass = null;
-      for (Bundle b : m_loaderBundles) {
-        try {
-          serviceInterfaceClass = b.loadClass(serviceReq.getServiceInterfaceClassName());
-          break;
-        }
-        catch (ClassNotFoundException e) {
-          // nop
-        }
-      }
-      //check access: existence
-      if (serviceInterfaceClass == null) {
-        throw new ClassNotFoundException(serviceReq.getServiceInterfaceClassName());
-      }
+      Class<?> serviceInterfaceClass = SerializationUtility.getClassLoader().loadClass(serviceReq.getServiceInterfaceClassName());
       //check access: service proxy allowed
       Method serviceOp = ServiceUtility.getServiceOperation(serviceInterfaceClass, serviceReq.getOperation(), serviceReq.getParameterTypes());
       checkRemoteServiceAccessByInterface(serviceInterfaceClass, serviceOp, serviceReq.getArgs());
@@ -232,9 +222,8 @@ public class DefaultTransactionDelegate {
       //
       serviceRes = new ServiceTunnelResponse(data, outParameters, null);
       serviceRes.setSoapOperation(soapOperation);
-      // add accumulated client notifications as side-payload
-      IClientNotification[] na = SERVICES.getService(IClientNotificationService.class).getNextNotifications(0);
-      serviceRes.setClientNotifications(na);
+
+      ThreadContext.getTransaction().registerMember(new P_ClientNotificationTransactionMember(serviceRes));
       return serviceRes;
     }
     finally {
@@ -258,7 +247,6 @@ public class DefaultTransactionDelegate {
           LOG.warn(null, t);
         }
       }
-      WebClientState.setWebClientInCurrentThread(backupIsWebClientCurrentThread);
     }
   }
 
@@ -306,10 +294,6 @@ public class DefaultTransactionDelegate {
       }
       if (m != null) {
         for (Annotation ann : m.getAnnotations()) {
-          //legacy
-          if (ann.annotationType() == ServiceTunnelAccessDenied.class) {
-            throw new SecurityException("access denied (code 2a).");
-          }
           if (ann.annotationType() == RemoteServiceAccessDenied.class) {
             throw new SecurityException("access denied (code 2b).");
           }
@@ -516,6 +500,48 @@ public class DefaultTransactionDelegate {
    */
   protected Class<? extends IValidationStrategy> findOutputValidationStrategyByPolicy(Object serviceImpl, Method op) {
     return IValidationStrategy.NO_CHECK.class;
+  }
+
+  /**
+   * This transaction member ensures that the retrieval of client notifications is done at the last possible moment, and
+   * not during the normal duration of the transaction. Notifications are added to the global notification queue at
+   * commit-time, so this is in fact needed.
+   */
+  private static class P_ClientNotificationTransactionMember extends AbstractTransactionMember {
+
+    private static final String TRANSACTION_MEMBER_ID = P_ClientNotificationTransactionMember.class.getSimpleName();
+
+    private final ServiceTunnelResponse m_serviceTunnelResponse;
+
+    public P_ClientNotificationTransactionMember(ServiceTunnelResponse serviceRes) {
+      super(TRANSACTION_MEMBER_ID);
+      m_serviceTunnelResponse = serviceRes;
+    }
+
+    @Override
+    public boolean needsCommit() {
+      return true;
+    }
+
+    @Override
+    public boolean commitPhase1() {
+      return true;
+    }
+
+    @Override
+    public void commitPhase2() {
+    }
+
+    @Override
+    public void rollback() {
+    }
+
+    @Override
+    public void release() {
+      Set<IClientNotification> nextNotifications = SERVICES.getService(IClientNotificationService.class).getNextNotifications(0);
+      m_serviceTunnelResponse.setClientNotifications(nextNotifications);
+    }
+
   }
 
 }

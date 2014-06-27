@@ -13,12 +13,17 @@ package org.eclipse.scout.rt.client.services.common.code;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.Platform;
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.CompositeObject;
 import org.eclipse.scout.commons.LocaleThreadLocal;
 import org.eclipse.scout.commons.annotations.Priority;
+import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.holders.Holder;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
@@ -29,7 +34,7 @@ import org.eclipse.scout.rt.client.IClientSession;
 import org.eclipse.scout.rt.client.services.common.clientnotification.ClientNotificationConsumerEvent;
 import org.eclipse.scout.rt.client.services.common.clientnotification.IClientNotificationConsumerListener;
 import org.eclipse.scout.rt.client.services.common.clientnotification.IClientNotificationConsumerService;
-import org.eclipse.scout.rt.client.servicetunnel.ServiceTunnelUtility;
+import org.eclipse.scout.rt.servicetunnel.ServiceTunnelUtility;
 import org.eclipse.scout.rt.shared.services.common.code.CodeTypeChangedNotification;
 import org.eclipse.scout.rt.shared.services.common.code.ICode;
 import org.eclipse.scout.rt.shared.services.common.code.ICodeService;
@@ -37,6 +42,7 @@ import org.eclipse.scout.rt.shared.services.common.code.ICodeType;
 import org.eclipse.scout.rt.shared.services.common.code.ICodeVisitor;
 import org.eclipse.scout.service.AbstractService;
 import org.eclipse.scout.service.SERVICES;
+import org.osgi.framework.ServiceRegistration;
 
 /**
  * maintains a cache of ICodeType objects that can be (re)loaded using the
@@ -81,10 +87,9 @@ public class CodeServiceClientProxy extends AbstractService implements ICodeServ
     }
   }
 
-  @SuppressWarnings("deprecation")
   @Override
-  public void initializeService() {
-    super.initializeService();
+  public void initializeService(ServiceRegistration registration) {
+    super.initializeService(registration);
     // add client notification listener
     SERVICES.getService(IClientNotificationConsumerService.class).addGlobalClientNotificationConsumerListener(new IClientNotificationConsumerListener() {
       @Override
@@ -110,10 +115,11 @@ public class CodeServiceClientProxy extends AbstractService implements ICodeServ
         }
       }
     });
+
   }
 
   @Override
-  public <T extends ICodeType> T getCodeType(Class<T> type) {
+  public <T extends ICodeType<?, ?>> T getCodeType(Class<T> type) {
     ServiceState state = getServiceState();
     synchronized (state.m_cacheLock) {
       @SuppressWarnings("unchecked")
@@ -129,17 +135,17 @@ public class CodeServiceClientProxy extends AbstractService implements ICodeServ
   }
 
   @Override
-  public <T extends ICodeType> T getCodeType(Long partitionId, Class<T> type) {
+  public <T extends ICodeType<?, ?>> T getCodeType(Long partitionId, Class<T> type) {
     T instance = getRemoteService().getCodeType(partitionId, type);
     return instance;
   }
 
   @Override
-  public ICodeType findCodeTypeById(Object id) {
+  public <T> ICodeType<T, ?> findCodeTypeById(T id) {
     if (id == null) {
       return null;
     }
-    ICodeType ct = findCodeTypeByIdInternal(id);
+    ICodeType<T, ?> ct = findCodeTypeByIdInternal(id);
     if (ct != null) {
       return ct;
     }
@@ -151,12 +157,13 @@ public class CodeServiceClientProxy extends AbstractService implements ICodeServ
   /**
    * @return Returns the code type with the given id or <code>null</code> if it is not found in the cache.
    */
-  private ICodeType findCodeTypeByIdInternal(Object id) {
+  @SuppressWarnings("unchecked")
+  private <T> ICodeType<T, ?> findCodeTypeByIdInternal(T id) {
     ServiceState state = getServiceState();
     synchronized (state.m_cacheLock) {
-      for (ICodeType ct : state.m_cache.values()) {
+      for (ICodeType<?, ?> ct : state.m_cache.values()) {
         if (id.equals(ct.getId())) {
-          return ct;
+          return (ICodeType<T, ?>) ct;
         }
       }
     }
@@ -164,11 +171,11 @@ public class CodeServiceClientProxy extends AbstractService implements ICodeServ
   }
 
   @Override
-  public ICodeType findCodeTypeById(Long partitionId, Object id) {
+  public <T> ICodeType<T, ?> findCodeTypeById(Long partitionId, T id) {
     if (id == null) {
       return null;
     }
-    ICodeType ct = findCodeTypeByIdInternal(partitionId, id);
+    ICodeType<T, ?> ct = findCodeTypeByIdInternal(partitionId, id);
     if (ct != null) {
       return ct;
     }
@@ -180,12 +187,13 @@ public class CodeServiceClientProxy extends AbstractService implements ICodeServ
   /**
    * @return Returns the code type with the given id and partition or <code>null</code> if it is not found in the cache.
    */
-  private ICodeType findCodeTypeByIdInternal(Long partitionId, Object id) {
+  @SuppressWarnings("unchecked")
+  private <T> ICodeType<T, ?> findCodeTypeByIdInternal(Long partitionId, T id) {
     ServiceState state = getServiceState(partitionId);
     synchronized (state.m_cacheLock) {
-      for (ICodeType ct : state.m_cache.values()) {
+      for (ICodeType<?, ?> ct : state.m_cache.values()) {
         if (id.equals(ct.getId())) {
-          return ct;
+          return (ICodeType<T, ?>) ct;
         }
       }
     }
@@ -193,31 +201,14 @@ public class CodeServiceClientProxy extends AbstractService implements ICodeServ
   }
 
   @Override
-  @SuppressWarnings("unchecked")
-  public ICodeType[] getCodeTypes(Class... types) {
-    ArrayList<Class> missingTypes = new ArrayList<Class>();
-    ICodeType[] instances = new ICodeType[types.length];
+  public List<ICodeType<?, ?>> getCodeTypes(List<Class<? extends ICodeType<?, ?>>> types) {
+    List<ICodeType<?, ?>> instances = new ArrayList<ICodeType<?, ?>>(types.size());
     ServiceState state = getServiceState();
     synchronized (state.m_cacheLock) {
-      for (int i = 0; i < types.length; i++) {
-        instances[i] = state.m_cache.get(types[i]);
-        if (instances[i] == null) {
-          missingTypes.add(types[i]);
-        }
-      }
-    }
-    if (missingTypes.size() > 0) {
-      ICodeType[] newInstances = getRemoteService().getCodeTypes(missingTypes.toArray(new Class[0]));
-      synchronized (state.m_cacheLock) {
-        int k = 0;
-        for (int i = 0; i < types.length; i++) {
-          if (instances[i] == null) {
-            instances[i] = newInstances[k];
-            if (instances[i] != null) {
-              state.m_cache.put(types[i], instances[i]);
-            }
-            k++;
-          }
+      for (Class<? extends ICodeType<?, ?>> codeTypeClazz : types) {
+        ICodeType<?, ?> codeType = state.m_cache.get(codeTypeClazz);
+        if (codeType != null) {
+          instances.add(codeType);
         }
       }
     }
@@ -225,12 +216,12 @@ public class CodeServiceClientProxy extends AbstractService implements ICodeServ
   }
 
   @Override
-  public ICodeType[] getCodeTypes(Long partitionId, Class... types) {
-    ICodeType[] codeTypes = getRemoteService().getCodeTypes(partitionId, types);
-    return codeTypes;
+  public List<ICodeType<?, ?>> getCodeTypes(Long partitionId, List<Class<? extends ICodeType<?, ?>>> types) {
+    return getRemoteService().getCodeTypes(partitionId, types);
   }
 
-  private <T extends ICode> Class getDeclaringCodeTypeClass(final Class<T> type) {
+  @SuppressWarnings("unchecked")
+  private <T> Class<? extends ICodeType<?, T>> getDeclaringCodeTypeClass(final Class<? extends ICode<T>> type) {
     if (type == null) {
       return null;
     }
@@ -272,23 +263,21 @@ public class CodeServiceClientProxy extends AbstractService implements ICodeServ
   }
 
   @Override
-  @SuppressWarnings("unchecked")
-  public <T extends ICode> T getCode(final Class<T> type) {
-    Class declaringCodeTypeClass = getDeclaringCodeTypeClass(type);
-    ICodeType codeType = getCodeType(declaringCodeTypeClass);
+  public <CODE_ID_TYPE, CODE extends ICode<CODE_ID_TYPE>> CODE getCode(Class<CODE> type) {
+    Class<? extends ICodeType<?, CODE_ID_TYPE>> declaringCodeTypeClass = getDeclaringCodeTypeClass(type);
+    ICodeType<?, CODE_ID_TYPE> codeType = getCodeType(declaringCodeTypeClass);
     return findCode(type, codeType);
   }
 
   @Override
-  @SuppressWarnings("unchecked")
-  public <T extends ICode> T getCode(Long partitionId, final Class<T> type) {
-    Class declaringCodeTypeClass = getDeclaringCodeTypeClass(type);
-    ICodeType codeType = getCodeType(partitionId, declaringCodeTypeClass);
+  public <CODE_ID_TYPE, CODE extends ICode<CODE_ID_TYPE>> CODE getCode(Long partitionId, Class<CODE> type) {
+    Class<? extends ICodeType<?, CODE_ID_TYPE>> declaringCodeTypeClass = getDeclaringCodeTypeClass(type);
+    ICodeType<?, CODE_ID_TYPE> codeType = getCodeType(partitionId, declaringCodeTypeClass);
     return findCode(type, codeType);
   }
 
   @Override
-  public <T extends ICodeType> T reloadCodeType(Class<T> type) {
+  public <T extends ICodeType<?, ?>> T reloadCodeType(Class<T> type) throws ProcessingException {
     unloadCodeType(type);
     // do NOT call reload on the backend service, clients can not reload codes,
     // they can just refresh their local cache
@@ -305,41 +294,43 @@ public class CodeServiceClientProxy extends AbstractService implements ICodeServ
   }
 
   @Override
-  @SuppressWarnings("unchecked")
-  public ICodeType[] reloadCodeTypes(Class... types) {
-    for (int i = 0; i < types.length; i++) {
-      unloadCodeType(types[i]);
+  public List<ICodeType<?, ?>> reloadCodeTypes(List<Class<? extends ICodeType<?, ?>>> types) throws ProcessingException {
+    for (Class<? extends ICodeType<?, ?>> codeTypeClazz : types) {
+      unloadCodeType(codeTypeClazz);
     }
     // do NOT call reload on the backend service, clients can not reload codes,
     // they can just refresh their local cache
     // In order to reload a code, the call to reload has to be placed on the
     // server
-    ICodeType[] instances = getRemoteService().getCodeTypes(types);
+    List<ICodeType<?, ?>> instances = getRemoteService().getCodeTypes(types);
     ServiceState state = getServiceState();
     synchronized (state.m_cacheLock) {
-      for (int i = 0; i < types.length; i++) {
-        if (instances[i] != null) {
-          state.m_cache.put(types[i], instances[i]);
+      int i = 0;
+      for (Class<? extends ICodeType<?, ?>> codeTypeClazz : types) {
+        ICodeType<?, ?> codeInstance = CollectionUtility.getElement(instances, i);
+        if (codeInstance != null) {
+          state.m_cache.put(codeTypeClazz, codeInstance);
         }
+        i++;
       }
     }
     return instances;
   }
 
   @Override
-  public BundleClassDescriptor[] getAllCodeTypeClasses(String classPrefix) {
+  public Set<BundleClassDescriptor> getAllCodeTypeClasses(String classPrefix) {
     if (classPrefix == null) {
-      return new BundleClassDescriptor[0];
+      return CollectionUtility.hashSet();
     }
     ServiceState state = getServiceState();
     synchronized (state.m_codeTypeClassDescriptorMapLock) {
-      BundleClassDescriptor[] a = state.m_codeTypeClassDescriptorMap.get(classPrefix);
+      Set<BundleClassDescriptor> a = state.m_codeTypeClassDescriptorMap.get(classPrefix);
       if (a != null) {
-        return a;
+        return CollectionUtility.hashSet(a);
       }
       // load code types from server-side
-      HashSet<BundleClassDescriptor> verifiedCodeTypes = new HashSet<BundleClassDescriptor>();
-      BundleClassDescriptor[] remoteCodeTypes = getRemoteService().getAllCodeTypeClasses(classPrefix);
+      Set<BundleClassDescriptor> verifiedCodeTypes = new HashSet<BundleClassDescriptor>();
+      Set<BundleClassDescriptor> remoteCodeTypes = getRemoteService().getAllCodeTypeClasses(classPrefix);
       for (BundleClassDescriptor d : remoteCodeTypes) {
         try {
           // check whether code type is available on client-side
@@ -350,30 +341,30 @@ public class CodeServiceClientProxy extends AbstractService implements ICodeServ
           LOG.error("Missing code-type in client: " + d.getClassName() + ", defined in server-side bundle " + d.getBundleSymbolicName());
         }
       }
-      //
-      a = verifiedCodeTypes.toArray(new BundleClassDescriptor[verifiedCodeTypes.size()]);
-      state.m_codeTypeClassDescriptorMap.put(classPrefix, a);
-      return a;
+
+      state.m_codeTypeClassDescriptorMap.put(classPrefix, verifiedCodeTypes);
+      return verifiedCodeTypes;
     }
   }
 
+  @SuppressWarnings("unchecked")
   @Override
-  public ICodeType[] getAllCodeTypes(String classPrefix) {
-    ArrayList<Class> list = new ArrayList<Class>();
+  public List<ICodeType<?, ?>> getAllCodeTypes(String classPrefix) {
+    List<Class<? extends ICodeType<?, ?>>> list = new ArrayList<Class<? extends ICodeType<?, ?>>>();
     for (BundleClassDescriptor d : getAllCodeTypeClasses(classPrefix)) {
       try {
-        list.add(Platform.getBundle(d.getBundleSymbolicName()).loadClass(d.getClassName()));
+        list.add((Class<? extends ICodeType<?, ?>>) Platform.getBundle(d.getBundleSymbolicName()).loadClass(d.getClassName()));
       }
       catch (Throwable t) {
         LOG.warn("Loading " + d.getClassName() + " of bundle " + d.getBundleSymbolicName(), t);
         continue;
       }
     }
-    return getCodeTypes(list.toArray(new Class[list.size()]));
+    return getCodeTypes(list);
   }
 
   @Override
-  public ICodeType[] getAllCodeTypes(String classPrefix, Long partitionId) {
+  public List<ICodeType<?, ?>> getAllCodeTypes(String classPrefix, Long partitionId) {
     return getAllCodeTypes(classPrefix);
   }
 
@@ -390,9 +381,9 @@ public class CodeServiceClientProxy extends AbstractService implements ICodeServ
 
   private static class ServiceState {
     final Object m_cacheLock = new Object();
-    final HashMap<Class<? extends ICodeType>, ICodeType> m_cache = new HashMap<Class<? extends ICodeType>, ICodeType>();
+    final Map<Class<? extends ICodeType<?, ?>>, ICodeType<?, ?>> m_cache = new HashMap<Class<? extends ICodeType<?, ?>>, ICodeType<?, ?>>();
     //
     final Object m_codeTypeClassDescriptorMapLock = new Object();
-    final HashMap<String, BundleClassDescriptor[]> m_codeTypeClassDescriptorMap = new HashMap<String, BundleClassDescriptor[]>();
+    final Map<String, Set<BundleClassDescriptor>> m_codeTypeClassDescriptorMap = new HashMap<String, Set<BundleClassDescriptor>>();
   }
 }
