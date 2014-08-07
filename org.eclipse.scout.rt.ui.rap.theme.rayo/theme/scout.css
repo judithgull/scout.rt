@@ -941,6 +941,19 @@ Button-FocusIndicator.colorpicker_browse_disabled_menu {
   border: none;
 }
 /*Datefield*/
+Composite[BORDER].datefield {
+  /* 2px on the right side to move the button a little bit away from the border */
+  padding: 0px 2px 0px 0px;
+  border: 1px solid #95b7c1;
+  border-radius: 4px;
+  background-image: none;
+}
+Composite[BORDER].datefield-disabled {
+  /* 2px on the right side to move the button a little bit away from the border */
+  padding: 0px 2px 0px 0px;
+  border: 1px solid #c9dadf;
+  border-radius: 4px;
+}
 Text.datefield {
   border-radius: 4px;
   background-image: none;
@@ -1779,6 +1792,19 @@ Text-Message {
   color: #a7a6aa;
 }
 /*Timefield*/
+Composite[BORDER].timefield {
+  /* 2px on the right side to move the button a little bit away from the border */
+  padding: 0px 2px 0px 0px;
+  border: 1px solid #95b7c1;
+  border-radius: 4px;
+  background-image: none;
+}
+Composite[BORDER].timefield-disabled {
+  /* 2px on the right side to move the button a little bit away from the border */
+  padding: 0px 2px 0px 0px;
+  border: 1px solid #c9dadf;
+  border-radius: 4px;
+}
 Text.timefield {
   border-radius: 4px;
   background-image: none;

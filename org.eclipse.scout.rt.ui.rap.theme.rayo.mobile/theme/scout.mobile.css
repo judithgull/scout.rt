@@ -982,6 +982,19 @@ Button-FocusIndicator.colorpicker_browse_disabled_menu {
   border:none;
 }
 
+Composite[BORDER].datefield {
+  padding:0px 2px 0px 0px;
+  border:1px solid #95b7c1;
+  border-radius:4px;
+  background-image:none;
+}
+
+Composite[BORDER].datefield-disabled {
+  padding:0px 2px 0px 0px;
+  border:1px solid #c9dadf;
+  border-radius:4px;
+}
+
 Text.datefield {
   border-radius:4px;
   background-image:none;
@@ -1962,6 +1975,19 @@ Text[MULTI][BORDER]:disabled {
 Text[MULTI][BORDER]:read-only { border:1px solid #c9dadf; }
 
 Text-Message { color:#a7a6aa; }
+
+Composite[BORDER].timefield {
+  padding:0px 2px 0px 0px;
+  border:1px solid #95b7c1;
+  border-radius:4px;
+  background-image:none;
+}
+
+Composite[BORDER].timefield-disabled {
+  padding:0px 2px 0px 0px;
+  border:1px solid #c9dadf;
+  border-radius:4px;
+}
 
 Text.timefield {
   border-radius:4px;
