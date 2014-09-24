@@ -16,10 +16,12 @@ import java.io.FilenameFilter;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.spec.client.config.ConfigRegistry;
 import org.eclipse.scout.rt.spec.client.utility.SpecIOUtility;
+import org.eclipse.scout.rt.testing.shared.DevTestMarker;
 
 /**
  * Copy manually written mediawiki and image files from source bundles to output directory
  */
+@DevTestMarker
 public class ManualSpecTest extends AbstractSpecGenTest {
 
   @Override

@@ -23,6 +23,7 @@ import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.spec.client.config.ConfigRegistry;
+import org.eclipse.scout.rt.spec.client.out.docx.DocxConverter;
 import org.eclipse.scout.rt.spec.client.out.html.HtmlConverter;
 import org.eclipse.scout.rt.spec.client.utility.SpecIOUtility;
 import org.eclipse.scout.rt.spec.client.utility.SpecIOUtility.IStringProcessor;
@@ -65,6 +66,8 @@ public class MediawikiPostProcessor implements ISpecProcessor {
       replaceLinks(wiki);
       File html = convertToHTML(wiki, cssFile);
       replaceWikiFileLinks(html);
+
+      convertToDocx(wiki);
     }
   }
 
@@ -166,6 +169,14 @@ public class MediawikiPostProcessor implements ISpecProcessor {
     HtmlConverter htmlConverter = new HtmlConverter(cssFile);
     htmlConverter.convertWikiToHtml(mediaWiki, htmlFile);
     return htmlFile;
+  }
+
+  protected File convertToDocx(File mediaWiki) throws ProcessingException {
+    File htmlDir = ConfigRegistry.getSpecFileConfigInstance().getHtmlDir();
+    File docxFile = SpecIOUtility.createNewFile(htmlDir, mediaWiki.getName().replace(".mediawiki", ""), ".docx");
+    DocxConverter docxConverter = new DocxConverter();
+    docxConverter.convertWikiToDocx(mediaWiki, docxFile);
+    return docxFile;
   }
 
 }
