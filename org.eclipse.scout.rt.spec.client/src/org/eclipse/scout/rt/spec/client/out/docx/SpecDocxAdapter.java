@@ -12,7 +12,6 @@ package org.eclipse.scout.rt.spec.client.out.docx;
 
 import java.io.File;
 
-import org.docx4j.openpackaging.packages.WordprocessingMLPackage;
 import org.docx4j.openpackaging.parts.WordprocessingML.MainDocumentPart;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.docx4j.DocxAdapter;
@@ -27,6 +26,10 @@ public class SpecDocxAdapter extends DocxAdapter {
    */
   public SpecDocxAdapter(File template) throws ProcessingException {
     super(template);
+  }
+
+  public SpecDocxAdapter() throws ProcessingException {
+    super(DocxAdapter.createEmptyPackage());
   }
 
   public void addParagraph(String styleId, String text) {

@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 
+import org.eclipse.mylyn.wikitext.core.parser.DocumentBuilder;
 import org.eclipse.mylyn.wikitext.core.parser.MarkupParser;
 import org.eclipse.mylyn.wikitext.mediawiki.core.MediaWikiLanguage;
 import org.eclipse.scout.commons.exception.ProcessingException;
@@ -35,7 +36,8 @@ public class DocxConverter {
   public void convertWikiToDocx(File in, File out) throws ProcessingException {
     try {
 
-      AsposeDocxDocumentBuilder builder = new AsposeDocxDocumentBuilder(out);
+      DocumentBuilder builder = new AsposeDocxDocumentBuilder(out);
+//      DocumentBuilder builder = new DocxDocumentBuilder(out);
 
       MarkupParser parser = new MarkupParser(new MediaWikiLanguage());
       parser.setBuilder(builder);

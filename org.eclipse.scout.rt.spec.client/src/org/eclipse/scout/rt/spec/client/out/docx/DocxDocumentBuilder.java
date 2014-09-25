@@ -30,9 +30,33 @@ public class DocxDocumentBuilder extends DocumentBuilder {
   private SpecDocxAdapter m_docxAdapter;
   private File m_destFile;
 
+  enum Style {
+    NORMAL("Standard"),
+    HEADING_1("Heading1"),
+    HEADING_2("Heading2");
+
+    private String name;
+
+    Style(String name) {
+      this.name = name;
+    }
+
+    public String getName() {
+      return name;
+    }
+  }
+
+  private static class Paragraph {
+    StringBuilder sb = new StringBuilder();
+    Style style = Style.NORMAL;
+  }
+
+  private Paragraph m_currentParagraph = null;
+  private BlockType m_currentBlock = null;
+
   public DocxDocumentBuilder(File out) {
     m_destFile = out;
-    URL resource = Activator.getDefault().getBundle().getResource("resources/spec/Normal.dotm");
+    URL resource = Activator.getDefault().getBundle().getResource("resources/spec/empty.docx");
     URI uri = null;
     try {
       URL url = FileLocator.resolve(resource);
@@ -53,12 +77,19 @@ public class DocxDocumentBuilder extends DocumentBuilder {
     catch (ProcessingException e) {
       e.printStackTrace();
     }
+
+//    try {
+//      m_docxAdapter = new SpecDocxAdapter();
+//    }
+//    catch (ProcessingException e) {
+//      e.printStackTrace();
+//    }
   }
 
   @Override
   public void beginDocument() {
     System.out.println("beginDocument()");
-    m_docxAdapter.addParagraph("Normal", "This is the begining...");
+//    m_docxAdapter.getPackage().getMainDocumentPart().addStyledParagraphOfText("Heading2", "This is the begining...");
 //    m_docxAdapter.addParagraph("berschrift1", "berschrift1...");
 //    m_docxAdapter.addParagraph("BSI Standard", "BSI Standard...");
   }
@@ -78,11 +109,23 @@ public class DocxDocumentBuilder extends DocumentBuilder {
   @Override
   public void beginBlock(BlockType type, Attributes attributes) {
     System.out.println("beginBlock: " + type.name() + " - " + attributeString(attributes));
+    m_currentBlock = type;
+    if (type == BlockType.PARAGRAPH) {
+      m_currentParagraph = new Paragraph();
+    }
   }
 
   @Override
   public void endBlock() {
     System.out.println("endBlock");
+    if (m_currentBlock == BlockType.PARAGRAPH) {
+      addCurrentParagraph();
+    }
+    m_currentBlock = null;
+  }
+
+  private void addCurrentParagraph() {
+    m_docxAdapter.getPackage().getMainDocumentPart().addStyledParagraphOfText(m_currentParagraph.style.getName(), m_currentParagraph.sb.toString());
   }
 
   @Override
@@ -98,16 +141,32 @@ public class DocxDocumentBuilder extends DocumentBuilder {
   @Override
   public void beginHeading(int level, Attributes attributes) {
     System.out.println("beginHeading: " + level + " - " + attributeString(attributes));
+    m_currentParagraph = new Paragraph();
+    switch (level) {
+      case 1:
+      case 2:
+        m_currentParagraph.style = Style.HEADING_1;
+        break;
+      case 3:
+        m_currentParagraph.style = Style.HEADING_2;
+        break;
+      default:
+        m_currentParagraph.style = Style.NORMAL;
+    }
   }
 
   @Override
   public void endHeading() {
     System.out.println("endHeading");
+    addCurrentParagraph();
   }
 
   @Override
   public void characters(String text) {
     System.out.println("characters: " + text);
+    if (m_currentParagraph != null) {
+      m_currentParagraph.sb.append(text);
+    }
   }
 
   @Override

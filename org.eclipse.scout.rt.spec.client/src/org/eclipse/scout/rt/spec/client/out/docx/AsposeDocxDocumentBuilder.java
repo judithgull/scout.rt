@@ -19,7 +19,7 @@ import org.eclipse.mylyn.wikitext.core.parser.DocumentBuilder;
 import com.aspose.words.Document;
 import com.aspose.words.ListTemplate;
 import com.aspose.words.Style;
-import com.aspose.words.StyleType;
+import com.aspose.words.StyleIdentifier;
 
 /**
  *
@@ -31,6 +31,8 @@ public class AsposeDocxDocumentBuilder extends DocumentBuilder {
   private Document m_doc;
   private Style m_heading_1;
   private Style m_heading_2;
+  private boolean m_openParagraph = false;
+  private BlockType m_currentBlockType;
 
   public AsposeDocxDocumentBuilder(File out) {
     m_destFile = out;
@@ -53,7 +55,8 @@ public class AsposeDocxDocumentBuilder extends DocumentBuilder {
   }
 
   private void initStyles() throws Exception {
-    m_heading_1 = m_doc.getStyles().add(StyleType.PARAGRAPH, "SpecHeading1");
+//    m_heading_1 = m_doc.getStyles().add(StyleType.PARAGRAPH, "SpecHeading1");
+    m_heading_1 = m_doc.getStyles().getByStyleIdentifier(StyleIdentifier.HEADING_1);
     m_heading_1.getFont().setName("Calibri");
     m_heading_1.getFont().setSize(16d);
     m_heading_1.getFont().setAllCaps(true);
@@ -62,7 +65,8 @@ public class AsposeDocxDocumentBuilder extends DocumentBuilder {
     m_heading_1.getListFormat().setList(m_doc.getLists().add(ListTemplate.NUMBER_DEFAULT));
     m_heading_1.getListFormat().setListLevelNumber(0);
 
-    m_heading_2 = m_doc.getStyles().add(StyleType.PARAGRAPH, "SpecHeading2");
+//    m_heading_2 = m_doc.getStyles().add(StyleType.PARAGRAPH, "SpecHeading2");
+    m_heading_2 = m_doc.getStyles().getByStyleIdentifier(StyleIdentifier.HEADING_2);
     m_heading_2.getFont().setName("Calibri");
     m_heading_2.getFont().setSize(12d);
     m_heading_2.getFont().setAllCaps(true);
@@ -101,6 +105,7 @@ public class AsposeDocxDocumentBuilder extends DocumentBuilder {
   @Override
   public void beginBlock(BlockType type, Attributes attributes) {
     System.out.println("beginBlock: " + type.name() + " - " + attributeString(attributes));
+    m_currentBlockType = type;
     if (type == BlockType.PARAGRAPH) {
       try {
         m_builder.insertParagraph();
@@ -109,12 +114,17 @@ public class AsposeDocxDocumentBuilder extends DocumentBuilder {
         // TODO Auto-generated catch block
         e.printStackTrace();
       }
+      m_openParagraph = true;
     }
   }
 
   @Override
   public void endBlock() {
     System.out.println("endBlock");
+    if (m_currentBlockType == BlockType.PARAGRAPH) {
+      m_openParagraph = false;
+    }
+    m_currentBlockType = null;
   }
 
   @Override
@@ -130,16 +140,26 @@ public class AsposeDocxDocumentBuilder extends DocumentBuilder {
   @Override
   public void beginHeading(int level, Attributes attributes) {
     System.out.println("beginHeading: " + level + " - " + attributeString(attributes));
-    switch (level) {
-      case 1:
-      case 2:
-        m_builder.getParagraphFormat().setStyle(m_heading_1);
-        break;
-      case 3:
-        m_builder.getParagraphFormat().setStyle(m_heading_2);
-        break;
-      default:
-        m_builder.getParagraphFormat().setStyle(m_doc.getStyles().get("Normal"));
+    m_openParagraph = true;
+    try {
+      switch (level) {
+        case 1:
+        case 2:
+//          m_builder.getParagraphFormat().setStyle(m_heading_1);
+          m_builder.getParagraphFormat().setStyleIdentifier(StyleIdentifier.HEADING_1);
+          break;
+        case 3:
+//          m_builder.getParagraphFormat().setStyle(m_heading_2);
+          m_builder.getParagraphFormat().setStyleIdentifier(StyleIdentifier.HEADING_2);
+          break;
+        default:
+//          m_builder.getParagraphFormat().setStyle(m_doc.getStyles().get("Normal"));
+          m_builder.getParagraphFormat().setStyleIdentifier(StyleIdentifier.NORMAL);
+      }
+    }
+    catch (Exception e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
     }
 
   }
@@ -148,17 +168,20 @@ public class AsposeDocxDocumentBuilder extends DocumentBuilder {
   public void endHeading() {
     System.out.println("endHeading");
     m_builder.getParagraphFormat().setStyle(m_doc.getStyles().get("Normal"));
+    m_openParagraph = false;
   }
 
   @Override
   public void characters(String text) {
     System.out.println("characters: " + text);
-    try {
-      m_builder.writeln(text);
-    }
-    catch (Exception e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
+    if (m_openParagraph) {
+      try {
+        m_builder.writeln(text);
+      }
+      catch (Exception e) {
+        // TODO Auto-generated catch block
+        e.printStackTrace();
+      }
     }
   }
 
