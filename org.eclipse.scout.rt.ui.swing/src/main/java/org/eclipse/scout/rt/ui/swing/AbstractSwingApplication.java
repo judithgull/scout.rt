@@ -12,14 +12,13 @@ package org.eclipse.scout.rt.ui.swing;
 
 import javax.swing.SwingUtilities;
 
-import org.eclipse.equinox.app.IApplicationContext;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.IClientSession;
 
 /**
  * This class is the base class for a typical Scout Swing application.
- * 
+ *
  * @author awe
  */
 public abstract class AbstractSwingApplication extends BaseSwingApplication {
@@ -38,13 +37,12 @@ public abstract class AbstractSwingApplication extends BaseSwingApplication {
   }
 
   @Override
-  protected Object startInSubject(IApplicationContext context) throws Exception {
+  protected void startInSubject() throws Exception {
     final IClientSession clientSession = getClientSession();
     if (!isClientSessionValid(clientSession)) {
-      return EXIT_OK;
+      return;
     }
     // Post-condition: session is active and loaded
-    context.applicationRunning();
     stopSplashScreen();
     try {
       SwingUtilities.invokeAndWait(
@@ -61,7 +59,7 @@ public abstract class AbstractSwingApplication extends BaseSwingApplication {
       LOG.warn("Error Starting GUI", e);
       System.exit(0);
     }
-    return runWhileActive(clientSession);
+    runWhileActive(clientSession);
   }
 
   /**

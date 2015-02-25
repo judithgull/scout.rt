@@ -45,7 +45,8 @@ public final class ApplicationLoader {
     }
     // pure Java
     List<IApplication> applications = new ArrayList<IApplication>();
-    Iterator<IApplication> it = ServiceLoader.load(IApplication.class).iterator();
+    ServiceLoader<IApplication> applicationLoader = ServiceLoader.load(IApplication.class);
+    Iterator<IApplication> it = applicationLoader.iterator();
     while (it.hasNext()) {
       applications.add(it.next());
     }

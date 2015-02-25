@@ -19,7 +19,7 @@ import org.eclipse.scout.rt.platform.cdi.IBeanContributor;
  */
 public interface IApplication {
 
-  void start();
+  void start() throws Exception;
 
-  void stop();
+  void stop() throws Exception;
 }

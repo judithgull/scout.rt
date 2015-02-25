@@ -36,6 +36,8 @@ public final class Platform implements IPlatform {
   private IApplication m_application;
 
   private Platform() {
+    LOG.setLevel(LOG.LEVEL_DEBUG);
+
   }
 
   /**
@@ -57,13 +59,21 @@ public final class Platform implements IPlatform {
     }
     m_state = State.Starting;
     notifyListeners(new PlatformEvent(this, PlatformEvent.ABOUT_TO_START));
+    LOG.debug("CDI start");
     CDI.start();
+    LOG.debug("CDI up an running");
+    LOG.debug("Modules start");
+    m_modules = ScoutServiceLoader.loadServices(IModule.class);
     startModules();
+    LOG.debug("Modules up and running");
     // parse xml
 
     notifyListeners(new PlatformEvent(this, PlatformEvent.MODULES_STARTED));
 
+    LOG.debug("Application start");
+    m_applications = ApplicationLoader.getApplications();
     startApplications();
+    LOG.debug("Application up and running");
     notifyListeners(new PlatformEvent(this, PlatformEvent.STARTED));
     m_state = State.Running;
   }
@@ -163,8 +173,12 @@ public final class Platform implements IPlatform {
   }
 
   public static boolean isOsgiRunning() {
-//    return StringUtility.hasText(System.getProperty("org.osgi.framework.version"));
     Bundle bundle = FrameworkUtil.getBundle(Platform.class);
     return bundle != null;
+  }
+
+  public static boolean isDevelopmentMode() {
+    // TODO NoOSGI
+    return true;
   }
 }
