@@ -63,7 +63,6 @@ public final class Platform implements IPlatform {
     CDI.start();
     LOG.debug("CDI up an running");
     LOG.debug("Modules start");
-    m_modules = ScoutServiceLoader.loadServices(IModule.class);
     startModules();
     LOG.debug("Modules up and running");
     // parse xml
@@ -71,7 +70,6 @@ public final class Platform implements IPlatform {
     notifyListeners(new PlatformEvent(this, PlatformEvent.MODULES_STARTED));
 
     LOG.debug("Application start");
-    m_applications = ApplicationLoader.getApplications();
     startApplications();
     LOG.debug("Application up and running");
     notifyListeners(new PlatformEvent(this, PlatformEvent.STARTED));
