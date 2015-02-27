@@ -83,7 +83,7 @@ public final class SerializationUtility {
     }
 
     if (factory == null) {
-      factory = new BundleObjectSerializerFactory();
+      factory = new BasicObjectSerializerFactory();
     }
 
     return factory;
