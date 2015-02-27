@@ -53,57 +53,53 @@ public class DefaultTestClientSessionProvider implements ITestClientSessionProvi
       }
       symbolicName = symbolicName.substring(0, i);
     }
-    final Bundle bundle = Platform.getBundle(symbolicName);
-    if (bundle != null) {
-      synchronized (CACHE_LOCK) {
-        String cacheKey = createSessionCacheKey(clazz, bundle, runAs);
-        IClientSession clientSession = CACHE.get(cacheKey);
-        if (clientSession == null || !clientSession.isActive() || createNew) {
-          try {
-            clientSession = clazz.newInstance();
-            CACHE.put(cacheKey, clientSession);
-            clientSession.setUserAgent(UserAgent.createDefault());
-            ClientSyncJob job = new ClientSyncJob("Session startup", clientSession) {
-              @Override
-              protected void runVoid(IProgressMonitor monitor) throws Throwable {
-                beforeStartSession(getClientSession(), runAs);
-                getCurrentSession().startSession(bundle);
-                simulateDesktopOpened(getClientSession());
-                afterStartSession(getClientSession(), runAs);
-              }
-            };
-            job.schedule();
-            job.join();
-            job.throwOnError();
-          }
-          catch (Throwable t) {
-            LOG.error("could not load session for " + symbolicName, t);
-          }
+    synchronized (CACHE_LOCK) {
+      String cacheKey = createSessionCacheKey(clazz, runAs);
+      IClientSession clientSession = CACHE.get(cacheKey);
+      if (clientSession == null || !clientSession.isActive() || createNew) {
+        try {
+          clientSession = clazz.newInstance();
+          CACHE.put(cacheKey, clientSession);
+          clientSession.setUserAgent(UserAgent.createDefault());
+          ClientSyncJob job = new ClientSyncJob("Session startup", clientSession) {
+            @Override
+            protected void runVoid(IProgressMonitor monitor) throws Throwable {
+              beforeStartSession(getClientSession(), runAs);
+              getCurrentSession().startSession();
+              simulateDesktopOpened(getClientSession());
+              afterStartSession(getClientSession(), runAs);
+            }
+          };
+          job.schedule();
+          job.join();
+          job.throwOnError();
         }
-        return (T) clientSession;
+        catch (Throwable t) {
+          LOG.error("could not load session for " + symbolicName, t);
+        }
       }
+      return (T) clientSession;
     }
-    return null;
   }
 
   /**
    * Creates a cache key for the given session class, its hosting bundle and the name of the user the session is created
    * for.
-   * 
+   *
    * @param sessionClass
    * @param providingBundleSymbolicName
    * @param runAs
    * @return
    */
-  protected String createSessionCacheKey(Class<? extends IClientSession> sessionClass, Bundle providingBundle, String runAs) {
-    return StringUtility.join("-", providingBundle.getSymbolicName(), runAs);
+  protected String createSessionCacheKey(Class<? extends IClientSession> sessionClass, String runAs) {
+    return StringUtility.join("-", sessionClass.getName(), runAs);
   }
 
   /**
    * Performs custom operations before the client session is started. This default implementation assigns the current
    * session on the {@link MultiClientAuthenticator}, so that a possibly arising HTTP BASIC authentication can be
    * performed. Additionally, all message boxes are automatically canceled.
-   * 
+   *
    * @param clientSession
    * @param runAs
    * @see MultiClientAuthenticator
@@ -126,7 +122,7 @@ public class DefaultTestClientSessionProvider implements ITestClientSessionProvi
 
   /**
    * Performs custom operations after the client session has been started.
-   * 
+   *
    * @param clientSession
    * @param runAs
    */
@@ -136,7 +132,7 @@ public class DefaultTestClientSessionProvider implements ITestClientSessionProvi
   /**
    * Simulates that the desktop has been opened. The method works also if the desktop has already been opened or if the
    * Scout client does not have a desktop at all.
-   * 
+   *
    * @param clientSession
    */
   protected void simulateDesktopOpened(IClientSession clientSession) {

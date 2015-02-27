@@ -40,7 +40,6 @@ import org.eclipse.scout.rt.shared.services.common.jdbc.SearchFilter;
 import org.eclipse.scout.rt.shared.services.lookup.CodeLookupCall;
 import org.eclipse.scout.rt.shared.services.lookup.ILookupCall;
 import org.eclipse.scout.rt.shared.services.lookup.ILookupRow;
-import org.osgi.framework.Bundle;
 
 public final class ClientTestUtility {
 
@@ -102,16 +101,8 @@ public final class ClientTestUtility {
     return ClientSyncJob.getCurrentSession();
   }
 
-  public static Bundle getClientBundle() {
-    return ClientSyncJob.getCurrentSession().getBundle();
-  }
-
   public static IDesktop getDesktop() {
     return ClientSyncJob.getCurrentSession().getDesktop();
-  }
-
-  public static String getFormsPackage() {
-    return getClientBundle().getSymbolicName() + ".ui.forms";
   }
 
   /**

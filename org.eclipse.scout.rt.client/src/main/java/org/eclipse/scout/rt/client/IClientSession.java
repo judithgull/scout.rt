@@ -55,7 +55,7 @@ public interface IClientSession extends ISession {
    * <p>
    * The session is active just after this method returns.
    */
-  void startSession(Bundle bundle);
+  void startSession();
 
   /**
    * send a stop signal to the session event queue<br>

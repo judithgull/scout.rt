@@ -17,7 +17,6 @@ import javax.security.auth.Subject;
 
 import org.eclipse.scout.commons.annotations.FormData;
 import org.eclipse.scout.rt.shared.ui.UserAgent;
-import org.osgi.framework.Bundle;
 
 /**
  * @since 3.8.0
@@ -28,8 +27,6 @@ public interface ISession {
    * The {@link ISession} which is currently associated with the current thread.
    */
   ThreadLocal<ISession> CURRENT = new ThreadLocal<>();
-
-  Bundle getBundle();
 
   /**
    * Shared context variable containing the authenticated userId in lowercase

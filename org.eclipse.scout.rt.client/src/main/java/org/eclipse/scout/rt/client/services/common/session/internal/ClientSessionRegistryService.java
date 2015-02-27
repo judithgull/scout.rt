@@ -31,26 +31,18 @@ public class ClientSessionRegistryService extends AbstractService implements ICl
 
   @Override
   public <T extends IClientSession> T newClientSession(Class<T> clazz, UserAgent userAgent) {
-    final Bundle bundle = getDefiningBundle(clazz);
-    if (bundle == null) {
-      return null;
-    }
 
-    return createAndStartClientSession(clazz, bundle, null, null, userAgent);
+    return createAndStartClientSession(clazz, null, null, userAgent);
   }
 
   @Override
   public <T extends IClientSession> T newClientSession(Class<T> clazz, Subject subject, String virtualSessionId, UserAgent userAgent) {
-    final Bundle bundle = getDefiningBundle(clazz);
-    if (bundle == null) {
-      return null;
-    }
 
-    return createAndStartClientSession(clazz, bundle, subject, virtualSessionId, userAgent);
+    return createAndStartClientSession(clazz, subject, virtualSessionId, userAgent);
   }
 
   @SuppressWarnings("unchecked")
-  private <T extends IClientSession> T createAndStartClientSession(Class<T> clazz, final Bundle bundle, Subject subject, String virtualSessionId, UserAgent userAgent) {
+  private <T extends IClientSession> T createAndStartClientSession(Class<T> clazz, Subject subject, String virtualSessionId, UserAgent userAgent) {
     try {
       IClientSession clientSession = clazz.newInstance();
       clientSession.setSubject(subject);
@@ -61,7 +53,7 @@ public class ClientSessionRegistryService extends AbstractService implements ICl
       ClientSyncJob job = new ClientSyncJob("Session startup", clientSession) {
         @Override
         protected void runVoid(IProgressMonitor monitor) throws Throwable {
-          getCurrentSession().startSession(bundle);
+          getCurrentSession().startSession();
         }
       };
       //must run now to use correct jaas and subject context of calling thread. Especially relevant when running in a servlet thread (rwt)
@@ -71,7 +63,7 @@ public class ClientSessionRegistryService extends AbstractService implements ICl
       return (T) clientSession;
     }
     catch (Throwable t) {
-      LOG.error("could not load session for " + bundle.getSymbolicName(), t);
+      LOG.error(String.format("could not load session '%1'.", clazz));
       return null;
     }
   }

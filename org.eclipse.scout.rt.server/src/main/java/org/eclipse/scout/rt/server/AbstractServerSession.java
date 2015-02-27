@@ -22,7 +22,6 @@ import java.util.Map;
 
 import javax.security.auth.Subject;
 
-import org.eclipse.core.runtime.Platform;
 import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.TypeCastUtility;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
@@ -47,13 +46,11 @@ import org.eclipse.scout.rt.shared.ui.IUiDeviceType;
 import org.eclipse.scout.rt.shared.ui.IUiLayer;
 import org.eclipse.scout.rt.shared.ui.UserAgent;
 import org.eclipse.scout.service.SERVICES;
-import org.osgi.framework.Bundle;
 
 public abstract class AbstractServerSession implements IServerSession, Serializable, IExtensibleObject {
 
   private static final long serialVersionUID = 1L;
 
-  private transient Bundle m_bundle;
   private boolean m_initialized;
   private boolean m_active;
   private Locale m_locale;
@@ -66,7 +63,6 @@ public abstract class AbstractServerSession implements IServerSession, Serializa
   private String m_virtualSessionId;
   private Subject m_subject;
   private String m_sessionId;
-  private String m_symbolicBundleName;
   private final ObjectExtensions<AbstractServerSession, IServerSessionExtension<? extends AbstractServerSession>> m_objectExtensions;
 
   public AbstractServerSession(boolean autoInitConfig) {
@@ -85,9 +81,6 @@ public abstract class AbstractServerSession implements IServerSession, Serializa
    */
   private void readObject(ObjectInputStream ois) throws ClassNotFoundException, IOException {
     ois.defaultReadObject();
-    if (m_bundle == null && m_symbolicBundleName != null) {
-      m_bundle = Platform.getBundle(m_symbolicBundleName);
-    }
 
     if (m_scoutTexts == null) {
       m_scoutTexts = new ScoutTexts();
@@ -228,20 +221,10 @@ public abstract class AbstractServerSession implements IServerSession, Serializa
   }
 
   @Override
-  public Bundle getBundle() {
-    return m_bundle;
-  }
-
-  @Override
-  public final void loadSession(Bundle bundle) throws ProcessingException {
+  public final void loadSession() throws ProcessingException {
     if (isActive()) {
       throw new IllegalStateException("session is active");
     }
-    if (bundle == null) {
-      throw new IllegalArgumentException("bundle must not be null");
-    }
-    m_bundle = bundle;
-    m_symbolicBundleName = bundle.getSymbolicName();
     m_active = true;
     m_scoutTexts = new ScoutTexts();
     // explicitly set the just created instance to the ThreadLocal because it was not available yet, when the job was started.

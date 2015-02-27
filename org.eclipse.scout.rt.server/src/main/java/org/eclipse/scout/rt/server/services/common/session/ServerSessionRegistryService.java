@@ -14,7 +14,6 @@ import javax.security.auth.Subject;
 
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
-import org.eclipse.core.runtime.Platform;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.server.IServerJobFactory;
@@ -24,7 +23,6 @@ import org.eclipse.scout.rt.server.ITransactionRunnable;
 import org.eclipse.scout.rt.shared.ui.UserAgent;
 import org.eclipse.scout.service.AbstractService;
 import org.eclipse.scout.service.SERVICES;
-import org.osgi.framework.Bundle;
 
 public class ServerSessionRegistryService extends AbstractService implements IServerSessionRegistryService {
 
@@ -74,9 +72,7 @@ public class ServerSessionRegistryService extends AbstractService implements ISe
     jobFactory.runNow("loading session " + serverSession.getClass().getSimpleName(), new ITransactionRunnable() {
       @Override
       public IStatus run(IProgressMonitor monitor) throws ProcessingException {
-        String symbolicName = serverSession.getClass().getPackage().getName();
-        Bundle bundle = Platform.getBundle(symbolicName);
-        serverSession.loadSession(bundle);
+        serverSession.loadSession();
         return Status.OK_STATUS;
       }
     });

@@ -25,7 +25,6 @@ import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.commons.osgi.BundleClassDescriptor;
-import org.eclipse.scout.commons.runtime.BundleBrowser;
 import org.eclipse.scout.rt.shared.servicetunnel.RemoteServiceAccessDenied;
 import org.eclipse.scout.service.AbstractService;
 import org.osgi.framework.Bundle;
@@ -161,48 +160,48 @@ public class SharedCodeService extends AbstractService implements ICodeService {
       if (a != null) {
         return CollectionUtility.hashSet(a);
       }
-      //
+
       Set<BundleClassDescriptor> discoveredCodeTypes = new HashSet<BundleClassDescriptor>();
-      for (Bundle bundle : Platform.getBundle("org.eclipse.scout.rt.shared").getBundleContext().getBundles()) {
-        if (bundle.getSymbolicName().startsWith(classPrefix)) {
-          // ok
-        }
-        else if (classPrefix.startsWith(bundle.getSymbolicName() + ".")) {
-          // ok
-        }
-        else {
-          continue;
-        }
-        // Skip uninteresting bundles
-        if (!acceptBundle(bundle, classPrefix)) {
-          continue;
-        }
-        String[] classNames;
-        try {
-          BundleBrowser bundleBrowser = new BundleBrowser(bundle.getSymbolicName(), bundle.getSymbolicName());
-          classNames = bundleBrowser.getClasses(false, true);
-        }
-        catch (Exception e1) {
-          LOG.warn(null, e1);
-          continue;
-        }
-        // filter
-        for (String className : classNames) {
-          // fast pre-check
-          if (acceptClassName(bundle, className)) {
-            try {
-              Class c = null;
-              c = bundle.loadClass(className);
-              if (acceptClass(bundle, c)) {
-                discoveredCodeTypes.add(new BundleClassDescriptor(bundle.getSymbolicName(), c.getName()));
-              }
-            }
-            catch (Throwable t) {
-              // nop
-            }
-          }
-        }
-      }
+//      for (Bundle bundle : Platform.getBundle("org.eclipse.scout.rt.shared").getBundleContext().getBundles()) {
+//        if (bundle.getSymbolicName().startsWith(classPrefix)) {
+//          // ok
+//        }
+//        else if (classPrefix.startsWith(bundle.getSymbolicName() + ".")) {
+//          // ok
+//        }
+//        else {
+//          continue;
+//        }
+//        // Skip uninteresting bundles
+//        if (!acceptBundle(bundle, classPrefix)) {
+//          continue;
+//        }
+//        String[] classNames;
+//        try {
+//          BundleBrowser bundleBrowser = new BundleBrowser(bundle.getSymbolicName(), bundle.getSymbolicName());
+//          classNames = bundleBrowser.getClasses(false, true);
+//        }
+//        catch (Exception e1) {
+//          LOG.warn(null, e1);
+//          continue;
+//        }
+//        // filter
+//        for (String className : classNames) {
+//          // fast pre-check
+//          if (acceptClassName(bundle, className)) {
+//            try {
+//              Class c = null;
+//              c = bundle.loadClass(className);
+//              if (acceptClass(bundle, c)) {
+//                discoveredCodeTypes.add(new BundleClassDescriptor(bundle.getSymbolicName(), c.getName()));
+//              }
+//            }
+//            catch (Throwable t) {
+//              // nop
+//            }
+//          }
+//        }
+//      }
       m_codeTypeClassDescriptorMap.put(classPrefix, discoveredCodeTypes);
       return CollectionUtility.hashSet(discoveredCodeTypes);
     }

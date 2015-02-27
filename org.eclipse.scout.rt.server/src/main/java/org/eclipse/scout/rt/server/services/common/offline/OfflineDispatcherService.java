@@ -203,7 +203,7 @@ public class OfflineDispatcherService extends AbstractService implements IOfflin
   private ServiceTunnelResponse callService(IServiceTunnelRequest serviceReq) throws ProcessingException {
     try {
       IServerSession serverSession = ThreadContext.getServerSession();
-      Class<?> serviceInterfaceClass = serverSession.getBundle().loadClass(serviceReq.getServiceInterfaceClassName());
+      Class<?> serviceInterfaceClass = Class.forName(serviceReq.getServiceInterfaceClassName());
       Object service = SERVICES.getService(serviceInterfaceClass);
       if (service == null) {
         throw new ProcessingException("service registry does not contain a service of type " + serviceReq.getServiceInterfaceClassName());

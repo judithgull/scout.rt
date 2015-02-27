@@ -65,14 +65,11 @@ import org.eclipse.scout.rt.shared.services.common.prefs.IPreferences;
 import org.eclipse.scout.rt.shared.services.common.security.ILogoutService;
 import org.eclipse.scout.rt.shared.ui.UserAgent;
 import org.eclipse.scout.service.SERVICES;
-import org.osgi.framework.Bundle;
 
 public abstract class AbstractClientSession implements IClientSession, IExtensibleObject {
 
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractClientSession.class);
 
-  // context
-  private Bundle m_bundle;
   // state
   private final Object m_stateLock;
   private volatile boolean m_active;
@@ -195,11 +192,6 @@ public abstract class AbstractClientSession implements IClientSession, IExtensib
   }
 
   @Override
-  public Bundle getBundle() {
-    return m_bundle;
-  }
-
-  @Override
   public boolean isActive() {
     return m_active;
   }
@@ -289,8 +281,7 @@ public abstract class AbstractClientSession implements IClientSession, IExtensib
   }
 
   @Override
-  public final void startSession(Bundle bundle) {
-    m_bundle = bundle;
+  public final void startSession() {
     if (isActive()) {
       throw new IllegalStateException("session is active");
     }

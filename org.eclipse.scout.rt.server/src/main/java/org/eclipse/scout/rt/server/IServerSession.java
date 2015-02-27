@@ -12,14 +12,13 @@ package org.eclipse.scout.rt.server;
 
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.shared.ISession;
-import org.osgi.framework.Bundle;
 
 /**
  * Server-side session
  */
 public interface IServerSession extends ISession {
 
-  void loadSession(Bundle bundle) throws ProcessingException;
+  void loadSession() throws ProcessingException;
 
   /**
    * Set the session id. Should only be done during initialization.

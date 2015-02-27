@@ -23,11 +23,11 @@ import java.util.regex.Pattern;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 
-import org.eclipse.core.runtime.Platform;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.services.common.icon.IconLocator;
 import org.eclipse.scout.rt.client.services.common.icon.IconSpec;
+import org.eclipse.scout.rt.platform.Platform;
 import org.eclipse.scout.rt.shared.AbstractIcons;
 import org.eclipse.scout.rt.ui.swing.basic.IconUtility;
 
@@ -93,7 +93,7 @@ public final class SwingIconLocator {
       Image img = Toolkit.getDefaultToolkit().createImage(iconSpec.getContent());
       if (img != null) {
         //decorate window icon in development mode
-        if (Platform.inDevelopmentMode() && name != null && name.matches("^(window\\d+|tray)$")) {
+        if (Platform.isDevelopmentMode() && name != null && name.matches("^(window\\d+|tray)$")) {
           img = decorateForDevelopment(img);
         }
       }
