@@ -26,6 +26,18 @@ public interface IClientSession extends ISession, IPropertyObserver {
 
   String PROP_LOCALE = "locale";
 
+  enum State {
+    Undefined,
+    Starting,
+    Started,
+    Stopping,
+    Stopped
+  }
+
+  void addClientSessionStateListener(IClientSessionStateListener listener);
+
+  void removeClientSessionStateListener(IClientSessionStateListener listener);
+
   /**
    * @return the session's {@link Locale} or <code>null</code> if not set.
    */

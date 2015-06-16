@@ -21,6 +21,7 @@ import org.eclipse.scout.rt.client.IClientSession;
 import org.eclipse.scout.rt.client.context.ClientRunContext;
 import org.eclipse.scout.rt.client.context.ClientRunContexts;
 import org.eclipse.scout.rt.client.job.ModelJobs;
+import org.eclipse.scout.rt.client.services.common.notification.INotificationClientService;
 import org.eclipse.scout.rt.platform.ApplicationScoped;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.shared.ISession;
@@ -47,6 +48,8 @@ public class ClientSessionProvider {
       public SESSION call() throws Exception {
         // 1. Create an empty session instance.
         final SESSION clientSession = ClientSessionProvider.cast(BEANS.get(IClientSession.class));
+        // register client session for notifications
+        BEANS.get(INotificationClientService.class).register(clientSession);
 
         // 2. Load the session.
         ModelJobs.schedule(new IRunnable() {
