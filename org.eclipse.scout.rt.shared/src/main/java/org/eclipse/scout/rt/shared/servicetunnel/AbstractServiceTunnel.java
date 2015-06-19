@@ -19,25 +19,24 @@ import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.platform.context.RunMonitor;
 import org.eclipse.scout.rt.platform.service.ServiceUtility;
-import org.eclipse.scout.rt.shared.ISession;
 import org.eclipse.scout.rt.shared.ui.UserAgent;
 
 /**
  * Service tunnel is Thread-Safe.
  */
-public abstract class AbstractServiceTunnel<T extends ISession> implements IServiceTunnel {
+public abstract class AbstractServiceTunnel implements IServiceTunnel {
 
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractServiceTunnel.class);
 
-  private final T m_session;
+//  private final T m_session;
 
-  public AbstractServiceTunnel(T session) {
-    m_session = session;
+  public AbstractServiceTunnel() {
+//    m_session = session;
   }
 
-  protected T getSession() {
-    return m_session;
-  }
+//  protected T getSession() {
+//    return m_session;
+//  }
 
   @Override
   public Object invokeService(Class serviceInterfaceClass, Method operation, Object[] callerArgs) throws ProcessingException {

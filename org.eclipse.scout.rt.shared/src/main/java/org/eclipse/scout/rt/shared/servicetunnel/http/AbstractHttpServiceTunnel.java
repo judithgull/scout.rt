@@ -15,8 +15,12 @@ import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLConnection;
+import java.security.AccessController;
 import java.util.concurrent.Callable;
 
+import javax.security.auth.Subject;
+
+import org.eclipse.scout.commons.Assertions;
 import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.UriUtility;
@@ -29,7 +33,6 @@ import org.eclipse.scout.rt.platform.context.RunContexts;
 import org.eclipse.scout.rt.platform.context.RunMonitor;
 import org.eclipse.scout.rt.platform.job.JobInput;
 import org.eclipse.scout.rt.platform.job.Jobs;
-import org.eclipse.scout.rt.shared.ISession;
 import org.eclipse.scout.rt.shared.ScoutTexts;
 import org.eclipse.scout.rt.shared.SharedConfigProperties.ServiceTunnelTargetUrlProperty;
 import org.eclipse.scout.rt.shared.servicetunnel.AbstractServiceTunnel;
@@ -42,19 +45,19 @@ import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelResponse;
 /**
  * Abstract tunnel used to invoke a service through HTTP.
  */
-public abstract class AbstractHttpServiceTunnel<T extends ISession> extends AbstractServiceTunnel<T> {
+public abstract class AbstractHttpServiceTunnel extends AbstractServiceTunnel {
 
   public static final String TOKEN_AUTH_HTTP_HEADER = "X-ScoutAccessToken";
 
   private IServiceTunnelContentHandler m_contentHandler;
   private final URL m_serverUrl;
 
-  public AbstractHttpServiceTunnel(T session) {
-    this(session, getConfiguredServerUrl());
+  public AbstractHttpServiceTunnel() {
+    this(getConfiguredServerUrl());
   }
 
-  public AbstractHttpServiceTunnel(T session, URL url) {
-    super(session);
+  public AbstractHttpServiceTunnel(URL url) {
+//    super(session);
     m_serverUrl = url;
   }
 
@@ -133,7 +136,8 @@ public abstract class AbstractHttpServiceTunnel<T extends ISession> extends Abst
     if (!DefaultAuthToken.isActive()) {
       return null;
     }
-    String userId = CollectionUtility.firstElement(getSession().getSubject().getPrincipals()).getName();
+    String userId = CollectionUtility.firstElement(Assertions.assertNotNull(Subject.getSubject(AccessController.getContext())).getPrincipals()).getName();
+//    String userId = CollectionUtility.firstElement(getSession().getSubject().getPrincipals()).getName();
     DefaultAuthToken token = BEANS.get(DefaultAuthToken.class);
     token.init(userId);
     return token.toString();

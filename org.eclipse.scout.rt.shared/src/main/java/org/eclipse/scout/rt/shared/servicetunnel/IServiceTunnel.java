@@ -13,10 +13,12 @@ package org.eclipse.scout.rt.shared.servicetunnel;
 import java.lang.reflect.Method;
 
 import org.eclipse.scout.commons.exception.ProcessingException;
+import org.eclipse.scout.rt.platform.Bean;
 
 /**
  * Interface of a tunnel used to invoke a service through HTTP.
  */
+@Bean
 public interface IServiceTunnel {
 
   /**

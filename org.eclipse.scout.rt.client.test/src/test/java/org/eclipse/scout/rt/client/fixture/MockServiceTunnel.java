@@ -22,7 +22,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.eclipse.scout.commons.UriUtility;
 import org.eclipse.scout.commons.exception.ProcessingException;
-import org.eclipse.scout.rt.client.IClientSession;
 import org.eclipse.scout.rt.client.servicetunnel.http.ClientHttpServiceTunnel;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.service.ServiceUtility;
@@ -34,8 +33,8 @@ public class MockServiceTunnel extends ClientHttpServiceTunnel {
 
   private final HashMap<Long, Thread> m_runningMap = new HashMap<Long, Thread>();
 
-  public MockServiceTunnel(IClientSession session) throws Exception {
-    super(session, UriUtility.toUrl("http://mock/process"));
+  public MockServiceTunnel() throws Exception {
+    super(UriUtility.toUrl("http://mock/process"));
     resetRequestSequenceGenerator();
   }
 

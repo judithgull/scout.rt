@@ -436,15 +436,15 @@ public abstract class AbstractClientSession extends AbstractPropertyObserver imp
   }
 
   protected void inactivateSession() {
-    if (getServiceTunnel() != null) {
-      try {
-        BEANS.get(ILogoutService.class).logout();
-      }
-      catch (Exception e) {
-        LOG.info("Failed to logout from server.", e);
+    try {
+      ILogoutService logoutService = BEANS.opt(ILogoutService.class);
+      if (logoutService != null) {
+        logoutService.logout();
       }
     }
-    setActive(false);
+    finally {
+      setActive(false);
+    }
 
     fireSessionChangedEvent(new SessionEvent(this, SessionEvent.TYPE_STOPPED));
     LOG.info("Client session stopped [session={}, user={}]", this, getUserId());
@@ -484,14 +484,14 @@ public abstract class AbstractClientSession extends AbstractPropertyObserver imp
     return m_exitCode;
   }
 
-  @Override
-  public IClientServiceTunnel getServiceTunnel() {
-    return m_serviceTunnel;
-  }
+//  @Override
+//  public IClientServiceTunnel getServiceTunnel() {
+//    return m_serviceTunnel;
+//  }
 
-  protected void setServiceTunnel(IClientServiceTunnel tunnel) {
-    m_serviceTunnel = tunnel;
-  }
+//  protected void setServiceTunnel(IClientServiceTunnel tunnel) {
+//    m_serviceTunnel = tunnel;
+//  }
 
   @Override
   public IMemoryPolicy getMemoryPolicy() {

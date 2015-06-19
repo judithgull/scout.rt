@@ -149,4 +149,21 @@ public final class SharedConfigProperties {
       return Enum.valueOf(Tier.class, value);
     }
   }
+
+  /**
+   * Property to specify if remote proxy beans should be created for interfaces annotated with {@link TunnelToServer}.
+   * Default is <code>true</code>.
+   */
+  public static class CreateTunnelToServerBeansProperty extends AbstractBooleanConfigProperty {
+
+    @Override
+    public String getKey() {
+      return "scout.beans.createTunnelToServerBeans";
+    }
+
+    @Override
+    public Boolean getDefaultValue() {
+      return Boolean.TRUE;
+    }
+  }
 }
