@@ -11,25 +11,62 @@
 package org.eclipse.scout.rt.shared.services.common.notification;
 
 import java.io.Serializable;
+import java.util.Collections;
+import java.util.Set;
+
+import org.eclipse.scout.commons.CollectionUtility;
 
 /**
  *
  */
-public class NotificationMessage {
-  private final String m_userId;
+public class NotificationMessage implements Serializable {
+  private static final long serialVersionUID = 1L;
+
+  private final Set<String> m_sessionIds;
+  private final Set<String> m_userIds;
+  private final String m_excludeNodeId;
+  private final boolean m_notifyAll;
   private final Serializable m_notification;
 
-  public NotificationMessage(String userId, Serializable notification) {
-    m_userId = userId;
+  public NotificationMessage(Set<String> sessionIds, Set<String> userIds, boolean notifyAll, Serializable notification) {
+    this(sessionIds, userIds, notifyAll, null, notification);
+  }
+
+  public NotificationMessage(Set<String> sessionIds, Set<String> userIds, boolean notifyAll, String excludeNodeId, Serializable notification) {
+    m_sessionIds = Collections.unmodifiableSet(CollectionUtility.hashSet(sessionIds));
+    m_userIds = Collections.unmodifiableSet(CollectionUtility.hashSet(userIds));
+    m_notifyAll = notifyAll;
+    m_excludeNodeId = excludeNodeId;
     m_notification = notification;
   }
 
-  public String getUserId() {
-    return m_userId;
+  public Set<String> getSessionIds() {
+    return m_sessionIds;
+  }
+
+  public Set<String> getUserIds() {
+    return m_userIds;
+  }
+
+  public boolean isNotifyAll() {
+    return m_notifyAll;
+  }
+
+  public String getExcludeNodeId() {
+    return m_excludeNodeId;
   }
 
   public Serializable getNotification() {
     return m_notification;
   }
 
+  @Override
+  public String toString() {
+    StringBuilder builder = new StringBuilder();
+    builder.append("NotificationMessage sessions=").append(getSessionIds()).append(", ");
+    builder.append("userIds=").append(getUserIds()).append(", ");
+    builder.append("excludeNodeId=").append(getExcludeNodeId()).append(", ");
+    builder.append("notification=").append(getNotification());
+    return builder.toString();
+  }
 }

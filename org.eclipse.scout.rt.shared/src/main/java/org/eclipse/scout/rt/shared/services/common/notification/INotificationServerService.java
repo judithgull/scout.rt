@@ -12,15 +12,34 @@ package org.eclipse.scout.rt.shared.services.common.notification;
 
 import java.util.List;
 
+import org.eclipse.scout.rt.platform.ApplicationScoped;
 import org.eclipse.scout.rt.shared.TunnelToServer;
 
+@ApplicationScoped
 @TunnelToServer
 public interface INotificationServerService {
 
-  void register(String notificationNodeId);
+  /**
+   * must be called in a session scope
+   * 
+   * @return
+   */
+  String getUserIdOfCurrentSession();
 
-  void unregister(String notificationNodeId);
+  void registerSession(String notificationNodeId, String sessionId, String userId);
+
+  void unregisterSession(String notificationNodeId);
 
   List<NotificationMessage> getNotifications(String notificationNodeId);
+
+  /**
+   * @param notificationNodeId
+   */
+  void registerNotificationNode(String notificationNodeId);
+
+  /**
+   * @param notificationNodeId
+   */
+  void unregisterNotificationNode(String notificationNodeId);
 
 }

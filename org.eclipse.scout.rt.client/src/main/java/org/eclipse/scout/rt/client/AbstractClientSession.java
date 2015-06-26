@@ -45,7 +45,6 @@ import org.eclipse.scout.rt.client.job.ModelJobs;
 import org.eclipse.scout.rt.client.services.common.clientnotification.ClientNotificationConsumerEvent;
 import org.eclipse.scout.rt.client.services.common.clientnotification.IClientNotificationConsumerListener;
 import org.eclipse.scout.rt.client.services.common.clientnotification.IClientNotificationConsumerService;
-import org.eclipse.scout.rt.client.servicetunnel.http.IClientServiceTunnel;
 import org.eclipse.scout.rt.client.ui.ClientUIPreferences;
 import org.eclipse.scout.rt.client.ui.DataChangeListener;
 import org.eclipse.scout.rt.client.ui.desktop.DesktopListener;
@@ -82,9 +81,9 @@ public abstract class AbstractClientSession extends AbstractPropertyObserver imp
   private volatile boolean m_isStopping;
   private int m_exitCode = 0;
   // model
+  private String m_id;
   private IDesktop m_desktop;
   private VirtualDesktop m_virtualDesktop;
-  private IClientServiceTunnel m_serviceTunnel;
   private Subject m_offlineSubject;
   private Subject m_subject;
   private final SharedVariableMap m_sharedVariableMap;
@@ -140,6 +139,11 @@ public abstract class AbstractClientSession extends AbstractPropertyObserver imp
   @Order(100)
   protected boolean getConfiguredSingleThreadSession() {
     return false;
+  }
+
+  @Override
+  public String getId() {
+    return m_id;
   }
 
   /**
@@ -278,10 +282,11 @@ public abstract class AbstractClientSession extends AbstractPropertyObserver imp
   }
 
   @Override
-  public void start() throws ProcessingException {
+  public void start(String sessionId) throws ProcessingException {
     if (isActive()) {
       throw new IllegalStateException("session is active");
     }
+    m_id = sessionId;
     interceptLoadSession();
     setActive(true);
 

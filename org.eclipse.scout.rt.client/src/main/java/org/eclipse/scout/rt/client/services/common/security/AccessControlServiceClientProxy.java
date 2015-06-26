@@ -197,7 +197,7 @@ public class AccessControlServiceClientProxy extends AbstractService implements 
   }
 
   private IAccessControlService getRemoteService() {
-    return ServiceTunnelUtility.createProxy(IAccessControlService.class, ClientSessionProvider.currentSession().getServiceTunnel());
+    return ServiceTunnelUtility.createProxy(IAccessControlService.class);
   }
 
   private static class ServiceState {

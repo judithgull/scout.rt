@@ -15,6 +15,7 @@ import java.io.InterruptedIOException;
 import java.net.SocketException;
 import java.security.AccessController;
 import java.util.Locale;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 
 import javax.security.auth.Subject;
@@ -35,7 +36,6 @@ import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.context.RunMonitor;
 import org.eclipse.scout.rt.platform.exception.ExceptionTranslator;
 import org.eclipse.scout.rt.server.admin.html.AdminSession;
-import org.eclipse.scout.rt.server.commons.cache.IClientIdentificationService;
 import org.eclipse.scout.rt.server.commons.cache.IHttpSessionCacheService;
 import org.eclipse.scout.rt.server.commons.context.ServletRunContexts;
 import org.eclipse.scout.rt.server.commons.servlet.IHttpServletRoundtrip;
@@ -45,8 +45,8 @@ import org.eclipse.scout.rt.server.context.ServerRunContexts;
 import org.eclipse.scout.rt.server.session.ServerSessionProvider;
 import org.eclipse.scout.rt.shared.servicetunnel.DefaultServiceTunnelContentHandler;
 import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelContentHandler;
-import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelRequest;
 import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelResponse;
+import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelRequest;
 import org.eclipse.scout.rt.shared.ui.UserAgent;
 
 /**
@@ -54,6 +54,8 @@ import org.eclipse.scout.rt.shared.ui.UserAgent;
  * {@link IServiceTunnelResponse} and any {@link IServiceTunnelContentHandler} implementation.
  */
 public class ServiceTunnelServlet extends HttpServlet {
+
+  private static final String SESSION_ID = "sessionId";
 
   private static final String ADMIN_SESSION_KEY = AdminSession.class.getName();
 
@@ -81,6 +83,7 @@ public class ServiceTunnelServlet extends HttpServlet {
         public void run() throws Exception {
           ServerRunContext serverRunContext = ServerRunContexts.copyCurrent();
           serverRunContext.userAgent(UserAgent.createDefault());
+          serverRunContext.propertyMap().put(SESSION_ID, UUID.randomUUID().toString());
           serverRunContext.session(lookupServerSessionOnHttpSession(serverRunContext.copy()), true);
 
           invokeAdminService(serverRunContext);
@@ -108,7 +111,7 @@ public class ServiceTunnelServlet extends HttpServlet {
 
         @Override
         public void run() throws Exception {
-          IServiceTunnelRequest serviceRequest = deserializeServiceRequest();
+          ServiceTunnelRequest serviceRequest = deserializeServiceRequest();
 
           // Enable global cancellation of the service request.
           RunMonitor runMonitor = BEANS.get(RunMonitor.class);
@@ -117,6 +120,7 @@ public class ServiceTunnelServlet extends HttpServlet {
           serverRunContext.locale(serviceRequest.getLocale());
           serverRunContext.userAgent(UserAgent.createByIdentifier(serviceRequest.getUserAgent()));
           serverRunContext.runMonitor(runMonitor);
+          serverRunContext.propertyMap().put(SESSION_ID, serviceRequest.getSessionId());
           serverRunContext.session(lookupServerSessionOnHttpSession(serverRunContext.copy()), true);
 
           IServerSession session = serverRunContext.session();
@@ -170,7 +174,7 @@ public class ServiceTunnelServlet extends HttpServlet {
   /**
    * Method invoked to delegate the HTTP request to the 'process service'.
    */
-  protected IServiceTunnelResponse invokeService(final ServerRunContext serverRunContext, final IServiceTunnelRequest serviceTunnelRequest) throws Exception {
+  protected IServiceTunnelResponse invokeService(final ServerRunContext serverRunContext, final ServiceTunnelRequest serviceTunnelRequest) throws Exception {
     return serverRunContext.call(new Callable<IServiceTunnelResponse>() {
 
       @Override
@@ -185,7 +189,7 @@ public class ServiceTunnelServlet extends HttpServlet {
   /**
    * Method invoked to deserialize a service request to be given to the service handler.
    */
-  protected IServiceTunnelRequest deserializeServiceRequest() throws Exception {
+  protected ServiceTunnelRequest deserializeServiceRequest() throws Exception {
     return m_contentHandler.readRequest(IHttpServletRoundtrip.CURRENT_HTTP_SERVLET_REQUEST.get().getInputStream());
   }
 
@@ -282,8 +286,8 @@ public class ServiceTunnelServlet extends HttpServlet {
     final HttpServletRequest servletRequest = IHttpServletRoundtrip.CURRENT_HTTP_SERVLET_REQUEST.get();
     final HttpServletResponse servletResponse = IHttpServletRoundtrip.CURRENT_HTTP_SERVLET_RESPONSE.get();
 
-    final IServerSession serverSession = BEANS.get(ServerSessionProvider.class).provide(serverRunContext);
-    serverSession.setIdInternal(BEANS.get(IClientIdentificationService.class).getClientId(servletRequest, servletResponse));
+    final IServerSession serverSession = BEANS.get(ServerSessionProvider.class).provide(serverRunContext, (String) serverRunContext.propertyMap().get(SESSION_ID));
+//    serverSession.setIdInternal(BEANS.get(IClientIdentificationService.class).getClientId(servletRequest, servletResponse));
     return serverSession;
   }
 

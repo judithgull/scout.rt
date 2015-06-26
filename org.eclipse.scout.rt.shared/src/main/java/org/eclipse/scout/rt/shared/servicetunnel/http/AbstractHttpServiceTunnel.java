@@ -38,8 +38,8 @@ import org.eclipse.scout.rt.shared.SharedConfigProperties.ServiceTunnelTargetUrl
 import org.eclipse.scout.rt.shared.servicetunnel.AbstractServiceTunnel;
 import org.eclipse.scout.rt.shared.servicetunnel.DefaultServiceTunnelContentHandler;
 import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelContentHandler;
-import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelRequest;
 import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelResponse;
+import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelRequest;
 import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelResponse;
 
 /**
@@ -91,7 +91,7 @@ public abstract class AbstractHttpServiceTunnel extends AbstractServiceTunnel {
    *           override this method to customize the creation of the {@link URLConnection} see
    *           {@link #addCustomHeaders(URLConnection, String)}
    */
-  protected URLConnection createURLConnection(IServiceTunnelRequest call, byte[] callData) throws IOException {
+  protected URLConnection createURLConnection(ServiceTunnelRequest call, byte[] callData) throws IOException {
     // fast check of dummy URL's
     if (getServerUrl().getProtocol().startsWith("file")) {
       throw new IOException("File connection is not supporting HTTP: " + getServerUrl());
@@ -173,7 +173,7 @@ public abstract class AbstractHttpServiceTunnel extends AbstractServiceTunnel {
 
   @Override
   // Method overwritten to be accessible from within @{link RemoteServiceInvocationCallable}.
-  protected IServiceTunnelRequest createServiceTunnelRequest(Class serviceInterfaceClass, Method operation, Object[] args) {
+  protected ServiceTunnelRequest createServiceTunnelRequest(Class serviceInterfaceClass, Method operation, Object[] args) {
     return super.createServiceTunnelRequest(serviceInterfaceClass, operation, args);
   }
 
@@ -183,12 +183,12 @@ public abstract class AbstractHttpServiceTunnel extends AbstractServiceTunnel {
    * To enable cancellation, the callable returned must also implement {@link ICancellable}, so that the remote
    * operation can be cancelled once the current {@link RunMonitor} gets cancelled.
    */
-  protected RemoteServiceInvocationCallable createRemoteServiceInvocationCallable(IServiceTunnelRequest serviceRequest) {
+  protected RemoteServiceInvocationCallable createRemoteServiceInvocationCallable(ServiceTunnelRequest serviceRequest) {
     return new RemoteServiceInvocationCallable(this, serviceRequest);
   }
 
   @Override
-  protected IServiceTunnelResponse tunnel(final IServiceTunnelRequest serviceRequest) {
+  protected IServiceTunnelResponse tunnel(final ServiceTunnelRequest serviceRequest) {
     final long requestSequence = serviceRequest.getRequestSequence();
 
     // Create the Callable to be given to the job manager for execution.
@@ -235,6 +235,6 @@ public abstract class AbstractHttpServiceTunnel extends AbstractServiceTunnel {
    *
    * @since 06.07.2009
    */
-  protected void preprocessHttpResponse(URLConnection urlConn, IServiceTunnelRequest call, int httpCode) {
+  protected void preprocessHttpResponse(URLConnection urlConn, ServiceTunnelRequest call, int httpCode) {
   }
 }

@@ -10,11 +10,17 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.services.common.notification;
 
+import java.util.UUID;
+
 import org.eclipse.scout.rt.client.IClientSession;
 import org.eclipse.scout.rt.platform.ApplicationScoped;
+import org.eclipse.scout.rt.platform.CreateImmediately;
 
 @ApplicationScoped
+@CreateImmediately
 public interface INotificationClientService {
+
+  String NOTIFICATION_NODE_ID = UUID.randomUUID().toString();
 
   void register(IClientSession clientSession);
 

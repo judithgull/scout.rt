@@ -8,14 +8,17 @@
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
-package org.eclipse.scout.rt.platform;
+package org.eclipse.scout.rt.client.services.common.notification;
 
-import org.eclipse.scout.rt.platform.internal.PlatformImplementor;
+import java.io.Serializable;
+
+import org.eclipse.scout.rt.platform.ApplicationScoped;
 
 /**
- * @since 5.1
+ *
  */
-public class DefaultPlatform extends PlatformImplementor {
-  public DefaultPlatform() {
-  }
+@ApplicationScoped
+public interface INotificationHandler<T extends Serializable> {
+
+  void handleNotification(T notification);
 }

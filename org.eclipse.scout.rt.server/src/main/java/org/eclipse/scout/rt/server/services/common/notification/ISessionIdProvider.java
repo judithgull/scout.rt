@@ -10,12 +10,19 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.server.services.common.notification;
 
-import java.util.List;
+import java.util.Set;
 
 /**
  *
  */
-public interface IUserProvider {
+public interface ISessionIdProvider {
 
-  List<String> provide(List<String> availableUsers);
+  public static ISessionIdProvider ALL_SESSION_ID_PROVIDER = new ISessionIdProvider() {
+    @Override
+    public Set<String> provide(Set<String> availableUsers) {
+      return availableUsers;
+    }
+  };
+
+  Set<String> provide(Set<String> availableUsers);
 }

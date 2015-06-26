@@ -397,7 +397,7 @@ public class CodeServiceClientProxy extends AbstractService implements ICodeServ
   }
 
   protected ICodeService getRemoteService() {
-    return ServiceTunnelUtility.createProxy(ICodeService.class, ClientSessionProvider.currentSession().getServiceTunnel());
+    return ServiceTunnelUtility.createProxy(ICodeService.class);
   }
 
   private static class ServiceState {

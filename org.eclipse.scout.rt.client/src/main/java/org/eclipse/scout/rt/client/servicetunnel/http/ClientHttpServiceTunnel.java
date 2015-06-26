@@ -17,16 +17,16 @@ import javax.security.auth.Subject;
 
 import org.eclipse.scout.rt.client.IClientSession;
 import org.eclipse.scout.rt.client.context.ClientRunContexts;
-import org.eclipse.scout.rt.client.job.ClientJobs;
+import org.eclipse.scout.rt.client.services.common.notification.INotificationClientService;
 import org.eclipse.scout.rt.client.services.common.perf.IPerformanceAnalyzerService;
 import org.eclipse.scout.rt.client.session.ClientSessionProvider;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.context.RunContext;
-import org.eclipse.scout.rt.platform.job.IFuture;
+import org.eclipse.scout.rt.shared.ISession;
 import org.eclipse.scout.rt.shared.OfflineState;
 import org.eclipse.scout.rt.shared.services.common.offline.IOfflineDispatcherService;
-import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelRequest;
 import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelResponse;
+import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelRequest;
 import org.eclipse.scout.rt.shared.servicetunnel.http.AbstractHttpServiceTunnel;
 
 /**
@@ -72,7 +72,12 @@ public class ClientHttpServiceTunnel extends AbstractHttpServiceTunnel implement
   }
 
   @Override
-  protected void beforeTunnel(IServiceTunnelRequest serviceRequest) {
+  protected void beforeTunnel(ServiceTunnelRequest serviceRequest) {
+    ISession session = IClientSession.CURRENT.get();
+    if (session != null) {
+      serviceRequest.setSessionId(session.getId());
+    }
+    serviceRequest.setNotificationNodeId(INotificationClientService.NOTIFICATION_NODE_ID);
     // TODO piggyback notifications
 //    IClientNotificationConsumerService cns = BEANS.get(IClientNotificationConsumerService.class);
 //    if (call instanceof ServiceTunnelRequest && cns != null) {
@@ -125,7 +130,7 @@ public class ClientHttpServiceTunnel extends AbstractHttpServiceTunnel implement
 //  }
 
   @Override
-  protected IServiceTunnelResponse tunnel(IServiceTunnelRequest serviceRequest) {
+  protected IServiceTunnelResponse tunnel(ServiceTunnelRequest serviceRequest) {
     if (OfflineState.isOfflineInCurrentThread()) {
       return tunnelOffline(serviceRequest);
     }
@@ -134,14 +139,14 @@ public class ClientHttpServiceTunnel extends AbstractHttpServiceTunnel implement
     }
   }
 
-  protected IServiceTunnelResponse tunnelOnline(final IServiceTunnelRequest serviceRequest) {
+  protected IServiceTunnelResponse tunnelOnline(final ServiceTunnelRequest serviceRequest) {
     return super.tunnel(serviceRequest);
   }
 
   /**
    * Default for offline handling
    */
-  protected IServiceTunnelResponse tunnelOffline(final IServiceTunnelRequest serviceRequest) {
+  protected IServiceTunnelResponse tunnelOffline(final ServiceTunnelRequest serviceRequest) {
     IClientSession clientSession = ClientSessionProvider.currentSession();
     if (clientSession != null && clientSession.getOfflineSubject() != null) {
       Object response = Subject.doAs(clientSession.getOfflineSubject(), new PrivilegedAction<IServiceTunnelResponse>() {

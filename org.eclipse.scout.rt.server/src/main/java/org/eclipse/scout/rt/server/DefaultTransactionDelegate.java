@@ -37,9 +37,9 @@ import org.eclipse.scout.rt.shared.ScoutTexts;
 import org.eclipse.scout.rt.shared.security.RemoteServiceAccessPermission;
 import org.eclipse.scout.rt.shared.services.common.clientnotification.IClientNotification;
 import org.eclipse.scout.rt.shared.services.common.security.ACCESS;
-import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelRequest;
 import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelResponse;
 import org.eclipse.scout.rt.shared.servicetunnel.RemoteServiceAccessDenied;
+import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelRequest;
 import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelResponse;
 import org.eclipse.scout.rt.shared.validate.DefaultValidator;
 import org.eclipse.scout.rt.shared.validate.IValidationStrategy;
@@ -76,7 +76,7 @@ public class DefaultTransactionDelegate {
     m_debug = debug;
   }
 
-  public IServiceTunnelResponse invoke(IServiceTunnelRequest serviceReq) throws Exception {
+  public IServiceTunnelResponse invoke(ServiceTunnelRequest serviceReq) throws Exception {
     long t0 = System.nanoTime();
     long elapsedMillis;
 
@@ -129,7 +129,7 @@ public class DefaultTransactionDelegate {
   /**
    * This method is executed within a {@link IServerSession} context on behalf of a server job.
    */
-  protected IServiceTunnelResponse invokeImpl(IServiceTunnelRequest serviceReq) throws Throwable {
+  protected IServiceTunnelResponse invokeImpl(ServiceTunnelRequest serviceReq) throws Throwable {
     IServerSession serverSession = ServerSessionProvider.currentSession();
     String authenticatedUser = serverSession.getUserId();
     if (LOG.isDebugEnabled()) {
@@ -224,10 +224,7 @@ public class DefaultTransactionDelegate {
     if (!interfaceClass.isInterface()) {
       throw new SecurityException("access denied (code 1a).");
     }
-    //check: must be a subclass of IService
-    if (!IService.class.isAssignableFrom(interfaceClass)) {
-      throw new SecurityException("access denied (code 1b).");
-    }
+
     //check: method is defined on service interface itself
     Method verifyMethod;
     try {
@@ -471,7 +468,7 @@ public class DefaultTransactionDelegate {
   /**
    * Method invoked to handle service exceptions.
    */
-  protected void handleException(Throwable t, IServiceTunnelRequest serviceTunnelRequest) {
+  protected void handleException(Throwable t, ServiceTunnelRequest serviceTunnelRequest) {
     if (ITransaction.CURRENT.get().isCancelled()) {
       return;
     }

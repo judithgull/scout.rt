@@ -56,6 +56,7 @@ public abstract class AbstractServerSession implements IServerSession, Serializa
 
   transient private final EventListenerList m_eventListeners;
 
+  private String m_id;
   private boolean m_initialized;
   private boolean m_active;
   private final Map<String, Object> m_attributes;
@@ -63,7 +64,6 @@ public abstract class AbstractServerSession implements IServerSession, Serializa
   private final SharedVariableMap m_sharedVariableMap;
   private transient ScoutTexts m_scoutTexts;
   private Subject m_subject;
-  private String m_sessionId;
   private final ObjectExtensions<AbstractServerSession, IServerSessionExtension<? extends AbstractServerSession>> m_objectExtensions;
 
   public AbstractServerSession(boolean autoInitConfig) {
@@ -202,7 +202,8 @@ public abstract class AbstractServerSession implements IServerSession, Serializa
   }
 
   @Override
-  public final void start() throws ProcessingException {
+  public final void start(String sessionId) throws ProcessingException {
+    m_id = sessionId;
     Assertions.assertFalse(isActive(), "Session already started");
     assignUserId();
     interceptLoadSession();
@@ -237,13 +238,8 @@ public abstract class AbstractServerSession implements IServerSession, Serializa
   }
 
   @Override
-  public void setIdInternal(String sessionId) {
-    m_sessionId = sessionId;
-  }
-
-  @Override
   public String getId() {
-    return m_sessionId;
+    return m_id;
   }
 
   /**

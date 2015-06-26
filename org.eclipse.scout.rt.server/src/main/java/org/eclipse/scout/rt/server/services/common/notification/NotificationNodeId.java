@@ -8,14 +8,29 @@
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
-package org.eclipse.scout.rt.platform;
+package org.eclipse.scout.rt.server.services.common.notification;
 
-import org.eclipse.scout.rt.platform.internal.PlatformImplementor;
+import java.util.Locale;
 
 /**
- * @since 5.1
+ *
  */
-public class DefaultPlatform extends PlatformImplementor {
-  public DefaultPlatform() {
+public class NotificationNodeId {
+
+  /**
+   * The {@link Locale} which is currently associated with the current thread.
+   */
+  public static final ThreadLocal<String> CURRENT = new ThreadLocal<>();
+
+  private NotificationNodeId() {
   }
+
+  /**
+   * Returns the {@link Locale} which is currently associated with the current thread or {@link Locale#getDefault()} if
+   * not set.
+   */
+  public static String get() {
+    return CURRENT.get();
+  }
+
 }

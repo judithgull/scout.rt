@@ -10,6 +10,7 @@ import org.eclipse.scout.rt.platform.service.IService;
  *
  * @since 4.0.0
  */
+// TODO[aho] remove
 public interface IClientIdentificationService extends IService {
 
   /**

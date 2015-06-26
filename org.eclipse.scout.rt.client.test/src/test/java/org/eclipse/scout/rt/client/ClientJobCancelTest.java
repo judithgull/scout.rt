@@ -25,8 +25,6 @@ import org.eclipse.scout.rt.client.context.ClientRunContext;
 import org.eclipse.scout.rt.client.context.ClientRunContexts;
 import org.eclipse.scout.rt.client.fixture.MockServerProcessingCancelService;
 import org.eclipse.scout.rt.client.fixture.MockServiceTunnel;
-import org.eclipse.scout.rt.client.servicetunnel.http.IClientServiceTunnel;
-import org.eclipse.scout.rt.client.session.ClientSessionProvider;
 import org.eclipse.scout.rt.client.testenvironment.TestEnvironmentClientSession;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.BeanMetaData;
@@ -35,6 +33,7 @@ import org.eclipse.scout.rt.platform.context.RunMonitor;
 import org.eclipse.scout.rt.platform.job.IFuture;
 import org.eclipse.scout.rt.platform.job.Jobs;
 import org.eclipse.scout.rt.shared.services.common.ping.IPingService;
+import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnel;
 import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelUtility;
 import org.eclipse.scout.rt.testing.client.runner.ClientTestRunner;
 import org.eclipse.scout.rt.testing.client.runner.RunWithClientSession;
@@ -43,9 +42,7 @@ import org.eclipse.scout.rt.testing.platform.runner.RunWithSubject;
 import org.eclipse.scout.rt.testing.platform.runner.Times;
 import org.eclipse.scout.rt.testing.shared.TestingUtility;
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -59,39 +56,21 @@ import org.junit.runner.RunWith;
 public class ClientJobCancelTest {
 
   private List<IBean<?>> m_serviceReg;
-  private TestEnvironmentClientSession m_session;
-  private static IClientServiceTunnel oldServiceTunnel;
-
-  @BeforeClass
-  public static void beforeClass() throws Exception {
-    IClientSession clientSession = ClientSessionProvider.currentSession();
-    if (clientSession != null) {
-      oldServiceTunnel = clientSession.getServiceTunnel();
-    }
-  }
-
-  @AfterClass
-  public static void afterClass() throws Exception {
-    TestEnvironmentClientSession clientSession = (TestEnvironmentClientSession) ClientSessionProvider.currentSession();
-    clientSession.setServiceTunnel(oldServiceTunnel);
-  }
 
   @Before
   public void before() throws Exception {
-    m_session = ClientSessionProvider.currentSession(TestEnvironmentClientSession.class);
-    MockServiceTunnel tunnel = new MockServiceTunnel(m_session);
-    m_session.setServiceTunnel(tunnel);
+
     m_serviceReg = TestingUtility.registerBeans(
         new BeanMetaData(MockServerProcessingCancelService.class).
             initialInstance(new MockServerProcessingCancelService(tunnel)).
             applicationScoped(true).order(-1)
         );
+
   }
 
   @After
   public void after() {
     TestingUtility.unregisterBeans(m_serviceReg);
-    m_session = null;
   }
 
   /**
@@ -158,7 +137,7 @@ public class ClientJobCancelTest {
           public String call() throws Exception {
             IBean<?> bean = TestingUtility.registerBean(new BeanMetaData(PingService.class).initialInstance(new PingService()).applicationScoped(true));
             try {
-              return ServiceTunnelUtility.createProxy(IPingService.class, m_session.getServiceTunnel()).ping(pingRequest);
+              return ServiceTunnelUtility.createProxy(IPingService.class).ping(pingRequest);
             }
             finally {
               TestingUtility.unregisterBeans(Arrays.asList(bean));

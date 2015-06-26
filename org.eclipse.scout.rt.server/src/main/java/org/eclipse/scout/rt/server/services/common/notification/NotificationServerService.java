@@ -10,25 +10,24 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.server.services.common.notification;
 
-import java.io.Serializable;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import javax.annotation.PostConstruct;
 
+import org.eclipse.scout.commons.Assertions;
+import org.eclipse.scout.commons.logger.IScoutLogger;
+import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.platform.BEANS;
-import org.eclipse.scout.rt.server.IServerSession;
-import org.eclipse.scout.rt.server.Server;
-import org.eclipse.scout.rt.server.session.ServerSessionProvider;
+import org.eclipse.scout.rt.shared.ISession;
 import org.eclipse.scout.rt.shared.services.common.notification.INotificationServerService;
 import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
 
 /**
  *
  */
-@Server
 public class NotificationServerService implements INotificationServerService {
-
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(NotificationServerService.class);
   private NotificationRegistry m_notificationRegistry;
 
   @PostConstruct
@@ -37,13 +36,27 @@ public class NotificationServerService implements INotificationServerService {
   }
 
   @Override
-  public void register(String notificationNodeId) {
-    IServerSession session = ServerSessionProvider.currentSession();
-    m_notificationRegistry.registerUser(notificationNodeId, session);
+  public String getUserIdOfCurrentSession() {
+    return Assertions.assertNotNull(ISession.CURRENT.get()).getUserId();
   }
 
   @Override
-  public void unregister(String notificationNodeId) {
+  public void registerNotificationNode(String notificationNodeId) {
+    m_notificationRegistry.registerNotificationNode(notificationNodeId);
+  }
+
+  @Override
+  public void unregisterNotificationNode(String notificationNodeId) {
+    m_notificationRegistry.unregisterNode(notificationNodeId);
+  }
+
+  @Override
+  public void registerSession(String notificationNodeId, String sessionId, String userId) {
+    m_notificationRegistry.registerSession(notificationNodeId, sessionId, userId);
+  }
+
+  @Override
+  public void unregisterSession(String notificationNodeId) {
 
   }
 
@@ -53,12 +66,8 @@ public class NotificationServerService implements INotificationServerService {
 
   @Override
   public List<NotificationMessage> getNotifications(String notificationNodeId) {
-    // TODO to be configured
+    // TODO[aho] to be configured
     return m_notificationRegistry.consume(notificationNodeId, 30, 10, TimeUnit.SECONDS);
-  }
-
-  public void push(Serializable data, IUserProvider userProvider) {
-
   }
 
 }

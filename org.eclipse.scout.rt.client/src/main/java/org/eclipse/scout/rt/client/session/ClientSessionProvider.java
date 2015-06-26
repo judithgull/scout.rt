@@ -10,6 +10,7 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.session;
 
+import java.util.UUID;
 import java.util.concurrent.Callable;
 
 import javax.security.auth.Subject;
@@ -33,23 +34,30 @@ import org.eclipse.scout.rt.shared.ISession;
 public class ClientSessionProvider {
 
   /**
+   * @see ClientSessionProvider#provide(ClientRunContext, String)
+   */
+  public <SESSION extends IClientSession> SESSION provide(ClientRunContext runContext) throws ProcessingException {
+    return provide(runContext, UUID.randomUUID().toString());
+  }
+
+  /**
    * Provides a new {@link IClientSession} for the {@link Subject} of the given {@link ClientRunContext}.
    *
    * @param runContext
    *          <code>RunContext</code> initialized with the Subject used to create and load the session.
+   * @param sessionId
+   *          the unique session id for the new session.
    * @return {@link IClientSession} created; is never <code>null</code>.
    * @throws ProcessingException
    *           is thrown if the {@link IClientSession} could not be created or initialized.
    */
-  public <SESSION extends IClientSession> SESSION provide(final ClientRunContext runContext) throws ProcessingException {
+  public <SESSION extends IClientSession> SESSION provide(final ClientRunContext runContext, final String sessionId) throws ProcessingException {
     return runContext.call(new Callable<SESSION>() {
 
       @Override
       public SESSION call() throws Exception {
         // 1. Create an empty session instance.
         final SESSION clientSession = ClientSessionProvider.cast(BEANS.get(IClientSession.class));
-        // register client session for notifications
-        BEANS.get(INotificationClientService.class).register(clientSession);
 
         // 2. Load the session.
         ModelJobs.schedule(new IRunnable() {
@@ -57,10 +65,12 @@ public class ClientSessionProvider {
           @Override
           public void run() throws Exception {
             beforeStartSession(clientSession);
-            clientSession.start();
+            clientSession.start(sessionId);
           }
         }, ModelJobs.newInput(ClientRunContexts.copyCurrent().session(clientSession, true)).name("initialize ClientSession [user=%s]", runContext.subject()).logOnError(false)).awaitDoneAndGet();
 
+        // register client session for notifications
+        BEANS.get(INotificationClientService.class).register(clientSession);
         return clientSession;
       }
     });

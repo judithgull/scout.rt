@@ -70,8 +70,9 @@ public interface IClientSession extends ISession, IPropertyObserver {
 
   /**
    * Invoke this method to initialize the session. The session is active just after this method returns.
+   * @param sessionId TODO
    */
-  void start() throws ProcessingException;
+  void start(String sessionId) throws ProcessingException;
 
   /**
    * send a stop signal to the session event queue<br>
@@ -101,7 +102,7 @@ public interface IClientSession extends ISession, IPropertyObserver {
   /**
    * @return the desktop model assiciated with this client session
    *         <p>
-   *         Desktop is available only after {@link #start()} and <code>AbstractClientSession.execLoadSession()</code>
+   *         Desktop is available only after {@link #start(String)} and
    */
   IDesktop getDesktop();
 

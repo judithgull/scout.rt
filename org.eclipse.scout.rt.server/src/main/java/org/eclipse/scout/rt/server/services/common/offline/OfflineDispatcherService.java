@@ -28,15 +28,15 @@ import org.eclipse.scout.rt.server.context.ServerRunContexts;
 import org.eclipse.scout.rt.server.services.common.clientnotification.IClientNotificationService;
 import org.eclipse.scout.rt.server.session.ServerSessionProviderWithCache;
 import org.eclipse.scout.rt.shared.services.common.offline.IOfflineDispatcherService;
-import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelRequest;
 import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelResponse;
+import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelRequest;
 import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelResponse;
 import org.eclipse.scout.rt.shared.ui.UserAgent;
 
 public class OfflineDispatcherService extends AbstractService implements IOfflineDispatcherService {
 
   @Override
-  public IServiceTunnelResponse dispatch(final IServiceTunnelRequest serviceRequest) {
+  public IServiceTunnelResponse dispatch(final ServiceTunnelRequest serviceRequest) {
     try {
       // Enable global cancellation of the service request.
       RunMonitor runMonitor = BEANS.get(RunMonitor.class);

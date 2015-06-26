@@ -12,6 +12,8 @@ package org.eclipse.scout.rt.shared;
 
 import java.util.concurrent.TimeUnit;
 
+import javax.security.auth.Subject;
+
 import org.eclipse.scout.commons.ConfigUtility;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.rt.platform.BEANS;
@@ -164,6 +166,22 @@ public final class SharedConfigProperties {
     @Override
     public Boolean getDefaultValue() {
       return Boolean.TRUE;
+    }
+  }
+
+  /**
+   * Technical {@link Subject} used to authenticate notification requests.
+   */
+  public static class NotificationSubjectProperty extends AbstractSubjectConfigProperty {
+
+    @Override
+    public String getKey() {
+      return "notification.user.authenticator";
+    }
+
+    @Override
+    public Subject getDefaultValue() {
+      return convertToSubject("notification-authenticator");
     }
   }
 }

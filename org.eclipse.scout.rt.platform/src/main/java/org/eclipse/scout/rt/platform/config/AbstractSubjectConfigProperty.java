@@ -8,7 +8,7 @@
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
-package org.eclipse.scout.rt.server.jaxws;
+package org.eclipse.scout.rt.platform.config;
 
 import javax.security.auth.Subject;
 

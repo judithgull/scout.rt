@@ -26,6 +26,7 @@ import org.eclipse.scout.rt.platform.job.PropertyMap;
 import org.eclipse.scout.rt.server.IServerSession;
 import org.eclipse.scout.rt.server.context.internal.CurrentSessionLogCallable;
 import org.eclipse.scout.rt.server.context.internal.TwoPhaseTransactionBoundaryCallable;
+import org.eclipse.scout.rt.server.services.common.notification.NotificationNodeId;
 import org.eclipse.scout.rt.server.session.ServerSessionProvider;
 import org.eclipse.scout.rt.server.transaction.ITransaction;
 import org.eclipse.scout.rt.server.transaction.TransactionRequiredException;
@@ -72,14 +73,16 @@ public class ServerRunContext extends RunContext {
 
   protected IServerSession m_session;
   protected UserAgent m_userAgent;
+  protected <String> m_notificationNodeId = new PreferredValue<String>(null, false);
   protected TransactionScope m_transactionScope;
   protected ITransaction m_transaction;
   protected boolean m_offline;
 
   @Override
   protected <RESULT> Callable<RESULT> interceptCallable(final Callable<RESULT> next) {
-    final Callable<RESULT> c7 = new TwoPhaseTransactionBoundaryCallable<>(next, transaction(), transactionScope());
-    final Callable<RESULT> c6 = new InitThreadLocalCallable<>(c7, ScoutTexts.CURRENT, (session() != null ? session().getTexts() : ScoutTexts.CURRENT.get()));
+    final Callable<RESULT> c8 = new TwoPhaseTransactionBoundaryCallable<>(next, transaction(), transactionScope());
+    final Callable<RESULT> c7 = new InitThreadLocalCallable<>(c8, ScoutTexts.CURRENT, (session() != null ? session().getTexts() : ScoutTexts.CURRENT.get()));
+    final Callable<RESULT> c6 = new InitThreadLocalCallable<>(c7, NotificationNodeId.CURRENT, notificationNodeId());
     final Callable<RESULT> c5 = new InitThreadLocalCallable<>(c6, UserAgent.CURRENT, userAgent());
     final Callable<RESULT> c4 = new CurrentSessionLogCallable<>(c5);
     final Callable<RESULT> c3 = new InitThreadLocalCallable<>(c4, ISession.CURRENT, session());
@@ -136,6 +139,23 @@ public class ServerRunContext extends RunContext {
     return this;
   }
 
+  public String notificationNodeId() {
+    return m_notificationNodeId.get();
+  }
+
+  /**
+   * The id of the notification node. This id is on the run context to make use of transactional piggy back
+   * notifications during a remote request. The notificationNodeId on the context will be excluded from sending
+   * notifications.
+   *
+   * @param notificationNodeId
+   * @return
+   */
+  public ServerRunContext notificationNodeId(final String notificationNodeId) {
+    m_notificationNodeId.set(notificationNodeId, true);
+    return this;
+  }
+
   public TransactionScope transactionScope() {
     return m_transactionScope;
   }
@@ -189,6 +209,7 @@ public class ServerRunContext extends RunContext {
     builder.attr("locale", locale());
     builder.ref("session", session());
     builder.attr("userAgent", userAgent());
+    builder.attr("notificationId", notificationNodeId());
     builder.ref("transaction", transaction());
     builder.attr("transactionScope", transactionScope());
     builder.attr("offline", offline());
@@ -204,6 +225,7 @@ public class ServerRunContext extends RunContext {
     super.copyValues(originRunContext);
     m_session = originRunContext.m_session;
     m_userAgent = originRunContext.m_userAgent;
+    m_notificationNodeId = originRunContext.m_notificationNodeId.copy();
     m_transactionScope = originRunContext.m_transactionScope;
     m_transaction = originRunContext.m_transaction;
     m_offline = originRunContext.m_offline;
@@ -213,6 +235,7 @@ public class ServerRunContext extends RunContext {
   protected void fillCurrentValues() {
     super.fillCurrentValues();
     m_userAgent = UserAgent.CURRENT.get();
+    m_notificationNodeId = new PreferredValue<>(NotificationNodeId.CURRENT.get(), false);
     m_transactionScope = TransactionScope.REQUIRES_NEW;
     m_transaction = ITransaction.CURRENT.get();
     m_offline = BooleanUtility.nvl(OfflineState.CURRENT.get(), false);
@@ -223,6 +246,7 @@ public class ServerRunContext extends RunContext {
   protected void fillEmptyValues() {
     super.fillEmptyValues();
     m_userAgent = null;
+    m_notificationNodeId = new PreferredValue<>(null, true); // null as preferred UserAgent
     m_transactionScope = TransactionScope.REQUIRES_NEW;
     m_transaction = null;
     m_offline = false;
