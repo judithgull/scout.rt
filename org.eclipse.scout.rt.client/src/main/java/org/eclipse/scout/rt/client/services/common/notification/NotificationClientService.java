@@ -27,8 +27,6 @@ import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.IClientSession;
-import org.eclipse.scout.rt.client.IClientSession.State;
-import org.eclipse.scout.rt.client.IClientSessionStateListener;
 import org.eclipse.scout.rt.client.context.ClientRunContexts;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.config.CONFIG;
@@ -37,6 +35,8 @@ import org.eclipse.scout.rt.platform.job.Jobs;
 import org.eclipse.scout.rt.shared.SharedConfigProperties.NotificationSubjectProperty;
 import org.eclipse.scout.rt.shared.services.common.notification.INotificationServerService;
 import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
+import org.eclipse.scout.rt.shared.session.ISessionListener;
+import org.eclipse.scout.rt.shared.session.SessionEvent;
 import org.eclipse.scout.rt.shared.ui.UserAgent;
 
 /**
@@ -51,7 +51,7 @@ public class NotificationClientService implements INotificationClientService {
   private final Map<String /*sessionId*/, WeakReference<IClientSession>> m_sessionIdToSession = new HashMap<>();
   private final Map<String /*userId*/, List<WeakReference<IClientSession>>> m_userToSessions = new HashMap<>();
 
-  private final IClientSessionStateListener m_clientSessionStateListener = new P_ClientSessionStateListener();
+  private final ISessionListener m_clientSessionStateListener = new P_ClientSessionStateListener();
 
   @PostConstruct
   protected void startSmartPollJob() {
@@ -72,7 +72,7 @@ public class NotificationClientService implements INotificationClientService {
 
   @Override
   public void register(IClientSession clientSession) {
-    clientSession.addClientSessionStateListener(m_clientSessionStateListener);
+    clientSession.addListener(m_clientSessionStateListener);
     // if the client session is already started, otherwise the listener will invoke the clientSessionStated method.
     if (clientSession.isActive()) {
       clientSessionStarted(clientSession);
@@ -87,7 +87,7 @@ public class NotificationClientService implements INotificationClientService {
   protected void clientSessionStopping(IClientSession session) {
     String userId = session.getUserId();
     LOG.debug(String.format("client session [%s] stopping", userId));
-    session.removeClientSessionStateListener(m_clientSessionStateListener);
+    session.removeListener(m_clientSessionStateListener);
     // unregister user remote
     try {
       RunContexts.empty().subject(NOTIFICATION_SUBJECT).run(new IRunnable() {
@@ -158,16 +158,17 @@ public class NotificationClientService implements INotificationClientService {
     }
   }
 
-  private class P_ClientSessionStateListener implements IClientSessionStateListener {
+  private class P_ClientSessionStateListener implements ISessionListener {
 
     @Override
-    public void stateChanged(IClientSession owner, State oldState, State newState) {
-      switch (newState) {
-        case Stopping:
-          clientSessionStopping(owner);
+    public void sessionChanged(SessionEvent event) {
+      switch (event.getType()) {
+        case SessionEvent.TYPE_STARTED:
+          clientSessionStarted((IClientSession) event.getSource());
           break;
-        case Started:
-          clientSessionStarted(owner);
+        case SessionEvent.TYPE_STOPPED:
+          clientSessionStopping((IClientSession) event.getSource());
+        default:
           break;
       }
     }
