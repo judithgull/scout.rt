@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -27,7 +26,7 @@ import javax.swing.AbstractAction;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
 
-import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.root.IContextMenu;
 import org.eclipse.scout.rt.client.ui.basic.calendar.CalendarComponent;
 import org.eclipse.scout.rt.client.ui.basic.calendar.ICalendar;
 import org.eclipse.scout.rt.ui.swing.SwingPopupWorker;
@@ -66,18 +65,6 @@ public class SwingScoutCalendar extends SwingScoutComposite<ICalendar> {
   @Override
   protected void attachScout() {
     super.attachScout();
-    // init swing->scout properties
-    final Date minDate = m_dateChooser.getViewDateStart();
-    final Date maxDate = m_dateChooser.getViewDateEnd();
-    // notify Scout
-    Runnable t = new Runnable() {
-      @Override
-      public void run() {
-        getScoutObject().getUIFacade().setVisibleRangeFromUI(minDate, maxDate);
-      }
-    };
-    getSwingEnvironment().invokeScoutLater(t, 0);
-    // end notify
     setSetupFromScout(getScoutObject().getDisplayMode(), getScoutObject().isDisplayCondensed());
     updateCalendarComponentsFromScout();
     setSelectionFromScout(getScoutObject().getSelectedDate(), getScoutObject().getSelectedComponent());
@@ -85,6 +72,15 @@ public class SwingScoutCalendar extends SwingScoutComposite<ICalendar> {
     setShowDisplayModeSelectionPanel(getScoutObject().getShowDisplayModeSelection());
     setMarkNoonHour(getScoutObject().getMarkNoonHour());
     setMarkOutOfMonthDays(getScoutObject().getMarkOutOfMonthDays());
+    // notify Scout
+    Runnable t = new Runnable() {
+      @Override
+      public void run() {
+        getScoutObject().getUIFacade().setVisibleRangeFromUI(m_dateChooser.getViewDateStart(), m_dateChooser.getViewDateEnd());
+      }
+    };
+    getSwingEnvironment().invokeScoutLater(t, 0);
+    // end notify
   }
 
   private void setWorkHours(int startHour, int endHour, boolean useOverflowCells) {
@@ -149,44 +145,25 @@ public class SwingScoutCalendar extends SwingScoutComposite<ICalendar> {
     if (getUpdateSwingFromScoutLock().isAcquired()) {
       return;
     }
-    //
-    final CalendarComponent item = (CalendarComponent) getDateChooser().getCalendarItemFor(e);
-    if (item != null) {
-      // popup on item
-      // notify Scout
-      Runnable t = new Runnable() {
-        @Override
-        public void run() {
-          List<IMenu> scoutMenus = getScoutObject().getUIFacade().fireComponentPopupFromUI();
-          // call swing menu
-          new SwingPopupWorker(getSwingEnvironment(), e.getComponent(), null, e.getPoint(), scoutMenus, false).enqueue();
-        }
-      };
-      getSwingEnvironment().invokeScoutLater(t, 5678);
-      // end notify
-    }
-    else {
-      // popup with general menu
-      // notify Scout
-      Runnable t = new Runnable() {
-        @Override
-        public void run() {
-          List<IMenu> scoutMenus = getScoutObject().getUIFacade().fireNewPopupFromUI();
-          // call swing menu
-          new SwingPopupWorker(getSwingEnvironment(), e.getComponent(), null, e.getPoint(), scoutMenus, false).enqueue();
-        }
-      };
-      getSwingEnvironment().invokeScoutLater(t, 5678);
-      // end notify
-    }
+
+    Runnable t = new Runnable() {
+      @Override
+      public void run() {
+        // about to show
+        IContextMenu contextMenu = getScoutObject().getContextMenu();
+        // call swing menu
+        SwingPopupWorker swingPopupWorker = new SwingPopupWorker(getSwingEnvironment(), e.getComponent(), e.getPoint(), contextMenu, contextMenu.getCurrentMenuTypes());
+        swingPopupWorker.setLightWeightPopup(false);
+        swingPopupWorker.enqueue();
+      }
+    };
+    getSwingEnvironment().invokeScoutLater(t, 5678);
   }
 
   private void handleSwingCalendarItemAction(MouseEvent e) {
     if (getUpdateSwingFromScoutLock().isAcquired()) {
       return;
     }
-    //
-    // action on item
     // notify Scout
     Runnable t = new Runnable() {
       @Override

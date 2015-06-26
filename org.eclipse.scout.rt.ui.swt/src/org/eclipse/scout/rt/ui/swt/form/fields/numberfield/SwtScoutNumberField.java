@@ -14,10 +14,13 @@ import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 
 import org.eclipse.scout.commons.StringUtility;
+import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
+import org.eclipse.scout.rt.client.ui.form.fields.numberfield.AbstractNumberField;
 import org.eclipse.scout.rt.client.ui.form.fields.numberfield.INumberField;
 import org.eclipse.scout.rt.ui.swt.LogicalGridLayout;
+import org.eclipse.scout.rt.ui.swt.action.menu.MenuPositionCorrectionListener;
 import org.eclipse.scout.rt.ui.swt.action.menu.SwtContextMenuMarkerComposite;
 import org.eclipse.scout.rt.ui.swt.action.menu.SwtScoutContextMenu;
 import org.eclipse.scout.rt.ui.swt.action.menu.text.StyledTextAccess;
@@ -34,16 +37,18 @@ import org.eclipse.swt.events.VerifyEvent;
 import org.eclipse.swt.events.VerifyListener;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.MessageBox;
 
 /**
  * <h3>SwtScoutNumberField</h3>
- * 
+ *
  * @since 1.0.0 14.04.2008
  */
 public class SwtScoutNumberField extends SwtScoutBasicFieldComposite<INumberField<?>> implements ISwtScoutNumberField {
 
   private SwtContextMenuMarkerComposite m_menuMarkerComposite;
   private SwtScoutContextMenu m_contextMenu;
+  private PropertyChangeListener m_contextMenuVisibilityListener;
 
   @Override
   protected void initializeSwt(Composite parent) {
@@ -77,10 +82,9 @@ public class SwtScoutNumberField extends SwtScoutBasicFieldComposite<INumberFiel
     m_menuMarkerComposite.setLayoutData(LogicalGridDataBuilder.createField(((IFormField) getScoutObject()).getGridData()));
   }
 
-  @Override
   protected void installContextMenu() {
     m_menuMarkerComposite.setMarkerVisible(getScoutObject().getContextMenu().isVisible());
-    getScoutObject().getContextMenu().addPropertyChangeListener(new PropertyChangeListener() {
+    m_contextMenuVisibilityListener = new PropertyChangeListener() {
       @Override
       public void propertyChange(PropertyChangeEvent evt) {
         if (IMenu.PROP_VISIBLE.equals(evt.getPropertyName())) {
@@ -93,13 +97,35 @@ public class SwtScoutNumberField extends SwtScoutBasicFieldComposite<INumberFiel
           });
         }
       }
-    });
+    };
+    getScoutObject().getContextMenu().addPropertyChangeListener(m_contextMenuVisibilityListener);
 
     m_contextMenu = new SwtScoutContextMenu(getSwtField().getShell(), getScoutObject().getContextMenu(), getEnvironment());
 
     SwtScoutContextMenu fieldMenu = new SwtScoutContextMenu(getSwtField().getShell(), getScoutObject().getContextMenu(), getEnvironment(),
         getScoutObject().isAutoAddDefaultMenus() ? new StyledTextAccess(getSwtField()) : null, getScoutObject().isAutoAddDefaultMenus() ? getSwtField() : null);
     getSwtField().setMenu(fieldMenu.getSwtMenu());
+    // correction of menu position
+    getSwtField().addListener(SWT.MenuDetect, new MenuPositionCorrectionListener(getSwtField()));
+  }
+
+  protected void uninstallContextMenu() {
+    if (m_contextMenuVisibilityListener != null) {
+      getScoutObject().getContextMenu().removePropertyChangeListener(m_contextMenuVisibilityListener);
+      m_contextMenuVisibilityListener = null;
+    }
+  }
+
+  @Override
+  protected void attachScout() {
+    super.attachScout();
+    installContextMenu();
+  }
+
+  @Override
+  protected void detachScout() {
+    uninstallContextMenu();
+    super.detachScout();
   }
 
   @Override
@@ -146,7 +172,29 @@ public class SwtScoutNumberField extends SwtScoutBasicFieldComposite<INumberFiel
     @Override
     public void verifyText(VerifyEvent e) {
       String curText = ((StyledText) e.widget).getText();
-      e.doit = StringUtility.isWithinNumberFormatLimits(getScoutObject().getFormat(), curText, e.start, e.end - e.start, e.text);
+      e.doit = AbstractNumberField.isWithinNumberFormatLimits(getScoutObject().getFormat(), curText, e.start, e.end - e.start, e.text);
+      if (!e.doit && textWasPasted(e)) {
+        try {
+          String newText = AbstractNumberField.createNumberWithinFormatLimits(getScoutObject().getFormat(), curText, e.start, e.end - e.start, e.text);
+          if (!curText.equals(newText)) {
+            ((StyledText) e.widget).setText(newText);
+            ((StyledText) e.widget).setSelection(newText.length());
+          }
+        }
+        catch (ProcessingException exception) {
+          MessageBox box = new MessageBox(e.display.getActiveShell(), SWT.OK);
+          box.setText(SwtUtility.getNlsText(e.display, "Paste"));
+          box.setMessage(SwtUtility.getNlsText(e.display, "PasteTextNotApplicableForNumberField", String.valueOf(getScoutObject().getFormat().getMaximumIntegerDigits())));
+          box.open();
+        }
+      }
+    }
+
+    /**
+     * returns true if the text was pasted.
+     */
+    private boolean textWasPasted(VerifyEvent e) {
+      return StringUtility.length(e.text) > 1;
     }
   }
 }

@@ -17,20 +17,17 @@ import java.util.Set;
 
 import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.exception.ProcessingException;
-import org.eclipse.scout.commons.holders.BooleanHolder;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenuType;
-import org.eclipse.scout.rt.client.ui.action.menu.TableMenuType;
-import org.eclipse.scout.rt.client.ui.action.menu.TreeMenuType;
-import org.eclipse.scout.rt.client.ui.action.menu.ValueFieldMenuType;
 import org.eclipse.scout.rt.client.ui.action.tree.IActionNode;
-import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
-import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
 
 /**
  *
  */
 public final class ActionUtility {
+
+  private ActionUtility() {
+  }
 
   public static IActionFilter FALSE_FILTER = new IActionFilter() {
     @Override
@@ -52,10 +49,10 @@ public final class ActionUtility {
    * @since 3.8.1
    */
   public static <T extends IAction> List<T> visibleNormalizedActions(List<T> actionNodes) {
-    return visibleNormalizedActions(actionNodes, createVisibleFilter());
+    return normalizedActions(actionNodes, createVisibleFilter());
   }
 
-  public static <T extends IAction> List<T> visibleNormalizedActions(List<T> actionNodes, IActionFilter filter) {
+  public static <T extends IAction> List<T> normalizedActions(List<T> actionNodes, IActionFilter filter) {
     if (actionNodes == null) {
       return CollectionUtility.emptyArrayList();
     }
@@ -106,33 +103,7 @@ public final class ActionUtility {
     if (actions != null) {
       List<T> result = new ArrayList<T>(actions.size());
       for (T a : actions) {
-        // action nodes with subnodes are only visible when at least one leaf is visible
-        if (a instanceof IActionNode<?>) {
-          final BooleanHolder visibleHolder = new BooleanHolder(false);
-          a.acceptVisitor(new IActionVisitor() {
-            @Override
-            public int visit(IAction action) {
-              if (action instanceof IActionNode) {
-                if (((IActionNode) action).hasChildActions()) {
-                  return CONTINUE;
-                }
-              }
-              if (action.isSeparator()) {
-                return CONTINUE;
-              }
-              if (filter.accept(action)) {
-                visibleHolder.setValue(true);
-                return CANCEL;
-
-              }
-              return CONTINUE;
-            }
-          });
-          if (a.isSeparator() || visibleHolder.getValue()) {
-            result.add(a);
-          }
-        }
-        else if (a.isSeparator()) {
+        if (a.isSeparator()) {
           result.add(a);
         }
         else if (filter.accept(a)) {
@@ -180,128 +151,111 @@ public final class ActionUtility {
     }
   }
 
-  public static IActionFilter createMenuFilterVisibleForTableSelection(List<? extends ITableRow> selection) {
-    boolean allEnabled = true;
-    if (!CollectionUtility.isEmpty(selection)) {
-      allEnabled = true;
-      for (ITableRow n : selection) {
-        if (!n.isEnabled()) {
-          allEnabled = false;
-          break;
-        }
-      }
-    }
-    if (allEnabled) {
-      final TableMenuType menuType;
-      if (CollectionUtility.isEmpty(selection)) {
-        menuType = TableMenuType.EmptySpace;
-      }
-      else if (CollectionUtility.size(selection) == 1) {
-        menuType = TableMenuType.SingleSelection;
-      }
-      else {
-        menuType = TableMenuType.MultiSelection;
-      }
-      return createMenuFilterVisibleAndMenuTypes(CollectionUtility.hashSet(menuType));
-    }
-    else {
-      return FALSE_FILTER;
-    }
-  }
-
-  public static IActionFilter createMenuFilterVisibleForValueFieldValue(Object value) {
-    final ValueFieldMenuType menuType;
-    if (value == null) {
-      menuType = ValueFieldMenuType.Null;
-    }
-    else {
-      menuType = ValueFieldMenuType.NotNull;
-    }
-    return createMenuFilterVisibleAndMenuTypes(menuType);
-  }
-
   public static IActionFilter createVisibleFilter() {
     return new IActionFilter() {
 
       @Override
       public boolean accept(IAction action) {
-        return action.isVisible();
-      }
-    };
-  }
-
-  public static IActionFilter createMenuFilterVisibleForTreeSelection(Set<? extends ITreeNode> selection) {
-    boolean allEnabled = true;
-    if (!CollectionUtility.isEmpty(selection)) {
-      allEnabled = true;
-      for (ITreeNode n : selection) {
-        if (!n.isEnabled()) {
-          allEnabled = false;
-          break;
-        }
-      }
-    }
-    if (allEnabled) {
-      final TreeMenuType menuType;
-      if (CollectionUtility.isEmpty(selection)) {
-        menuType = TreeMenuType.EmptySpace;
-      }
-      else if (CollectionUtility.size(selection) == 1) {
-        menuType = TreeMenuType.SingleSelection;
-      }
-      else {
-        menuType = TreeMenuType.MultiSelection;
-      }
-      return createMenuFilterVisibleAndMenuTypes(CollectionUtility.hashSet(menuType));
-    }
-    else {
-      return FALSE_FILTER;
-    }
-  }
-
-  public static IActionFilter createMenuFilterVisibleAndMenuTypes(IMenuType... menuTypes) {
-    return createMenuFilterVisibleAndMenuTypes(CollectionUtility.hashSet(menuTypes));
-  }
-
-  public static IActionFilter createMenuFilterVisibleAndMenuTypes(final Set<? extends IMenuType> menuTypes) {
-    return new IActionFilter() {
-
-      @Override
-      public boolean accept(IAction action) {
-        if (action.isVisible() && action instanceof IMenu) {
-          IMenu menu = (IMenu) action;
-          for (IMenuType t : menuTypes) {
-            if (menu.getMenuTypes().contains(t)) {
-              return true;
-            }
+        if (action.isVisible()) {
+          // remove menu groups with no visible child action
+          if (action instanceof IActionNode<?> && ((IActionNode<?>) action).hasChildActions()) {
+            List<?> visibleChildActions = getActions(((IActionNode<?>) action).getChildActions(), this);
+            return !visibleChildActions.isEmpty();
           }
+          return true;
         }
         return false;
       }
     };
   }
 
-  public static IActionFilter createMenuFilterMenuTypes(IMenuType... menuTypes) {
-    return createMenuFilterMenuTypes(CollectionUtility.hashSet(menuTypes));
+  public static IActionFilter createMenuFilterMenuTypes(boolean visibleOnly, IMenuType... menuTypes) {
+    return createMenuFilterMenuTypes(CollectionUtility.hashSet(menuTypes), visibleOnly);
 
   }
 
-  public static IActionFilter createMenuFilterMenuTypes(final Set<? extends IMenuType> menuTypes) {
-    return new IActionFilter() {
+  /**
+   * <ul>
+   * <li>If the menu is a leaf (menu without any child menus) the filter accepts a menu when it is visible (depending on
+   * visibleOnly) and it has one of the passed menu types.</li>
+   * <li>If the menu has child menus (is a menu group) then the filter accepts a menu if it is visible (depending on
+   * visibleOnly) and at least one of its leaf children (recursively) is visible (depending on visible only) and and has
+   * one of the passed menu types.</li>
+   * </ul>
+   * 
+   * @param menuTypes
+   * @param visibleOnly
+   * @return
+   */
+  public static IActionFilter createMenuFilterMenuTypes(Set<? extends IMenuType> menuTypes, boolean visibleOnly) {
+    return new MenuTypeFilter(menuTypes, visibleOnly);
 
-      @Override
-      public boolean accept(IAction action) {
-        if (action instanceof IMenu) {
-          IMenu menu = (IMenu) action;
-          for (IMenuType t : menuTypes) {
-            if (menu.getMenuTypes().contains(t)) {
-              return true;
+  }
+
+  public static IActionFilter createCombinedFilter(final IActionFilter... actionFilters) {
+    if (actionFilters != null) {
+      return new IActionFilter() {
+
+        @Override
+        public boolean accept(IAction action) {
+          for (IActionFilter f : actionFilters) {
+            if (!f.accept(action)) {
+              return false;
             }
           }
+          return true;
         }
-        return false;
-      }
-    };
+      };
+    }
+    return TRUE_FILTER;
   }
 
+  public static class MenuTypeFilter implements IActionFilter {
+
+    private final boolean m_visibleOnly;
+    private final Set<? extends IMenuType> m_menuTypes;
+
+    public MenuTypeFilter(Set<? extends IMenuType> menuTypes, boolean visibleOnly) {
+      m_menuTypes = menuTypes;
+      m_visibleOnly = visibleOnly;
+
+    }
+
+    @Override
+    public boolean accept(IAction action) {
+      if (action instanceof IMenu) {
+        IMenu menu = (IMenu) action;
+        if (isVisibleOnly() && !menu.isVisible()) {
+          return false;
+        }
+        else {
+          if (menu.hasChildActions()) {
+            // check for filter matching child menus
+            return !normalizedActions(menu.getChildActions(), this).isEmpty();
+          }
+          if (getMenuTypes() != null) {
+            for (IMenuType t : getMenuTypes()) {
+              if (menu.getMenuTypes().contains(t)) {
+                return true;
+              }
+            }
+            return false;
+          }
+          else {
+            return true;
+          }
+
+        }
+      }
+      return false;
+    }
+
+    public Set<? extends IMenuType> getMenuTypes() {
+      return m_menuTypes;
+    }
+
+    public boolean isVisibleOnly() {
+      return m_visibleOnly;
+    }
+  }
 }

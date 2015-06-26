@@ -13,8 +13,10 @@ package org.eclipse.scout.commons;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
 public final class DateUtility {
@@ -23,6 +25,13 @@ public final class DateUtility {
   }
 
   public static final long DAY_MILLIS = 24L * 3600L * 1000L;
+
+  //2 letter code countries for different weekends worldwide
+  private static final List<String> SUN_WEEKEND_DAYS_COUNTRIES = Arrays.asList(new String[]{"GQ", "IN", "TH", "UG"});
+  private static final List<String> FRY_WEEKEND_DAYS_COUNTRIES = Arrays.asList(new String[]{"DJ", "IR"});
+  private static final List<String> FRY_SUN_WEEKEND_DAYS_COUNTRIES = Arrays.asList(new String[]{"BN"});
+  private static final List<String> THU_FRY_WEEKEND_DAYS_COUNTRIES = Arrays.asList(new String[]{"AF"});
+  private static final List<String> FRY_SAT_WEEKEND_DAYS_COUNTRIES = Arrays.asList(new String[]{"AE", "DZ", "BH", "BD", "EG", "IQ", "IL", "JO", "KW", "LY", "MV", "MR", "OM", "PS", "QA", "SA", "SD", "SY", "YE"});
 
   /**
    * format date with {@value DateFormat#DEFAULT} pattern
@@ -109,7 +118,7 @@ public final class DateUtility {
 
   /**
    * Adds a number of days to a date.
-   * 
+   *
    * @param count
    *          days is truncated to second and can be negative
    * @param d
@@ -157,7 +166,7 @@ public final class DateUtility {
 
   /**
    * determines the day of the week
-   * 
+   *
    * @param d
    * @return int with the the day of the week (sunday=1)
    */
@@ -181,7 +190,7 @@ public final class DateUtility {
     Calendar c = Calendar.getInstance();
     c.setTime(d);
     truncCalendar(c);
-    return new Date(c.getTime().getTime());
+    return c.getTime();
   }
 
   public static Date truncDateToMinute(Date d) {
@@ -192,7 +201,7 @@ public final class DateUtility {
     c.setTime(d);
     c.set(Calendar.SECOND, 0);
     c.set(Calendar.MILLISECOND, 0);
-    return new Date(c.getTime().getTime());
+    return c.getTime();
   }
 
   public static Date truncDateToSecond(Date d) {
@@ -202,7 +211,7 @@ public final class DateUtility {
     Calendar c = Calendar.getInstance();
     c.setTime(d);
     c.set(Calendar.MILLISECOND, 0);
-    return new Date(c.getTime().getTime());
+    return c.getTime();
   }
 
   /**
@@ -215,7 +224,7 @@ public final class DateUtility {
     Calendar c = Calendar.getInstance();
     c.setTime(d);
     truncCalendarToWeek(c, -1);
-    return new Date(c.getTime().getTime());
+    return c.getTime();
   }
 
   /**
@@ -228,7 +237,7 @@ public final class DateUtility {
     Calendar c = Calendar.getInstance();
     c.setTime(d);
     truncCalendarToMonth(c);
-    return new Date(c.getTime().getTime());
+    return c.getTime();
   }
 
   /**
@@ -241,13 +250,61 @@ public final class DateUtility {
     Calendar c = Calendar.getInstance();
     c.setTime(d);
     truncCalendarToYear(c);
-    return new Date(c.getTime().getTime());
+    return c.getTime();
+  }
+
+  /**
+   * truncate the date to half year (i.e. jan 1 or jul 1 of the given year)
+   *
+   * @since 4.2
+   */
+  public static Date truncDateToHalfYear(Date d) {
+    if (d == null) {
+      return null;
+    }
+    Calendar c = Calendar.getInstance();
+    c.setTime(d);
+    truncCalendarToHalfYear(c);
+    return c.getTime();
+  }
+
+  /**
+   * truncate the date to quarter year (i.e. jan 1, apr 1, jul 1 or oct 1 of the given year)
+   *
+   * @since 4.2
+   */
+  public static Date truncDateToQuarter(Date d) {
+    if (d == null) {
+      return null;
+    }
+    Calendar c = Calendar.getInstance();
+    c.setTime(d);
+    truncCalendarToQuarter(c);
+    return c.getTime();
+  }
+
+  /**
+   * truncate the date to hour
+   *
+   * @since 4.2
+   */
+  public static Date truncDateToHour(Date d) {
+    if (d == null) {
+      return null;
+    }
+    Calendar c = Calendar.getInstance();
+    c.setTime(d);
+    truncCalendarToHour(c);
+    return c.getTime();
   }
 
   /**
    * truncate the calendar to a day with time 00:00:00.000
    */
   public static void truncCalendar(Calendar c) {
+    if (c == null) {
+      return;
+    }
     c.set(Calendar.HOUR_OF_DAY, 0);
     c.set(Calendar.MINUTE, 0);
     c.set(Calendar.SECOND, 0);
@@ -256,11 +313,14 @@ public final class DateUtility {
 
   /**
    * truncate the calendar to week
-   * 
+   *
    * @param adjustIncrement
    *          +1 or -1
    */
   public static void truncCalendarToWeek(Calendar c, int adjustIncrement) {
+    if (c == null) {
+      return;
+    }
     if (adjustIncrement < -1) {
       adjustIncrement = -1;
     }
@@ -284,6 +344,9 @@ public final class DateUtility {
    * truncate the calendar to month
    */
   public static void truncCalendarToMonth(Calendar c) {
+    if (c == null) {
+      return;
+    }
     c.set(Calendar.DATE, 1);
     c.set(Calendar.HOUR_OF_DAY, 0);
     c.set(Calendar.MINUTE, 0);
@@ -295,9 +358,76 @@ public final class DateUtility {
    * truncate the calendar to year
    */
   public static void truncCalendarToYear(Calendar c) {
+    if (c == null) {
+      return;
+    }
     c.set(Calendar.MONTH, Calendar.JANUARY);
     c.set(Calendar.DATE, 1);
     c.set(Calendar.HOUR_OF_DAY, 0);
+    c.set(Calendar.MINUTE, 0);
+    c.set(Calendar.SECOND, 0);
+    c.set(Calendar.MILLISECOND, 0);
+  }
+
+  /**
+   * truncate the calendar to half year (i.e. jan 1 or jul 1 of the given year)
+   *
+   * @since 4.2
+   */
+  public static void truncCalendarToHalfYear(Calendar c) {
+    if (c == null) {
+      return;
+    }
+    int month = c.get(Calendar.MONTH);
+    truncCalendarToYear(c);
+    if (month >= Calendar.JULY) {
+      c.set(Calendar.MONTH, Calendar.JULY);
+    }
+  }
+
+  /**
+   * truncate the calendar to half year (i.e. jan 1, apr 1, jul 1 or oct 1 of the given year)
+   *
+   * @since 4.2
+   */
+  public static void truncCalendarToQuarter(Calendar c) {
+    if (c == null) {
+      return;
+    }
+    final int month = c.get(Calendar.MONTH);
+    truncCalendarToYear(c);
+    int quarterMonth = Calendar.JANUARY;
+    switch (month) {
+      case Calendar.APRIL:
+      case Calendar.MAY:
+      case Calendar.JUNE:
+        quarterMonth = Calendar.APRIL;
+        break;
+      case Calendar.JULY:
+      case Calendar.AUGUST:
+      case Calendar.SEPTEMBER:
+        quarterMonth = Calendar.JULY;
+        break;
+      case Calendar.OCTOBER:
+      case Calendar.NOVEMBER:
+      case Calendar.DECEMBER:
+        quarterMonth = Calendar.OCTOBER;
+        break;
+    }
+    if (quarterMonth != Calendar.JANUARY) {
+      c.set(Calendar.MONTH, quarterMonth);
+    }
+  }
+
+  /**
+   * truncate the calendar to hour
+   *
+   * @since 4.2
+   */
+  public static void truncCalendarToHour(Calendar c) {
+    if (c == null) {
+      return;
+    }
     c.set(Calendar.MINUTE, 0);
     c.set(Calendar.SECOND, 0);
     c.set(Calendar.MILLISECOND, 0);
@@ -337,7 +467,7 @@ public final class DateUtility {
 
   /**
    * only compares the date, so doesn't care about time
-   * 
+   *
    * @return true if d is in the date range [minDate,maxDate]
    */
   public static boolean isInDateRange(Date minDate, Date d, Date maxDate) {
@@ -351,7 +481,7 @@ public final class DateUtility {
     Calendar c = Calendar.getInstance();
     c.setTime(d);
     c.add(Calendar.DATE, 1);
-    Date dNew = new Date(c.getTime().getTime());
+    Date dNew = c.getTime();
     return dNew;
   }
 
@@ -405,17 +535,49 @@ public final class DateUtility {
   }
 
   public static boolean isWeekend(Date d) {
+    return isWeekend(d, LocaleThreadLocal.get());
+  }
+
+  public static boolean isWeekend(Date d, Locale locale) {
     Calendar c = Calendar.getInstance();
     c.setTime(d);
     int dayOfWeek = c.get(Calendar.DAY_OF_WEEK);
-    return dayOfWeek == Calendar.SATURDAY || dayOfWeek == Calendar.SUNDAY;
+
+    int[] weekendDays = getWeekendDays(locale);
+    for (int weekendDay : weekendDays) {
+      if (dayOfWeek == weekendDay) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static int[] getWeekendDays(Locale locale) {
+    if (THU_FRY_WEEKEND_DAYS_COUNTRIES.contains(locale.getCountry())) {
+      return new int[]{Calendar.THURSDAY, Calendar.FRIDAY};
+    }
+    else if (FRY_SUN_WEEKEND_DAYS_COUNTRIES.contains(locale.getCountry())) {
+      return new int[]{Calendar.FRIDAY, Calendar.SUNDAY};
+    }
+    else if (FRY_WEEKEND_DAYS_COUNTRIES.contains(locale.getCountry())) {
+      return new int[]{Calendar.FRIDAY};
+    }
+    else if (SUN_WEEKEND_DAYS_COUNTRIES.contains(locale.getCountry())) {
+      return new int[]{Calendar.SUNDAY};
+    }
+    else if (FRY_SAT_WEEKEND_DAYS_COUNTRIES.contains(locale.getCountry())) {
+      return new int[]{Calendar.FRIDAY, Calendar.SATURDAY};
+    }
+    else {
+      return new int[]{Calendar.SATURDAY, Calendar.SUNDAY};
+    }
   }
 
   /**
    * Correctly calculate covered days of a day range. 13.3.2008 00:00 -
    * 14.3.2008 00:00 only covers 1 day (13.3.) 13.3.2008 12:00 - 14.3.2008 12:00
    * covers 2 days (13.3., 14.3.)
-   * 
+   *
    * @return array of days that with time set to 00:00:00.000
    */
   public static Date[] getCoveredDays(Date from, Date to) {

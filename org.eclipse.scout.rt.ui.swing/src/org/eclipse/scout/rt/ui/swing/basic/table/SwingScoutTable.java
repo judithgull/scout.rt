@@ -35,7 +35,6 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EventObject;
-import java.util.HashSet;
 import java.util.List;
 
 import javax.swing.AbstractAction;
@@ -76,7 +75,6 @@ import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ClientSyncJob;
 import org.eclipse.scout.rt.client.ui.IEventHistory;
-import org.eclipse.scout.rt.client.ui.action.ActionUtility;
 import org.eclipse.scout.rt.client.ui.action.IAction;
 import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
 import org.eclipse.scout.rt.client.ui.action.menu.TableMenuType;
@@ -147,6 +145,7 @@ public class SwingScoutTable extends SwingScoutComposite<ITable> implements ISwi
   protected void initializeSwing() {
     m_htmlViewCache = new HtmlViewCache();
     JTableEx table = new P_SwingTable();
+    table.putClientProperty("terminateEditOnFocusLost", Boolean.TRUE);
     m_swingScrollPane = new JScrollPaneEx(table);
     m_swingScrollPane.setBackground(table.getBackground());
     setSwingField(table);
@@ -158,18 +157,13 @@ public class SwingScoutTable extends SwingScoutComposite<ITable> implements ISwi
     // swing properties
     table.setAutoCreateColumnsFromModel(false);
     m_swingTableHeader.setReorderingAllowed(true);
-    // header renderer must be set before models
-    m_swingTableHeader.setDefaultRenderer(new SwingTableHeaderCellRenderer(m_swingTableHeader.getDefaultRenderer(), this));
     // models
     table.setAutoCreateColumnsFromModel(false);
-    table.setColumnModel(new SwingTableColumnModel(getSwingEnvironment(), this));
-    table.setModel(new SwingTableModel(getSwingEnvironment(), this));
     m_editor = new SwingScoutTableCellEditor(this);
     m_editor.initialize();
     //disable auto-start editing
     table.putClientProperty("JTable.autoStartsEdit", Boolean.FALSE);
     table.setSelectionModel(new DefaultListSelectionModel());
-    table.getSelectionModel().setAnchorSelectionIndex(0);
     // listeners
     table.getSelectionModel().addListSelectionListener(new P_SwingSelectionListener());
     // re-attach observer when selection model changes
@@ -245,8 +239,9 @@ public class SwingScoutTable extends SwingScoutComposite<ITable> implements ISwi
             public void run() {
               // call swing menu
               IContextMenu contextMenu = getScoutObject().getContextMenu();
-              new SwingPopupWorker(getSwingEnvironment(), compF, pFinal, contextMenu,
-                  contextMenu.getActiveFilter()).enqueue();
+              SwingPopupWorker swingPopupWorker = new SwingPopupWorker(getSwingEnvironment(), compF, pFinal, contextMenu, contextMenu.getCurrentMenuTypes());
+              swingPopupWorker.setLightWeightPopup(true);
+              swingPopupWorker.enqueue();
             }
           };
           getSwingEnvironment().invokeScoutLater(t, 5678);
@@ -309,6 +304,14 @@ public class SwingScoutTable extends SwingScoutComposite<ITable> implements ISwi
       m_scoutTableListener = new P_ScoutTableListener();
       getScoutObject().addUITableListener(m_scoutTableListener);
     }
+
+    // header renderer must be set before models
+    m_swingTableHeader.setDefaultRenderer(new SwingTableHeaderCellRenderer(m_swingTableHeader.getDefaultRenderer(), this));
+
+    getSwingTable().setColumnModel(new SwingTableColumnModel(getSwingEnvironment(), this));
+    getSwingTable().setModel(new SwingTableModel(getSwingEnvironment(), this));
+    getSwingTable().getSelectionModel().setAnchorSelectionIndex(0);
+
     setMultiSelectFromScout(getScoutObject().isMultiSelect());
     setMultilineTextFromScout(getScoutObject().isMultilineText());
     setKeyboardNavigationFromScout();
@@ -335,7 +338,7 @@ public class SwingScoutTable extends SwingScoutComposite<ITable> implements ISwi
 
         @Override
         public void actionPerformed(ActionEvent e) {
-          handleSwingRowClick(getSwingTable().getSelectedRow());
+          handleSwingRowClick(getSwingTable().getSelectedRow(), 99);
         }
       });
     }
@@ -457,7 +460,6 @@ public class SwingScoutTable extends SwingScoutComposite<ITable> implements ISwi
     if (getScoutObject() == null) {
       return;
     }
-    //
     List<ITableRow> scoutRows = getScoutObject().getSelectedRows();
     ListSelectionModel lsm = getSwingTableSelectionModel();
     //
@@ -467,35 +469,23 @@ public class SwingScoutTable extends SwingScoutComposite<ITable> implements ISwi
     Arrays.sort(newSwingRows);
     // restore selection only, if list selection model has received its final value.
     if (!CompareUtility.equals(oldSwingRows, newSwingRows) && !lsm.getValueIsAdjusting()) {
-      HashSet<Integer> addSet = new HashSet<Integer>();
-      HashSet<Integer> removeSet = new HashSet<Integer>();
-      for (int index : newSwingRows) {
-        addSet.add(index);
-      }
-      for (int index : oldSwingRows) {
-        addSet.remove(index);
-        removeSet.add(index);
-      }
-      for (int index : newSwingRows) {
-        removeSet.remove(index);
-      }
       try {
         lsm.setValueIsAdjusting(true);
-        //
-        int lastIndex = -1;
-        for (int index : addSet) {
-          lsm.addSelectionInterval(index, index);
-          lastIndex = index;
+        // new
+        if (newSwingRows.length > 0) {
+          lsm.setLeadSelectionIndex(newSwingRows[0]);
+          lsm.setAnchorSelectionIndex(newSwingRows[0]);
+          lsm.clearSelection();
+          for (int rowIndex : newSwingRows) {
+            lsm.addSelectionInterval(rowIndex, rowIndex);
+          }
         }
-        for (int index : removeSet) {
-          lsm.removeSelectionInterval(index, index);
+        else if (getSwingTable().getRowCount() > 0) {
+          // set anchor lead
+          lsm.setLeadSelectionIndex(0);
+          lsm.setAnchorSelectionIndex(0);
+          lsm.clearSelection();
         }
-        if (lastIndex < 0) {
-          lastIndex = lsm.getMinSelectionIndex();
-        }
-        // update lead and anchor in model (bug 353998)
-        lsm.setAnchorSelectionIndex(lastIndex);
-        lsm.setLeadSelectionIndex(lastIndex);
       }
       finally {
         lsm.setValueIsAdjusting(false);
@@ -801,7 +791,9 @@ public class SwingScoutTable extends SwingScoutComposite<ITable> implements ISwi
           if (e.isPopupTrigger()) {
             // call swing menu
             IContextMenu contextMenu = getScoutObject().getContextMenu();
-            new SwingPopupWorker(getSwingEnvironment(), e.getComponent(), e.getPoint(), contextMenu, contextMenu.getActiveFilter()).enqueue();
+            SwingPopupWorker swingPopupWorker = new SwingPopupWorker(getSwingEnvironment(), e.getComponent(), e.getPoint(), contextMenu, contextMenu.getCurrentMenuTypes());
+            swingPopupWorker.setLightWeightPopup(true);
+            swingPopupWorker.enqueue();
           }
         }
       };
@@ -847,7 +839,9 @@ public class SwingScoutTable extends SwingScoutComposite<ITable> implements ISwi
           // about to show
           IContextMenu contextMenu = getScoutObject().getContextMenu();
           // call swing menu
-          new SwingPopupWorker(getSwingEnvironment(), e.getComponent(), null, e.getPoint(), contextMenu, contextMenu.getActiveFilter(), false).enqueue();
+          SwingPopupWorker swingPopupWorker = new SwingPopupWorker(getSwingEnvironment(), e.getComponent(), e.getPoint(), contextMenu, contextMenu.getCurrentMenuTypes());
+          swingPopupWorker.setLightWeightPopup(false);
+          swingPopupWorker.enqueue();
         }
       };
       getSwingEnvironment().invokeScoutLater(t, 5678);
@@ -855,7 +849,7 @@ public class SwingScoutTable extends SwingScoutComposite<ITable> implements ISwi
     }
   }
 
-  protected void handleSwingRowClick(int rowIndex) {
+  protected void handleSwingRowClick(int rowIndex, final int swingButton) {
     if (getUpdateSwingFromScoutLock().isAcquired()) {
       return;
     }
@@ -867,7 +861,7 @@ public class SwingScoutTable extends SwingScoutComposite<ITable> implements ISwi
         Runnable t = new Runnable() {
           @Override
           public void run() {
-            getScoutObject().getUIFacade().fireRowClickFromUI(scoutRow);
+            getScoutObject().getUIFacade().fireRowClickFromUI(scoutRow, SwingUtility.swingToScoutMouseButton(swingButton));
           }
         };
 
@@ -957,8 +951,9 @@ public class SwingScoutTable extends SwingScoutComposite<ITable> implements ISwi
         @Override
         public void run() {
           // call swing menu
-          new SwingPopupWorker(getSwingEnvironment(), e.getComponent(), null, e.getPoint(), getScoutObject().getContextMenu(),
-              ActionUtility.createMenuFilterVisibleAndMenuTypes(TableMenuType.EmptySpace, TableMenuType.Header), false).enqueue();
+          SwingPopupWorker swingPopupWorker = new SwingPopupWorker(getSwingEnvironment(), e.getComponent(), e.getPoint(), getScoutObject().getContextMenu(), CollectionUtility.hashSet(TableMenuType.EmptySpace, TableMenuType.Header));
+          swingPopupWorker.setLightWeightPopup(false);
+          swingPopupWorker.enqueue();
         }
       };
       getSwingEnvironment().invokeScoutLater(t, 5678);
@@ -1578,7 +1573,7 @@ public class SwingScoutTable extends SwingScoutComposite<ITable> implements ISwi
       if (e.getClickCount() == 1 && e.getButton() == MouseEvent.BUTTON1) {
         int pressedRow = getSwingTable().rowAtPoint(e.getPoint());
         if (pressedRow >= 0) {
-          handleSwingRowClick(pressedRow);
+          handleSwingRowClick(pressedRow, e.getButton());
         }
       }
       else if (e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1) {
@@ -1666,7 +1661,7 @@ public class SwingScoutTable extends SwingScoutComposite<ITable> implements ISwi
 
   /**
    * Implementation of DropSource's DragGestureListener support for drag/drop
-   * 
+   *
    * @since Build 202
    */
   private class P_SwingRowTransferHandler extends TransferHandlerEx {

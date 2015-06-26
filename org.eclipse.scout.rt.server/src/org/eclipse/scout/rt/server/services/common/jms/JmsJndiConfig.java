@@ -4,7 +4,7 @@
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- * 
+ *
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
@@ -20,6 +20,10 @@ import javax.naming.NamingException;
 import org.eclipse.scout.commons.CompareUtility;
 import org.eclipse.scout.commons.exception.ProcessingException;
 
+/**
+ * @deprecated use org.eclipse.scout.rt.server.jms.AbstractJmsService. Will be removed in the N release.
+ */
+@Deprecated
 public class JmsJndiConfig {
 
   // JNDI config
@@ -176,12 +180,12 @@ public class JmsJndiConfig {
 
   private int compareTo(Object obj) {
     JmsJndiConfig c = (JmsJndiConfig) obj;
-    if (CompareUtility.compareTo(c.getConnectionFactoryJndiName(), this.m_connectionFactoryJndiName) == 0 &&
-        CompareUtility.compareTo(c.getInitialContextFactory(), this.m_initialContextFactory) == 0 &&
-        CompareUtility.compareTo(c.getJndiName(), this.m_jndiName) == 0 &&
-        CompareUtility.compareTo(c.getPassword(), this.m_password) == 0 &&
-        CompareUtility.compareTo(c.getProviderUrl(), this.m_providerUrl) == 0 &&
-        CompareUtility.compareTo(c.getUserName(), this.m_userName) == 0) {
+    if (CompareUtility.compareTo(c.getConnectionFactoryJndiName(), this.m_connectionFactoryJndiName) == 0
+        && CompareUtility.compareTo(c.getInitialContextFactory(), this.m_initialContextFactory) == 0
+        && CompareUtility.compareTo(c.getJndiName(), this.m_jndiName) == 0
+        && CompareUtility.compareTo(c.getPassword(), this.m_password) == 0
+        && CompareUtility.compareTo(c.getProviderUrl(), this.m_providerUrl) == 0
+        && CompareUtility.compareTo(c.getUserName(), this.m_userName) == 0) {
       return 0;
     }
     else {

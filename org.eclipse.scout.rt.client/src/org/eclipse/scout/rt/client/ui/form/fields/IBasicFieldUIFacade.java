@@ -12,7 +12,7 @@ package org.eclipse.scout.rt.client.ui.form.fields;
 
 /**
  * UI facade for {@link IBasicField}
- * 
+ *
  * @since 3.10.0 M3
  */
 public interface IBasicFieldUIFacade {
@@ -26,5 +26,14 @@ public interface IBasicFieldUIFacade {
    * @return
    */
   boolean setTextFromUI(String newText, boolean whileTyping);
+
+  /**
+   * Iff {@link IBasicField#PROP_UPDATE_DISPLAY_TEXT_ON_MODIFY} is true the UI calls this method on any changes in the
+   * field. If {@link IBasicField#PROP_UPDATE_DISPLAY_TEXT_ON_MODIFY} is false the model's display-text is only updated
+   * when a new value is set.
+   *
+   * @param text
+   */
+  void setDisplayTextFromUI(String text);
 
 }

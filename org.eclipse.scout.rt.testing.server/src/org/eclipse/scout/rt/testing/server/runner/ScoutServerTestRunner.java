@@ -20,13 +20,17 @@ import java.util.List;
 
 import javax.security.auth.Subject;
 
+import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.commons.serialization.SerializationUtility;
+import org.eclipse.scout.rt.server.IServerJobFactory;
+import org.eclipse.scout.rt.server.IServerJobService;
 import org.eclipse.scout.rt.server.IServerSession;
 import org.eclipse.scout.rt.testing.server.DefaultTestServerSessionProvider;
 import org.eclipse.scout.rt.testing.server.ITestServerSessionProvider;
 import org.eclipse.scout.rt.testing.shared.services.common.exceptionhandler.ProcessingRuntimeExceptionUnwrappingStatement;
+import org.eclipse.scout.service.SERVICES;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.runners.BlockJUnit4ClassRunner;
@@ -81,19 +85,21 @@ public class ScoutServerTestRunner extends BlockJUnit4ClassRunner {
   private static Class<? extends IServerSession> s_defaultServerSessionClass;
   private static String s_defaultPrincipalName;
   private static ITestServerSessionProvider s_defaultServerSessionProvider = new DefaultTestServerSessionProvider();
+  private static final IServerJobService BACKEND_JOB_SERVICE;
   private static final IScoutLogger LOG;
   private static final IServerTestEnvironment FACTORY;
 
   static {
     LOG = ScoutLogManager.getLogger(ScoutServerTestRunner.class);
     FACTORY = createServerTestEnvironmentFactory();
+    BACKEND_JOB_SERVICE = SERVICES.getService(IServerJobService.class);
 
     if (FACTORY != null) {
       FACTORY.setupGlobalEnvironment();
     }
   }
 
-  private LoginInfo m_loginInfo;
+  private IServerJobFactory m_serverJobFactory;
 
   @Retention(RetentionPolicy.RUNTIME)
   @Target({ElementType.TYPE, ElementType.METHOD})
@@ -125,12 +131,14 @@ public class ScoutServerTestRunner extends BlockJUnit4ClassRunner {
     }
 
     try {
-      m_loginInfo = getOrCreateServerSession(klass.getAnnotation(ServerTest.class), null);
+      LoginInfo loginInfo = getOrCreateServerSession(klass.getAnnotation(ServerTest.class), null);
+      m_serverJobFactory = createServerJobFactory(loginInfo);
     }
     catch (InitializationError e) {
       throw e;
     }
     catch (Exception e) {
+      LOG.error("Error creating session", e);
       List<Throwable> errors = new ArrayList<Throwable>();
       errors.add(e);
       throw new InitializationError(errors);
@@ -187,28 +195,33 @@ public class ScoutServerTestRunner extends BlockJUnit4ClassRunner {
     return getDefaultPrincipalName();
   }
 
+  protected IServerJobFactory createServerJobFactory(LoginInfo loginInfo) throws ProcessingException {
+    return BACKEND_JOB_SERVICE.createJobFactory(loginInfo.getServerSession(), loginInfo.getSubject());
+  }
+
   @Override
   protected Statement withBeforeClasses(Statement statement) {
     // run all methods annotated with @BeforeClass in a separate ServerSession
     List<FrameworkMethod> befores = getTestClass().getAnnotatedMethods(BeforeClass.class);
-    return befores.isEmpty() ? statement : new RunBeforesInSeparateScoutServerSession(m_loginInfo.getServerSession(), m_loginInfo.getSubject(), statement, befores, null);
+    return befores.isEmpty() ? statement : new RunBeforesInSeparateScoutServerSession(m_serverJobFactory, statement, befores, null);
   }
 
   @Override
   protected Statement withAfterClasses(Statement statement) {
     // run all methods annotated with @AfterClass in a separate ServerSession
     List<FrameworkMethod> afters = getTestClass().getAnnotatedMethods(AfterClass.class);
-    return afters.isEmpty() ? statement : new RunAftersInSeparateScoutServerSession(m_loginInfo.getServerSession(), m_loginInfo.getSubject(), statement, afters, null);
+    return afters.isEmpty() ? statement : new RunAftersInSeparateScoutServerSession(m_serverJobFactory, statement, afters, null);
   }
 
   @Override
   protected Statement methodBlock(FrameworkMethod method) {
-    LoginInfo loginInfo = m_loginInfo;
-    ServerTest methodLevelClientTest = method.getAnnotation(ServerTest.class);
-    if (methodLevelClientTest != null) {
+    IServerJobFactory serverJobFactory = m_serverJobFactory;
+    ServerTest methodLevelAnnotation = method.getAnnotation(ServerTest.class);
+    if (methodLevelAnnotation != null) {
       try {
-        ServerTest classLevelClientTest = getTestClass().getJavaClass().getAnnotation(ServerTest.class);
-        loginInfo = getOrCreateServerSession(classLevelClientTest, methodLevelClientTest);
+        ServerTest classLevelAnnotation = getTestClass().getJavaClass().getAnnotation(ServerTest.class);
+        LoginInfo loginInfo = getOrCreateServerSession(classLevelAnnotation, methodLevelAnnotation);
+        serverJobFactory = createServerJobFactory(loginInfo);
       }
       catch (final Throwable e) {
         return new Statement() {
@@ -220,8 +233,8 @@ public class ScoutServerTestRunner extends BlockJUnit4ClassRunner {
       }
     }
 
-    // run each test method in a separate ServerSession
-    return new ScoutServerJobWrapperStatement(loginInfo.getServerSession(), loginInfo.getSubject(), super.methodBlock(method));
+    // run each test method in a separate ServerJob
+    return new ScoutServerJobWrapperStatement(serverJobFactory, super.methodBlock(method));
   }
 
   @Override
@@ -231,6 +244,18 @@ public class ScoutServerTestRunner extends BlockJUnit4ClassRunner {
     return super.possiblyExpectingExceptions(method, test, new ProcessingRuntimeExceptionUnwrappingStatement(next));
   }
 
+  /**
+   * Creates a {@link LoginInfo} with a {@link Subject} and {@link IServerSession} for tests given class and method
+   * annotations or default, if none available.
+   *
+   * @param classLevelServerTest
+   *          {@link ServerTest} class annotation
+   * @param methodLevelServerTest
+   *          {@link ServerTest} method annotation
+   * @return {@link LoginInfo}
+   * @throws InitializationError
+   *           , if no session class can be found.
+   */
   protected LoginInfo getOrCreateServerSession(ServerTest classLevelServerTest, ServerTest methodLevelServerTest) throws Exception {
     // process default values
     Class<? extends IServerSession> serverSessionClass = defaultServerSessionClass();
@@ -338,7 +363,7 @@ public class ScoutServerTestRunner extends BlockJUnit4ClassRunner {
         }
       }
       catch (ClassNotFoundException e) {
-        // no custom custom test environment installed
+        LOG.debug("no custom custom test environment installed", e);
       }
       catch (Exception e) {
         LOG.warn("Unexpected problem while creating a new instance of custom test environment", e);

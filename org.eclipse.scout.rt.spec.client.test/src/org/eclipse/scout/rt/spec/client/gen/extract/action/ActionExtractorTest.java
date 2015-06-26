@@ -21,9 +21,9 @@ import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenuType;
 import org.eclipse.scout.rt.client.ui.action.menu.TableMenuType;
 import org.eclipse.scout.rt.shared.TEXTS;
-import org.eclipse.scout.rt.spec.client.SpecUtility;
-import org.eclipse.scout.rt.spec.client.gen.extract.AbstractBooleanTextExtractor;
+import org.eclipse.scout.rt.spec.client.config.ConfigRegistry;
 import org.eclipse.scout.rt.spec.client.gen.extract.IDocTextExtractor;
+import org.eclipse.scout.rt.spec.client.utility.SpecUtility;
 import org.junit.Test;
 
 /**
@@ -41,14 +41,14 @@ public class ActionExtractorTest {
     SingleSelectionExtractor<AbstractMenu> ex = new SingleSelectionExtractor<AbstractMenu>();
     AbstractMenu testAction = mock(AbstractMenu.class);
     when(testAction.getMenuTypes()).thenReturn(CollectionUtility.<IMenuType> hashSet(TableMenuType.SingleSelection));
-    String trueText = TEXTS.get(AbstractBooleanTextExtractor.DOC_ID_TRUE);
+    String trueText = TEXTS.get(SpecUtility.DOC_ID_TRUE);
     String text = ex.getText(testAction);
     assertEquals(trueText, text);
   }
 
   /**
    * Tests that {@link SingleSelectionExtractor#getText(AbstractAction)} for
-   * the default case returns the text for {@link AbstractBooleanTextExtractor#DOC_ID_FALSE}
+   * the default case returns the text for {@link SpecUtility#DOC_ID_FALSE}
    */
   @Test
   public void testSingleSelectionExtractorDefault() {
@@ -64,14 +64,14 @@ public class ActionExtractorTest {
     MultiSelectionExtractor<AbstractMenu> ex = new MultiSelectionExtractor<AbstractMenu>();
     AbstractMenu testAction = mock(AbstractMenu.class);
     when(testAction.getMenuTypes()).thenReturn(CollectionUtility.<IMenuType> hashSet(TableMenuType.MultiSelection));
-    String trueText = TEXTS.get(AbstractBooleanTextExtractor.DOC_ID_TRUE);
+    String trueText = TEXTS.get(SpecUtility.DOC_ID_TRUE);
     String text = ex.getText(testAction);
     assertEquals(trueText, text);
   }
 
   /**
    * Tests that {@link MultiSelectionExtractor#getText(AbstractAction)} for
-   * the default case returns the text for {@link AbstractBooleanTextExtractor#DOC_ID_FALSE}
+   * the default case returns the text for {@link SpecUtility#DOC_ID_FALSE}
    */
   @Test
   public void testMultiSelectionExtractorDefault() {
@@ -87,14 +87,14 @@ public class ActionExtractorTest {
     EmptySpaceSelectionExtractor<AbstractMenu> ex = new EmptySpaceSelectionExtractor<AbstractMenu>();
     AbstractMenu testAction = mock(AbstractMenu.class);
     when(testAction.getMenuTypes()).thenReturn(CollectionUtility.<IMenuType> hashSet(TableMenuType.EmptySpace));
-    String trueText = TEXTS.get(AbstractBooleanTextExtractor.DOC_ID_TRUE);
+    String trueText = TEXTS.get(SpecUtility.DOC_ID_TRUE);
     String text = ex.getText(testAction);
     assertEquals(trueText, text);
   }
 
   /**
    * Tests that {@link EmptySpaceSelectionExtractor#getText(AbstractAction)} for
-   * the default case returns the text for {@link AbstractBooleanTextExtractor#DOC_ID_FALSE}
+   * the default case returns the text for {@link SpecUtility#DOC_ID_FALSE}
    */
   @Test
   public void testEmptySpaceSelectionExtractorDefault() {
@@ -106,7 +106,7 @@ public class ActionExtractorTest {
    */
   @Test
   public void testHierarchicActionNodeLabelExtractor() {
-    String indent = SpecUtility.getDocConfigInstance().getIndent();
+    String indent = ConfigRegistry.getDocConfigInstance().getIndent();
     HierarchicActionNodeLabelExtractor<IMenu> ex = new HierarchicActionNodeLabelExtractor<IMenu>();
     AbstractMenu hierarchicMenu = new AbstractMenu() {
       @Override
@@ -140,7 +140,7 @@ public class ActionExtractorTest {
    *          {@link IDocTextExtractor}
    */
   private void assertFalseTextForDefault(IDocTextExtractor<AbstractMenu> ex) {
-    String defaultValue = TEXTS.get(AbstractBooleanTextExtractor.DOC_ID_FALSE);
+    String defaultValue = TEXTS.get(SpecUtility.DOC_ID_FALSE);
     AbstractMenu a = mock(AbstractMenu.class);
     String text = ex.getText(a);
     assertEquals(defaultValue, text);

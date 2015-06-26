@@ -1,14 +1,18 @@
 package org.eclipse.scout.rt.ui.rap.basic.table;
 
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.eclipse.core.runtime.IStatus;
-import org.eclipse.core.runtime.ListenerList;
 import org.eclipse.jface.viewers.ColumnLabelProvider;
 import org.eclipse.jface.viewers.ViewerCell;
 import org.eclipse.rap.rwt.RWT;
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.HTMLUtility;
 import org.eclipse.scout.commons.StringUtility;
+import org.eclipse.scout.commons.logger.IScoutLogger;
+import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.basic.cell.ICell;
 import org.eclipse.scout.rt.client.ui.basic.table.ITable;
 import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
@@ -24,22 +28,23 @@ import org.eclipse.swt.graphics.Font;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.TableItem;
 
 public class RwtScoutColumnModel extends ColumnLabelProvider {
+
+  public static final String EDITABLE_VARIANT_PREFIX = "EDITABLE_CELL_VARIANT_";
+  public static final String EDITABLE_VARIANT_CELL_MARKER = "EDITABLE";
+
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(RwtScoutColumnModel.class);
   private static final long serialVersionUID = 1L;
 
-  private static final int HTML_ROW_LINE_HIGHT = 19;
-  private static final int NEWLINE_LINE_HIGHT = 15;
-
-  private transient ListenerList listenerList = null;
   private final ITable m_scoutTable;
-  private HashMap<ITableRow, HashMap<IColumn<?>, ICell>> m_cachedCells;
   private final RwtScoutTable m_uiTable;
   private final TableColumnManager m_columnManager;
-  private Image m_imgCheckboxFalse;
-  private Image m_imgCheckboxTrue;
-  private Color m_disabledForegroundColor;
-  private int m_defaultRowHeight;
+  private final Image m_imgCheckboxFalse;
+  private final Image m_imgCheckboxTrue;
+  private final Color m_disabledForegroundColor;
+  private Map<ITableRow, Map<IColumn<?>, P_CachedCell>> m_cachedCells;
 
   public RwtScoutColumnModel(ITable scoutTable, RwtScoutTable uiTable, TableColumnManager columnManager) {
     m_scoutTable = scoutTable;
@@ -61,15 +66,21 @@ public class RwtScoutColumnModel extends ColumnLabelProvider {
 
   @Override
   public void update(ViewerCell cell) {
-    ITableRow element = (ITableRow) cell.getElement();
+    ITableRow row = (ITableRow) cell.getElement();
     int columnIndex = cell.getColumnIndex();
 
-    cell.setText(getColumnText(element, columnIndex));
-    cell.setImage(getColumnImage(element, columnIndex));
+    cell.setText(getColumnText(row, columnIndex));
+    cell.setImage(getColumnImage(row, columnIndex));
+    cell.setBackground(getBackground(row, columnIndex));
+    cell.setForeground(getForeground(row, columnIndex));
+    cell.setFont(getFont(row, columnIndex));
 
-    cell.setBackground(getBackground(element, columnIndex));
-    cell.setForeground(getForeground(element, columnIndex));
-    cell.setFont(getFont(element, columnIndex));
+    // Encode the information of which cell is editable into the custom variant of the 'TableItem' to display a visual marker for editable cells.
+    // This is a workaround because there is no actual RAP support to set an individual variant on table-cells (the CSS-element 'Table-Cell' applies to all cells of the table).
+    // The marker itself is added in the JavaScript patch 'EditableCellMarkerPatch.js' which patches 'GridRow.js'.
+    if (cell.getColumnIndex() == 1) {
+      cell.getItem().setData(RWT.CUSTOM_VARIANT, createTableRowVariant(row)); // A 'TableItem' represents not a single cell but the whole row instead. Therefore, the encoding is only done for the first cell being updated.
+    }
   }
 
   public String getColumnText(ITableRow element, int columnIndex) {
@@ -120,10 +131,6 @@ public class RwtScoutColumnModel extends ColumnLabelProvider {
       text = StringUtility.replaceNewLines(text, " ");
     }
     return text;
-  }
-
-  protected int getDefaultRowHeight() {
-    return m_defaultRowHeight;
   }
 
   public Image getColumnImage(ITableRow element, int columnIndex) {
@@ -253,23 +260,114 @@ public class RwtScoutColumnModel extends ColumnLabelProvider {
       if (m_cachedCells == null || m_cachedCells.get(row) == null) {
         rebuildCache();
       }
-      return m_cachedCells.get(row).get(column);
+      P_CachedCell cachedCell = m_cachedCells.get(row).get(column);
+      if (cachedCell != null) {
+        return cachedCell.m_cell;
+      }
     }
-    else {
-      return null;
+    return null;
+  }
+
+  /**
+   * Creates a custom variant to be set as {@link TableItem}'s data to identify editable cells of that row. This
+   * identifier is used in <code>GridRow.js</code> to install a visual marker for editable cells.<br/>
+   * Format: the cells are delimited with a '_' and editable cells are marked with the literal 'EDITABLE'.
+   *
+   * @param row
+   *          the current row.
+   * @return the variant for that row.
+   */
+  protected String createTableRowVariant(ITableRow row) {
+    StringBuilder builder = new StringBuilder();
+
+    Map<IColumn<?>, P_CachedCell> cachedRow = m_cachedCells.get(row);
+    int[] visibleColumnIndexes = getScoutTable().getColumnSet().getVisibleColumnIndexes();
+    boolean isEditable = false;
+    for (int i = 0; i < visibleColumnIndexes.length; i++) {
+      if (i > 0) {
+        builder.append('_');
+      }
+
+      IColumn<?> col = getScoutTable().getColumnSet().getColumn(visibleColumnIndexes[i]);
+      if (col != null && cachedRow != null) {
+        P_CachedCell cachedCell = cachedRow.get(col);
+        if (cachedCell != null && cachedCell.m_isEditable) {
+          builder.append(EDITABLE_VARIANT_CELL_MARKER);
+          isEditable = true;
+        }
+      }
     }
+
+    if (isEditable) {
+      builder.insert(0, EDITABLE_VARIANT_PREFIX);
+      return builder.toString();
+    }
+
+    return null;
+  }
+
+  /**
+   * Determines whether the visual marker for a cell is to be displayed.
+   *
+   * @return <code>true</code> if the cell is editable and not of the type {@link Boolean}.
+   */
+  protected boolean isEditableIconNeededInScoutThread(final ITableRow row, final IColumn<?> column) {
+    if (column == null || row == null) {
+      return false;
+    }
+
+    if (column.getDataType().isAssignableFrom(Boolean.class)) {
+      return false;
+    }
+
+    ITable scoutTable = getScoutTable();
+    if (scoutTable == null) {
+      return false;
+    }
+    return scoutTable.isCellEditable(row, column);
   }
 
   private void rebuildCache() {
-    m_cachedCells = new HashMap<ITableRow, HashMap<IColumn<?>, ICell>>();
-    if (getScoutTable() != null) {
-      for (ITableRow scoutRow : getScoutTable().getRows()) {
-        HashMap<IColumn<?>, ICell> cells = new HashMap<IColumn<?>, ICell>();
-        for (IColumn<?> col : getScoutTable().getColumnSet().getVisibleColumns()) {
-          cells.put(col, getScoutTable().getCell(scoutRow, col));
+    if (getScoutTable() == null) {
+      m_cachedCells = CollectionUtility.emptyHashMap();
+      return;
+    }
+
+    Runnable r = new Runnable() {
+      @Override
+      public void run() {
+        List<ITableRow> rows = getScoutTable().getRows();
+        Map<ITableRow, Map<IColumn<?>, P_CachedCell>> tmp = new HashMap<ITableRow, Map<IColumn<?>, P_CachedCell>>(rows.size());
+        for (ITableRow scoutRow : rows) {
+          List<IColumn<?>> visibleColumns = getScoutTable().getColumnSet().getVisibleColumns();
+          Map<IColumn<?>, P_CachedCell> cells = new HashMap<IColumn<?>, P_CachedCell>(visibleColumns.size());
+          for (IColumn<?> col : visibleColumns) {
+            ICell cell = getScoutTable().getCell(scoutRow, col);
+            boolean isCellEditable = isEditableIconNeededInScoutThread(scoutRow, col);
+            cells.put(col, new P_CachedCell(cell, isCellEditable));
+          }
+          tmp.put(scoutRow, cells);
         }
-        m_cachedCells.put(scoutRow, cells);
+
+        m_cachedCells = tmp;
       }
+    };
+
+    try {
+      getUiTable().getUiEnvironment().invokeScoutLater(r, 2345).join(2345);
+    }
+    catch (InterruptedException e) {
+      LOG.warn("Interrupted while waiting for the model.", e);
+    }
+  }
+
+  private static final class P_CachedCell {
+    private final ICell m_cell;
+    private final boolean m_isEditable;
+
+    private P_CachedCell(ICell cell, boolean isEditable) {
+      m_cell = cell;
+      m_isEditable = isEditable;
     }
   }
 }

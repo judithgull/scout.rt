@@ -10,16 +10,24 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.action;
 
+/**
+ * Callback to listen for action events triggered by the UI.
+ */
 public interface IActionUIFacade {
 
   /**
-   * use {@link #fireActionFromUI()} instead
+   * This method is called every time the selection is changed from within the UI. Please note, that
+   * {@link #fireActionFromUI()} must be called as well, regardless of whether the selection state changed.
    * 
-   * @deprecated will be removed with V 5.0
+   * @param selected
+   *          <code>true</code> if selected, <code>false</code> otherwise.
+   * @see #fireActionFromUI()
    */
-  @Deprecated
-  void setSelectedFromUI(boolean b);
+  void setSelectedFromUI(boolean selected);
 
+  /**
+   * This method is called every time an action is executed from within the UI (e.g. by a click or selection event).
+   * This method is also called for selection events no matter if the selection status changed.
+   */
   void fireActionFromUI();
-
 }

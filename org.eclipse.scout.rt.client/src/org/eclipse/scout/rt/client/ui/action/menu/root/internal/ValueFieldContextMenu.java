@@ -11,17 +11,13 @@
 package org.eclipse.scout.rt.client.ui.action.menu.root.internal;
 
 import java.beans.PropertyChangeEvent;
+import java.util.Collection;
 import java.util.List;
 
-import org.eclipse.scout.commons.exception.ProcessingException;
-import org.eclipse.scout.rt.client.ui.action.ActionUtility;
-import org.eclipse.scout.rt.client.ui.action.IAction;
-import org.eclipse.scout.rt.client.ui.action.IActionVisitor;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
-import org.eclipse.scout.rt.client.ui.action.menu.IValueFieldContextMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.MenuUtility;
+import org.eclipse.scout.rt.client.ui.action.menu.root.IValueFieldContextMenu;
 import org.eclipse.scout.rt.client.ui.form.fields.IValueField;
-import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
-import org.eclipse.scout.service.SERVICES;
 
 /**
  *
@@ -38,43 +34,33 @@ public class ValueFieldContextMenu extends FormFieldContextMenu<IValueField<?>> 
   @Override
   protected void initConfig() {
     super.initConfig();
-    // set active filter
-    setActiveFilter(ActionUtility.createMenuFilterVisibleForValueFieldValue(getOwner().getValue()));
+    // init current menu types
+    setCurrentMenuTypes(MenuUtility.getMenuTypesForValueFieldValue(getOwner().getValue()));
     calculateLocalVisibility();
   }
 
   @Override
-  protected void afterChildMenusAdd(List<? extends IMenu> newChildMenus) {
+  protected void afterChildMenusAdd(Collection<? extends IMenu> newChildMenus) {
     super.afterChildMenusAdd(newChildMenus);
     handleOwnerEnabledChanged();
   }
 
   @Override
-  protected void afterChildMenusRemove(List<? extends IMenu> childMenusToRemove) {
+  protected void afterChildMenusRemove(Collection<? extends IMenu> childMenusToRemove) {
     super.afterChildMenusRemove(childMenusToRemove);
     handleOwnerEnabledChanged();
+  }
+
+  @Override
+  public void callOwnerValueChanged() {
+    handleOwnerValueChanged();
   }
 
   protected void handleOwnerValueChanged() {
     if (getOwner() != null) {
       final Object ownerValue = getOwner().getValue();
-      acceptVisitor(new IActionVisitor() {
-        @Override
-        public int visit(IAction action) {
-          if (action instanceof IMenu) {
-            IMenu menu = (IMenu) action;
-            try {
-              menu.handleOwnerValueChanged(ownerValue);
-            }
-            catch (ProcessingException ex) {
-              SERVICES.getService(IExceptionHandlerService.class).handleException(ex);
-            }
-          }
-          return CONTINUE;
-        }
-      });
-      // set active filter
-      setActiveFilter(ActionUtility.createMenuFilterVisibleForValueFieldValue(ownerValue));
+      setCurrentMenuTypes(MenuUtility.getMenuTypesForValueFieldValue(ownerValue));
+      acceptVisitor(new MenuOwnerChangedVisitor(ownerValue, getCurrentMenuTypes()));
     }
     calculateLocalVisibility();
   }

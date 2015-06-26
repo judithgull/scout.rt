@@ -38,6 +38,8 @@ import org.eclipse.scout.rt.server.transaction.ITransaction;
 import org.eclipse.scout.rt.server.transaction.internal.ActiveTransactionRegistry;
 import org.eclipse.scout.rt.shared.ScoutTexts;
 import org.eclipse.scout.rt.shared.TextsThreadLocal;
+import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
+import org.eclipse.scout.service.SERVICES;
 
 /**
  * Perform a transaction on a {@link IServerSession}<br>
@@ -202,10 +204,10 @@ public abstract class ServerJob extends JobEx implements IServerSessionProvider 
     }
   }
 
-  private IStatus runTransactionWrapper(IProgressMonitor monitor) throws Exception {
+  protected final IStatus runTransactionWrapper(IProgressMonitor monitor) throws Exception {
     ITransaction transaction = createNewTransaction();
     Map<Class, Object> backup = ThreadContext.backup();
-    Locale oldLocale = LocaleThreadLocal.get();
+    Locale oldLocale = LocaleThreadLocal.get(false);
     ScoutTexts oldTexts = TextsThreadLocal.get();
     ClassLoader oldContextClassLoader = Thread.currentThread().getContextClassLoader();
     try {
@@ -249,12 +251,25 @@ public abstract class ServerJob extends JobEx implements IServerSessionProvider 
     finally {
       ActiveTransactionRegistry.unregister(transaction);
       if (transaction.hasFailures()) {
-        // xa rollback
         try {
-          transaction.rollback();
+          IExceptionHandlerService exceptionHandlerService = SERVICES.getService(IExceptionHandlerService.class);
+          for (Throwable transactionFailure : transaction.getFailures()) {
+            if (transactionFailure instanceof ProcessingException) {
+              exceptionHandlerService.handleException((ProcessingException) transactionFailure);
+            }
+            else {
+              LOG.error("Transaction had failure.", transactionFailure);
+            }
+          }
         }
-        catch (Throwable t) {
-          LOG.error("Transaction rollback failed with exception.", t);
+        finally {
+          // xa rollback
+          try {
+            transaction.rollback();
+          }
+          catch (Throwable t) {
+            LOG.error("Transaction rollback failed with exception.", t);
+          }
         }
       }
       else {

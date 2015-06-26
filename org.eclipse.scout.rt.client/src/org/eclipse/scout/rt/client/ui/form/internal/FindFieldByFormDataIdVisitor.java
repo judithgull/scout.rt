@@ -10,29 +10,35 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.form.internal;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.regex.Pattern;
 
 import org.eclipse.scout.commons.CompositeObject;
-import org.eclipse.scout.commons.ConfigurationUtility;
 import org.eclipse.scout.rt.client.ui.form.IForm;
 import org.eclipse.scout.rt.client.ui.form.IFormFieldVisitor;
 import org.eclipse.scout.rt.client.ui.form.fields.ICompositeField;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.IValueField;
+import org.eclipse.scout.rt.client.ui.form.fields.tablefield.ITableField;
+import org.eclipse.scout.rt.shared.data.form.AbstractFormData;
 import org.eclipse.scout.rt.shared.data.form.FormDataUtility;
 
 /**
  * Visitor for finding a form field by its form data field Id.
- * 
+ *
  * @see IFormField#getFieldId()
  * @see FormDataUtility#getFieldDataId(String)
  */
 public class FindFieldByFormDataIdVisitor implements IFormFieldVisitor {
 
   private static final CompositeObject PERFECT_VALUE_FIELD_MATCH_KEY = new CompositeObject(0, 0);
+  private static final Pattern FIELD_PATH_SPLIT_PATTERN = Pattern.compile("[" + AbstractFormData.FIELD_PATH_DELIM + "]");
 
-  private String[] m_fieldIdParts;
-  private TreeMap<CompositeObject, IFormField> m_prioMap;
+  private final String[] m_fieldIdParts;
+  private final SortedMap<CompositeObject, IFormField> m_prioMap;
   /**
    * {@link IForm} this visitor starts on. The closer a field is embedded into this form, the more likely it will be the
    * result of this visitor. may be <code>null</code>
@@ -53,7 +59,7 @@ public class FindFieldByFormDataIdVisitor implements IFormFieldVisitor {
    */
   public FindFieldByFormDataIdVisitor(String fieldId, IForm searchContextRootForm) {
     m_searchContextRootForm = searchContextRootForm;
-    m_fieldIdParts = fieldId.split("[/]");
+    m_fieldIdParts = FIELD_PATH_SPLIT_PATTERN.split(fieldId);
     m_prioMap = new TreeMap<CompositeObject, IFormField>();
   }
 
@@ -76,11 +82,14 @@ public class FindFieldByFormDataIdVisitor implements IFormFieldVisitor {
       if (field instanceof IValueField) {
         // fieldTypeRank is fine
       }
-      else if (!(field instanceof ICompositeField)) {
+      else if (field instanceof ITableField) {
         fieldTypeRank += 1;
       }
-      else {
+      else if (!(field instanceof ICompositeField)) {
         fieldTypeRank += 2;
+      }
+      else {
+        fieldTypeRank += 3;
       }
       // Compute the enclosing field path rank that is used as additional hint for determining the
       // best matching form field for the requested formId. Note: for compatibility reasons, the enclosing
@@ -120,20 +129,15 @@ public class FindFieldByFormDataIdVisitor implements IFormFieldVisitor {
   private int getEnclosingFieldPathRank(IFormField f) {
     int rank = 0;
     int i = m_fieldIdParts.length - 2; // the last segment is the field id, i.e. not part of the enclosing field path
-    Class<?> currentEnclosingContainerType = ConfigurationUtility.getEnclosingContainerType(f);
-    ICompositeField p = f.getParentField();
-    while (p != null) {
-      Class<?> enclosingContainerType = ConfigurationUtility.getEnclosingContainerType(p);
-      if (enclosingContainerType != currentEnclosingContainerType) {
-        if (i >= 0 && m_fieldIdParts[i].equals(FormDataUtility.getFieldDataId(p.getFieldId()))) {
-          i--;
-        }
-        else {
-          rank++;
-        }
-        currentEnclosingContainerType = enclosingContainerType;
+    List<ICompositeField> enclosingFieldList = f.getEnclosingFieldList();
+    Collections.reverse(enclosingFieldList);
+    for (ICompositeField p : enclosingFieldList) {
+      if (i >= 0 && m_fieldIdParts[i].equals(FormDataUtility.getFieldDataId(p.getFieldId()))) {
+        i--;
       }
-      p = p.getParentField();
+      else {
+        rank++;
+      }
     }
     return rank;
   }

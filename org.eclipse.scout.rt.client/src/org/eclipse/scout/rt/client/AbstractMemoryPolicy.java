@@ -31,7 +31,7 @@ import org.eclipse.scout.rt.client.ui.form.IForm;
 import org.eclipse.scout.rt.client.ui.form.fields.pagefield.AbstractPageField;
 import org.eclipse.scout.rt.shared.services.common.jdbc.SearchFilter;
 
-public class AbstractMemoryPolicy implements IMemoryPolicy {
+public abstract class AbstractMemoryPolicy implements IMemoryPolicy {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractMemoryPolicy.class);
 
   public static class SearchFormState {
@@ -190,11 +190,11 @@ public class AbstractMemoryPolicy implements IMemoryPolicy {
     }
     FastBeanInfo pi = new FastBeanInfo(page.getClass(), page.getClass().getSuperclass());
     for (FastPropertyDescriptor prop : pi.getPropertyDescriptors()) {
-      if (prop.getReadMethod() != null &&
-          (Date.class.isAssignableFrom(prop.getPropertyType()) ||
-              Number.class.isAssignableFrom(prop.getPropertyType()) ||
-              String.class.isAssignableFrom(prop.getPropertyType()) ||
-              long.class.isAssignableFrom(prop.getPropertyType()))) {
+      if (prop.getReadMethod() != null
+          && (Date.class.isAssignableFrom(prop.getPropertyType())
+              || Number.class.isAssignableFrom(prop.getPropertyType())
+              || String.class.isAssignableFrom(prop.getPropertyType())
+              || long.class.isAssignableFrom(prop.getPropertyType()))) {
         // only accept Numbers, Strings or Dates
         try {
           b.append("/");

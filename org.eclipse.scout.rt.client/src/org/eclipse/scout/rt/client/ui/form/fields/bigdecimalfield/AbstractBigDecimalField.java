@@ -18,6 +18,7 @@ import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.bigdecimalfield.IBigDecimalFieldExtension;
 import org.eclipse.scout.rt.client.ui.form.fields.decimalfield.AbstractDecimalField;
 import org.eclipse.scout.rt.shared.data.form.ValidationRule;
 
@@ -54,12 +55,34 @@ public abstract class AbstractBigDecimalField extends AbstractDecimalField<BigDe
     return AbstractBigDecimalField.DEFAULT_MAX_VALUE;
   }
 
+  @Override
+  protected BigDecimal getMinPossibleValue() {
+    return AbstractBigDecimalField.DEFAULT_MIN_VALUE;
+  }
+
+  @Override
+  protected BigDecimal getMaxPossibleValue() {
+    return AbstractBigDecimalField.DEFAULT_MAX_VALUE;
+  }
+
   /**
    * uses {@link #parseToBigDecimalInternal(String)} to parse text
    */
   @Override
   protected BigDecimal parseValueInternal(String text) throws ProcessingException {
     return parseToBigDecimalInternal(text);
+  }
+
+  protected static class LocalBigDecimalFieldExtension<OWNER extends AbstractBigDecimalField> extends LocalDecimalFieldExtension<BigDecimal, OWNER> implements IBigDecimalFieldExtension<OWNER> {
+
+    public LocalBigDecimalFieldExtension(OWNER owner) {
+      super(owner);
+    }
+  }
+
+  @Override
+  protected IBigDecimalFieldExtension<? extends AbstractBigDecimalField> createLocalExtension() {
+    return new LocalBigDecimalFieldExtension<AbstractBigDecimalField>(this);
   }
 
 }

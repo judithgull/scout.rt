@@ -32,10 +32,11 @@ import org.junit.Test;
  */
 public class FormDataCloneTest {
 
-  private int outCount;
-  private int inCount;
+  private int m_outCount;
+  private int m_inCount;
 
   @Test
+  @SuppressWarnings("resource")
   public void test() throws Exception {
     CompanySearchFormData d = new CompanySearchFormData();
     d.getActive().setValue(true);
@@ -44,13 +45,13 @@ public class FormDataCloneTest {
     d.getPersonIdProperty().setValue(1234L);
     d = (CompanySearchFormData) d.clone();
     //
-    outCount = 0;
-    inCount = 0;
+    m_outCount = 0;
+    m_inCount = 0;
     ByteArrayOutputStream b = new ByteArrayOutputStream();
     new OutVisitor(b).writeObject(d);
     new InVisitor(new ByteArrayInputStream(b.toByteArray())).readObject();
-    assertEquals(1, outCount);
-    assertEquals(1, inCount);
+    assertEquals(1, m_outCount);
+    assertEquals(1, m_inCount);
   }
 
   private class OutVisitor extends ObjectOutputStream {
@@ -62,7 +63,7 @@ public class FormDataCloneTest {
     @Override
     protected Object replaceObject(Object obj) throws IOException {
       if (obj instanceof AbstractFormData) {
-        outCount++;
+        m_outCount++;
       }
       return obj;
     }
@@ -77,7 +78,7 @@ public class FormDataCloneTest {
     @Override
     protected Object resolveObject(Object obj) throws IOException {
       if (obj instanceof AbstractFormData) {
-        inCount++;
+        m_inCount++;
       }
       return obj;
     }
@@ -103,8 +104,8 @@ public class FormDataCloneTest {
     /**
      * access method for property PersonId.
      */
-    public void setPersonId(Long PersonId) {
-      getPersonIdProperty().setValue(PersonId);
+    public void setPersonId(Long personId) {
+      getPersonIdProperty().setValue(personId);
     }
 
     public Active getActive() {

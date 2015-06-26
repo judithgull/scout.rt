@@ -13,6 +13,7 @@ package org.eclipse.scout.rt.client.ui.action;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -26,6 +27,7 @@ import org.eclipse.scout.commons.holders.IntegerHolder;
 import org.eclipse.scout.rt.client.ui.action.fixture.TestFormWithTemplateSmartfield;
 import org.eclipse.scout.rt.client.ui.action.fixture.TestFormWithTemplateSmartfield.MainBox.SmartField1;
 import org.eclipse.scout.rt.client.ui.action.fixture.TestFormWithTemplateSmartfield.MainBox.SmartField2;
+import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
 import org.eclipse.scout.rt.client.ui.action.menu.AbstractMenu;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 import org.eclipse.scout.rt.client.ui.desktop.IDesktop;
@@ -36,11 +38,11 @@ import org.mockito.Mockito;
 
 /**
  * JUnit tests for {@link AbstractAction}
- * 
+ *
  * @since 3.8.2
  */
 public class ActionTest {
-  private static final String TEST_CLASS_ID = "TEST_CLASS_ID";
+  private static final String TEST_ACTION_CLASS_ID = "TEST_CLASS_ID";
 
   @Test
   public void testOutlineButton() throws ProcessingException {
@@ -57,22 +59,24 @@ public class ActionTest {
       }
 
       @Override
-      protected void execToggleAction(boolean selected) throws ProcessingException {
+      protected void execSelectionChanged(boolean selection) throws ProcessingException {
         execToggleHolder.setValue(execToggleHolder.getValue() + 1);
       }
     };
+    b.getUIFacade().setSelectedFromUI(true);
     b.getUIFacade().fireActionFromUI();
     assertEquals(1, execActionHolder.getValue().intValue());
     assertEquals(1, execToggleHolder.getValue().intValue());
     assertTrue(b.isSelected());
 
     b.getUIFacade().fireActionFromUI();
-    assertEquals(1, execActionHolder.getValue().intValue());
+    assertEquals(2, execActionHolder.getValue().intValue());
     assertEquals(1, execToggleHolder.getValue().intValue());
     assertTrue(b.isSelected());
 
-    b.setSelected(false);
-    assertEquals(1, execActionHolder.getValue().intValue());
+    b.getUIFacade().setSelectedFromUI(false);
+    b.getUIFacade().fireActionFromUI();
+    assertEquals(3, execActionHolder.getValue().intValue());
     assertEquals(2, execToggleHolder.getValue().intValue());
     assertFalse(b.isSelected());
 
@@ -90,7 +94,18 @@ public class ActionTest {
 
   @Test
   public void testActionClassIds() throws ProcessingException {
-    assertEquals(TEST_CLASS_ID, new AnnotatedAction().classId());
+    assertEquals(TEST_ACTION_CLASS_ID, new AnnotatedAction().classId());
+  }
+
+  /**
+   * test for {@link AbstractAction#combineKeyStrokes(String...)}
+   */
+  @Test
+  public void testCombineKeyStrokes() throws Exception {
+    final BaseAction testAction = new BaseAction();
+    assertEquals("", testAction.combineKeyStrokes());
+    assertEquals(IKeyStroke.F1, testAction.combineKeyStrokes(IKeyStroke.F1));
+    assertEquals(IKeyStroke.CONTROL + IKeyStroke.KEY_STROKE_SEPARATOR + IKeyStroke.F1, testAction.combineKeyStrokes(IKeyStroke.CONTROL, IKeyStroke.F1));
   }
 
   /**
@@ -108,7 +123,19 @@ public class ActionTest {
     assertNotEquals(CollectionUtility.firstElement(menus1).classId(), CollectionUtility.firstElement(menus2).classId());
   }
 
-  @ClassId(TEST_CLASS_ID)
+  @Test
+  public void testKeystroke() {
+    BaseAction action = new BaseAction();
+    assertNull(action.getKeyStroke());
+    action.setKeyStroke("");
+    assertEquals(null, action.getKeyStroke());
+    action.setKeyStroke(null);
+    assertNull(action.getKeyStroke());
+    action.setKeyStroke("f11");
+    assertEquals("f11", action.getKeyStroke());
+  }
+
+  @ClassId(TEST_ACTION_CLASS_ID)
   static class AnnotatedAction extends AbstractAction {
   }
 

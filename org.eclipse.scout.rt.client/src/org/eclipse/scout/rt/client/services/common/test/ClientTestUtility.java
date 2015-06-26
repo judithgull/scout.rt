@@ -42,6 +42,10 @@ import org.eclipse.scout.rt.shared.services.lookup.ILookupCall;
 import org.eclipse.scout.rt.shared.services.lookup.ILookupRow;
 import org.osgi.framework.Bundle;
 
+/**
+ * @deprecated will be removed in the Neptune release.
+ */
+@Deprecated
 public final class ClientTestUtility {
 
   private ClientTestUtility() {
@@ -203,13 +207,13 @@ public final class ClientTestUtility {
               }
               // Number Field
             }
-            else if (formField instanceof AbstractNumberField) {
-              ((AbstractNumberField) formField).setValue(42L);
-              // Big Decimal Field
-            }
             else if (formField instanceof AbstractBigDecimalField) {
               ((AbstractBigDecimalField) formField).setValue(BigDecimal.valueOf(42.42));
               // Date Field
+            }
+            else if (formField instanceof AbstractNumberField) {
+              ((AbstractNumberField) formField).setValue(42L);
+              // Big Decimal Field
             }
             else if (formField instanceof AbstractDateField) {
               ((AbstractDateField) formField).setValue(new Date());

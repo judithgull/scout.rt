@@ -14,8 +14,8 @@ import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
-import java.text.NumberFormat;
 import java.text.ParsePosition;
+import java.util.regex.Pattern;
 
 import org.eclipse.scout.commons.CompareUtility;
 import org.eclipse.scout.commons.LocaleThreadLocal;
@@ -28,17 +28,18 @@ import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.exception.VetoException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.numberfield.INumberFieldExtension;
 import org.eclipse.scout.rt.client.ui.form.fields.AbstractBasicField;
+import org.eclipse.scout.rt.client.ui.form.fields.IBasicFieldUIFacade;
 import org.eclipse.scout.rt.client.ui.form.fields.decimalfield.AbstractDecimalField;
 import org.eclipse.scout.rt.client.ui.valuecontainer.INumberValueContainer;
 import org.eclipse.scout.rt.shared.ScoutTexts;
 
 @ClassId("05955664-a6c7-4b3a-8622-3e166fe8ff79")
-public abstract class AbstractNumberField<T extends Number> extends AbstractBasicField<T> implements INumberField<T> {
+public abstract class AbstractNumberField<NUMBER extends Number> extends AbstractBasicField<NUMBER> implements INumberField<NUMBER> {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractNumberField.class);
 
-  @SuppressWarnings("deprecation")
-  private INumberFieldUIFacade m_uiFacade;
+  private IBasicFieldUIFacade m_uiFacade;
 
   public AbstractNumberField() {
     this(true);
@@ -51,23 +52,6 @@ public abstract class AbstractNumberField<T extends Number> extends AbstractBasi
   /*
    * Configuration
    */
-  /**
-   * Configures the format used to render the value. See {@link DecimalFormat#applyPattern(String)} for more information
-   * about the expected format.
-   * <p>
-   * If this configuration is not null, the pattern overrides other configurations that are delegated to the internal
-   * {@link DecimalFormat} like for example {@link #setGroupingUsed(boolean)}
-   * <p>
-   * Subclasses can override this method. Default is {@code null}.
-   * 
-   * @deprecated Will be removed with scout 5.0. For setting the format override {@link #initConfig()} and call
-   *             {@link #setFormat(DecimalFormat)}.
-   */
-  @Deprecated
-  @Order(230)
-  protected String getConfiguredFormat() {
-    return null;
-  }
 
   /**
    * Default used for {@link INumberField#setGroupingUsed(boolean)}
@@ -94,12 +78,12 @@ public abstract class AbstractNumberField<T extends Number> extends AbstractBasi
   /**
    * Default for {@link INumberField#setMinValue(Number)}
    */
-  protected abstract T getConfiguredMinValue();
+  protected abstract NUMBER getConfiguredMinValue();
 
   /**
    * Default for {@link INumberField#setMaxValue(Number)}
    */
-  protected abstract T getConfiguredMaxValue();
+  protected abstract NUMBER getConfiguredMaxValue();
 
   /**
    * Default used for {@link INumberField#setMaxIntegerDigits(int)}
@@ -108,7 +92,7 @@ public abstract class AbstractNumberField<T extends Number> extends AbstractBasi
    * (before the decimal separator).<br>
    * Corresponds to {@link DecimalFormat#setMaximumIntegerDigits(int)}
    * <p>
-   * 
+   *
    * @return
    */
   @ConfigProperty(ConfigProperty.INTEGER)
@@ -129,9 +113,6 @@ public abstract class AbstractNumberField<T extends Number> extends AbstractBasi
     initFormat();
     setRoundingMode(getConfiguredRoundingMode());
     setGroupingUsed(getConfiguredGroupingUsed());
-    if (getConfiguredFormat() != null) {
-      getFormatInternal().applyPattern(getConfiguredFormat());
-    }
     setMinValue(getConfiguredMinValue());
     setMaxValue(getConfiguredMaxValue());
   }
@@ -153,7 +134,7 @@ public abstract class AbstractNumberField<T extends Number> extends AbstractBasi
       setFormat(format);
       if (isInitialized()) {
         if (shouldUpdateDisplayText(false)) {
-          setDisplayText(execFormatValue(getValue()));
+          setDisplayText(interceptFormatValue(getValue()));
         }
       }
     }
@@ -180,7 +161,7 @@ public abstract class AbstractNumberField<T extends Number> extends AbstractBasi
       propertySupport.setProperty(INumberValueContainer.PROP_DECIMAL_FORMAT, newFormat);
       if (isInitialized()) {
         if (shouldUpdateDisplayText(false)) {
-          setDisplayText(execFormatValue(getValue()));
+          setDisplayText(interceptFormatValue(getValue()));
         }
       }
     }
@@ -212,7 +193,7 @@ public abstract class AbstractNumberField<T extends Number> extends AbstractBasi
       setFormat(format);
       if (isInitialized()) {
         if (shouldUpdateDisplayText(false)) {
-          setDisplayText(execFormatValue(getValue()));
+          setDisplayText(interceptFormatValue(getValue()));
         }
       }
     }
@@ -234,7 +215,7 @@ public abstract class AbstractNumberField<T extends Number> extends AbstractBasi
       setFormat(format);
       if (isInitialized()) {
         if (shouldUpdateDisplayText(false)) {
-          setDisplayText(execFormatValue(getValue()));
+          setDisplayText(interceptFormatValue(getValue()));
         }
       }
     }
@@ -248,12 +229,17 @@ public abstract class AbstractNumberField<T extends Number> extends AbstractBasi
     return getFormatInternal().getMaximumIntegerDigits();
   }
 
+  /**
+   * Set the minimum value for this field. If value is <code>null</code>, it is replaced by
+   * {@link #getMinPossibleValue()}.
+   */
   @Override
-  public void setMinValue(T n) {
+  public void setMinValue(NUMBER value) {
+    NUMBER n = (value == null) ? getMinPossibleValue() : value;
     try {
       setFieldChanging(true);
       //
-      T max = getMaxValue();
+      NUMBER max = getMaxValue();
       if (n != null && max != null && compareInternal(n, max) > 0) {
         propertySupport.setProperty(PROP_MAX_VALUE, n);
       }
@@ -269,16 +255,21 @@ public abstract class AbstractNumberField<T extends Number> extends AbstractBasi
 
   @SuppressWarnings("unchecked")
   @Override
-  public T getMinValue() {
-    return (T) propertySupport.getProperty(PROP_MIN_VALUE);
+  public NUMBER getMinValue() {
+    return (NUMBER) propertySupport.getProperty(PROP_MIN_VALUE);
   }
 
+  /**
+   * Set the maximum value for this field. If value is <code>null</code>, it is replaced by
+   * {@link #getMaxPossibleValue()}.
+   */
   @Override
-  public void setMaxValue(T n) {
+  public void setMaxValue(NUMBER value) {
+    NUMBER n = (value == null) ? getMaxPossibleValue() : value;
     try {
       setFieldChanging(true);
       //
-      T min = getMinValue();
+      NUMBER min = getMinValue();
       if (n != null && min != null && compareInternal(n, min) < 0) {
         propertySupport.setProperty(PROP_MIN_VALUE, n);
       }
@@ -294,27 +285,37 @@ public abstract class AbstractNumberField<T extends Number> extends AbstractBasi
 
   @SuppressWarnings("unchecked")
   @Override
-  public T getMaxValue() {
-    return (T) propertySupport.getProperty(PROP_MAX_VALUE);
+  public NUMBER getMaxValue() {
+    return (NUMBER) propertySupport.getProperty(PROP_MAX_VALUE);
   }
 
-  private int compareInternal(T a, T b) {
+  private int compareInternal(NUMBER a, NUMBER b) {
     return CompareUtility.compareTo(NumberUtility.numberToBigDecimal(a), NumberUtility.numberToBigDecimal(b));
   }
 
+  /**
+   * Lower bound for the value (depending on the type)
+   */
+  protected abstract NUMBER getMinPossibleValue();
+
+  /**
+   * Upper bound for the value (depending on the type)
+   */
+  protected abstract NUMBER getMaxPossibleValue();
+
   @Override
-  protected T validateValueInternal(T rawValue) throws ProcessingException {
-    T validValue = null;
+  protected NUMBER validateValueInternal(NUMBER rawValue) throws ProcessingException {
+    NUMBER validValue = null;
     rawValue = super.validateValueInternal(rawValue);
     if (rawValue == null) {
       validValue = null;
     }
     else {
       if (getMaxValue() != null && compareInternal(rawValue, getMaxValue()) > 0) {
-        throw new VetoException(ScoutTexts.get("NumberTooLargeMessageXY", "" + formatValueInternal(getMinValue()), "" + formatValueInternal(getMaxValue())));
+        throwNumberTooLarge();
       }
       if (getMinValue() != null && compareInternal(rawValue, getMinValue()) < 0) {
-        throw new VetoException(ScoutTexts.get("NumberTooSmallMessageXY", "" + formatValueInternal(getMinValue()), "" + formatValueInternal(getMaxValue())));
+        throwNumberTooSmall();
       }
       validValue = rawValue;
     }
@@ -322,7 +323,7 @@ public abstract class AbstractNumberField<T extends Number> extends AbstractBasi
   }
 
   @Override
-  protected String formatValueInternal(T validValue) {
+  protected String formatValueInternal(NUMBER validValue) {
     if (validValue == null) {
       return "";
     }
@@ -330,25 +331,12 @@ public abstract class AbstractNumberField<T extends Number> extends AbstractBasi
     return displayValue;
   }
 
-  /**
-   * @deprecated Will be removed with scout 5.0, use {@link #getFormat()}.
-   */
-  @Deprecated
-  protected NumberFormat createNumberFormat() {
-    return getFormat();
-  }
-
-  @SuppressWarnings("deprecation")
   @Override
-  public INumberFieldUIFacade getUIFacade() {
+  public IBasicFieldUIFacade getUIFacade() {
     return m_uiFacade;
   }
 
-  /**
-   * When {@link INumberFieldUIFacade} is removed, this class will implements IBasicFieldUIFacade.
-   */
-  @SuppressWarnings("deprecation")
-  private class P_UIFacade implements INumberFieldUIFacade {
+  private class P_UIFacade extends AbstractBasicField.P_UIFacade implements IBasicFieldUIFacade {
     @Override
     public boolean setTextFromUI(String newText, boolean whileTyping) {
       if (newText != null && newText.length() == 0) {
@@ -361,7 +349,7 @@ public abstract class AbstractNumberField<T extends Number> extends AbstractBasi
   }
 
   @Override
-  protected abstract T parseValueInternal(String text) throws ProcessingException;
+  protected abstract NUMBER parseValueInternal(String text) throws ProcessingException;
 
   /**
    * Parses text input into a BigDecimal.
@@ -373,7 +361,7 @@ public abstract class AbstractNumberField<T extends Number> extends AbstractBasi
    * <p>
    * If the parsing cannot be done complying these rules and considering {@link #getRoundingMode()} an exception is
    * thrown.
-   * 
+   *
    * @param text
    * @return
    * @throws ProcessingException
@@ -402,18 +390,36 @@ public abstract class AbstractNumberField<T extends Number> extends AbstractBasi
       }
       // check for bad range
       if (getMinValue() != null && retVal.compareTo(NumberUtility.numberToBigDecimal(getMinValue())) < 0) {
-        throw new ProcessingException(ScoutTexts.get("NumberTooSmallMessageXY", String.valueOf(getMinValue()), String.valueOf(getMaxValue())));
+        throwNumberTooSmall();
       }
       if (getMaxValue() != null && retVal.compareTo(NumberUtility.numberToBigDecimal(getMaxValue())) > 0) {
-        throw new ProcessingException(ScoutTexts.get("NumberTooLargeMessageXY", String.valueOf(getMinValue()), String.valueOf(getMaxValue())));
+        throwNumberTooLarge();
       }
     }
     return retVal;
   }
 
+  private void throwNumberTooLarge() throws VetoException {
+    if (getMinValue() == null || CompareUtility.equals(getMinValue(), getMinPossibleValue())) {
+      throw new VetoException(ScoutTexts.get("NumberTooLargeMessageX", formatValueInternal(getMaxValue())));
+    }
+    else {
+      throw new VetoException(ScoutTexts.get("NumberTooLargeMessageXY", formatValueInternal(getMinValue()), formatValueInternal(getMaxValue())));
+    }
+  }
+
+  private void throwNumberTooSmall() throws VetoException {
+    if (getMaxValue() == null || CompareUtility.equals(getMaxValue(), getMaxPossibleValue())) {
+      throw new VetoException(ScoutTexts.get("NumberTooSmallMessageX", formatValueInternal(getMinValue())));
+    }
+    else {
+      throw new VetoException(ScoutTexts.get("NumberTooSmallMessageXY", formatValueInternal(getMinValue()), formatValueInternal(getMaxValue())));
+    }
+  }
+
   /**
    * Rounds the parsed value according {@link #getRoundingMode()}.
-   * 
+   *
    * @throws ArithmeticException
    *           if roundingMode is {@link RoundingMode#UNNECESSARY} but rounding would be needed
    */
@@ -434,5 +440,138 @@ public abstract class AbstractNumberField<T extends Number> extends AbstractBasi
       text = StringUtility.concatenateTokens(text, positiveSuffix);
     }
     return text;
+  }
+
+  /**
+   * Checks whether the given string modification still fulfills the given {@link DecimalFormat} max length constraints.
+   *
+   * @param format
+   *          The {@link DecimalFormat} holding the constraints: {@link DecimalFormat#getMaximumIntegerDigits()},
+   *          {@link DecimalFormat#getMaximumFractionDigits()}.
+   * @param curText
+   *          The current text (before the modification).
+   * @param offset
+   *          The offset of the modification relative to the curText parameter.
+   * @param replaceLen
+   *          How many characters that will be replaced starting at the given offset.
+   * @param insertText
+   *          The new text that should be inserted at the given replace range.
+   * @return <code>true</code> if the given {@link DecimalFormat} length constraints are still fulfilled after the
+   *         string modification has been applied or if the resulting string is no valid number. <code>false</code>
+   *         otherwise. Also returns <code>true</code> if the String can not be parsed as number (e.g. when it contains
+   *         alpha-numerical characters) or is <code>null</code>
+   */
+  public static boolean isWithinNumberFormatLimits(DecimalFormat format, String curText, int offset, int replaceLen, String insertText) {
+    // !! IMPORTANT NOTE: There is also a JavaScript implementation of this method: org/eclipse/scout/rt/ui/rap/form/fields/numberfield/RwtScoutNumberField.js
+    // When changing this implementation also consider updating the js version!
+    if (insertText == null || insertText.length() < 1) {
+      return true;
+    }
+
+    String futureText = null;
+    if (curText == null) {
+      futureText = insertText;
+    }
+    else {
+      StringBuilder docTxt = new StringBuilder(curText.length() + insertText.length());
+      docTxt.append(curText);
+      docTxt.replace(offset, offset + replaceLen, insertText);
+      futureText = docTxt.toString();
+    }
+
+    Pattern pat = Pattern.compile("[^1-9" + format.getDecimalFormatSymbols().getZeroDigit() + "]");
+    String decimalSeparator = String.valueOf(format.getDecimalFormatSymbols().getDecimalSeparator());
+    String[] parts = futureText.split(Pattern.quote(decimalSeparator));
+    if (parts.length >= 1) {
+      String intPartDigits = pat.matcher(parts[0]).replaceAll("");
+      boolean intPartValid = StringUtility.length(intPartDigits) <= format.getMaximumIntegerDigits();
+      if (!intPartValid) {
+        return false;
+      }
+    }
+    if (parts.length == 2) {
+      String fracPartDigits = pat.matcher(parts[1]).replaceAll("");
+      boolean fracPartValid = StringUtility.length(fracPartDigits) <= format.getMaximumFractionDigits();
+      if (!fracPartValid) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Creates a new string which fulfills the given {@link DecimalFormat} max length constraints. An exception is thrown
+   * if the number's digits before the decimal point be cut off. It the number's digits after the decimal point would be
+   * cut off, no exception is thrown.
+   *
+   * @param format
+   *          The {@link DecimalFormat} holding the constraints: {@link DecimalFormat#getMaximumIntegerDigits()},
+   *          {@link DecimalFormat#getMaximumFractionDigits()}.
+   * @param curText
+   *          The current text (before the modification).
+   * @param offset
+   *          The offset of the modification relative to the curText parameter.
+   * @param replaceLen
+   *          How many characters that will be replaced starting at the given offset.
+   * @param insertText
+   *          The new text that should be inserted at the given replace range.
+   * @return String that fulfills the given {@link DecimalFormat} length constraints
+   * @throws throws a {@link ProcessingException} if the number's digits before the decimal point would be cut off
+   */
+  public static String createNumberWithinFormatLimits(DecimalFormat format, String curText, int offset, int replaceLen, String insertText) throws ProcessingException {
+    // !! IMPORTANT NOTE: There is also a JavaScript implementation of this method: org/eclipse/scout/rt/ui/rap/form/fields/numberfield/RwtScoutNumberField.js
+    // When changing this implementation also consider updating the js version!
+    if (insertText == null || insertText.length() < 1) {
+      insertText = "";
+    }
+    StringBuilder result = new StringBuilder();
+
+    String futureText = null;
+    if (curText == null) {
+      futureText = insertText;
+    }
+    else {
+      StringBuilder docTxt = new StringBuilder(curText.length() + insertText.length());
+      docTxt.append(curText);
+      docTxt.replace(offset, offset + replaceLen, insertText);
+      futureText = docTxt.toString();
+    }
+
+    Pattern pat = Pattern.compile("[^1-9" + format.getDecimalFormatSymbols().getZeroDigit() + "]");
+    String decimalSeparator = String.valueOf(format.getDecimalFormatSymbols().getDecimalSeparator());
+    String[] parts = futureText.split(Pattern.quote(decimalSeparator));
+    if (parts.length >= 1) {
+      String intPartDigits = pat.matcher(parts[0]).replaceAll("");
+      boolean intPartValid = StringUtility.length(intPartDigits) <= format.getMaximumIntegerDigits();
+      if (intPartValid) {
+        result.append(intPartDigits);
+      }
+      else {
+        throw new ProcessingException("Do not truncate integer digits!");
+      }
+    }
+    if (parts.length == 2) {
+      String fracPartDigits = pat.matcher(parts[1]).replaceAll("");
+      boolean fracPartValid = StringUtility.length(fracPartDigits) <= format.getMaximumFractionDigits();
+      if (fracPartValid) {
+        result.append(decimalSeparator + fracPartDigits);
+      }
+      else {
+        result.append(decimalSeparator + fracPartDigits.substring(0, format.getMaximumFractionDigits()));
+      }
+    }
+    return result.toString();
+  }
+
+  protected static class LocalNumberFieldExtension<NUMBER extends Number, OWNER extends AbstractNumberField<NUMBER>> extends LocalBasicFieldExtension<NUMBER, OWNER> implements INumberFieldExtension<NUMBER, OWNER> {
+
+    public LocalNumberFieldExtension(OWNER owner) {
+      super(owner);
+    }
+  }
+
+  @Override
+  protected INumberFieldExtension<NUMBER, ? extends AbstractNumberField<NUMBER>> createLocalExtension() {
+    return new LocalNumberFieldExtension<NUMBER, AbstractNumberField<NUMBER>>(this);
   }
 }

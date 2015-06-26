@@ -39,6 +39,7 @@ import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.IClientSession;
 import org.eclipse.scout.rt.client.ui.IDNDSupport;
+import org.eclipse.scout.rt.client.ui.MouseButton;
 import org.eclipse.scout.rt.client.ui.action.IAction;
 import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
 import org.eclipse.scout.rt.client.ui.action.keystroke.KeyStroke;
@@ -82,9 +83,6 @@ public final class RwtUtility {
   public static final String VARIANT_LISTBOX_DISABLED = "listboxDisabled";
   public static final String VARIANT_EMPTY = "empty";
 
-  public static final String VARIANT_COMPOSITE_INPUT_FIELD_BORDER = "inputField";
-  public static final String VARIANT_COMPOSITE_INPUT_FIELD_BORDER_READONLY = "inputField-readOnly";
-
   private static final Map<String, Integer> SCOUT_RWT_KEY_MAP;
   private static final Map<Integer, String> RWT_SCOUT_KEY_MAP;
 
@@ -95,7 +93,7 @@ public final class RwtUtility {
 
   /**
    * Convenience method to get the environment from the client session
-   * 
+   *
    * @param session
    *          the clientsession from the current thread
    */
@@ -106,7 +104,7 @@ public final class RwtUtility {
 
   /**
    * Convenience method to get the environment from the display
-   * 
+   *
    * @param display
    *          the display from the current thread
    */
@@ -117,7 +115,7 @@ public final class RwtUtility {
 
   /**
    * Convenience method to get the locale from the current client session
-   * 
+   *
    * @param display
    *          the display from the current thread
    */
@@ -536,6 +534,17 @@ public final class RwtUtility {
     return null;
   }
 
+  public static MouseButton rwtToScoutMouseButton(int rwtButton) {
+    switch (rwtButton) {
+      case 1:
+        return MouseButton.Left;
+      case 3:
+        return MouseButton.Right;
+      default:
+        return MouseButton.Unknown;
+    }
+  }
+
   public static IRwtKeyStroke[] getKeyStrokes(IKeyStroke stroke, IRwtEnvironment uiEnvironment) {
     ArrayList<IRwtKeyStroke> uiKeyStrokes = new ArrayList<IRwtKeyStroke>();
     int keycode = getRwtKeyCode(stroke);
@@ -568,7 +577,7 @@ public final class RwtUtility {
    * of zero or more SWT key modifier masks (i.e. SWT.CTRL or SWT.ALT) and a
    * character code).<br>
    * For example if the keyStroke is defined as 'control-alt-f1' the method will return SWT.F1
-   * 
+   *
    * @param stroke
    * @return
    */
@@ -584,7 +593,7 @@ public final class RwtUtility {
 
   /**
    * Converts a scoutKey to an Rwt key. For example 'f11' will be converted to SWT.F11
-   * 
+   *
    * @param scoutKey
    *          must be lowercase, e.g. f11 instead of F11
    * @return Rwt key
@@ -620,13 +629,13 @@ public final class RwtUtility {
     if (keyText == null) {
       return null;
     }
-    if (keyText.equals("shift")) {
+    if ("shift".equals(keyText)) {
       return null;
     }
-    if (keyText.equals("ctrl")) {
+    if ("ctrl".equals(keyText)) {
       return null;
     }
-    if (keyText.equals("alt")) {
+    if ("alt".equals(keyText)) {
       return null;
     }
     StringBuffer buf = new StringBuffer();
@@ -1179,6 +1188,10 @@ public final class RwtUtility {
     // RWT_SCOUT_KEY_MAP.put((int) KeyEvent.VK_ALT_GRAPH, "alt_graph");
   }
 
+  public static Map<String, Integer> getScoutRwtKeyMap() {
+    return SCOUT_RWT_KEY_MAP;
+  }
+
   /**
    * Since there is no way to easily delegate and simulate up/down pageup/pagedown events on trees, tables and other
    * widgets,
@@ -1249,7 +1262,7 @@ public final class RwtUtility {
               tree.setTopItem(next);
             }
           }
-          */
+           */
           break;
         case SWT.PAGE_UP:
           //XXX rap
@@ -1279,7 +1292,7 @@ public final class RwtUtility {
               tree.setTopItem(next);
             }
           }
-          */
+           */
           break;
       }
       if (next != null) {
@@ -1508,7 +1521,7 @@ public final class RwtUtility {
 
   /**
    * Escapes every mnemonic character '&' in the string by simply doubling the character.
-   * 
+   *
    * @param text
    *          the string to be escaped, also <code>null</code> or empty string values are allowed
    * @return the escaped string
@@ -1522,16 +1535,8 @@ public final class RwtUtility {
   }
 
   /**
-   * @deprecated Use {@link #runUiInputVerifier(Control)} instead. Will be removed in the 5.0 Release.
-   */
-  @Deprecated
-  public static void verifyUiInput(Control control) {
-    runUiInputVerifier(control);
-  }
-
-  /**
    * Run the inputVerifier on the currently focused control. See {@link #runUiInputVerifier(Control)} for more details.
-   * 
+   *
    * @since 3.10.0-M5
    */
   public static void runUiInputVerifier() {
@@ -1560,7 +1565,7 @@ public final class RwtUtility {
    * <ul>
    * <li>control-alternate-f1 --> Ctrl+Alt+F1
    * </ul>
-   * 
+   *
    * @since 3.10.0-M4
    */
   public static String getKeyStrokePrettyPrinted(IAction scoutAction) {
@@ -1573,7 +1578,7 @@ public final class RwtUtility {
   /**
    * Pretty printed version of the key stroke.
    * See {@link RwtUtility#getKeyStrokePrettyPrinted(IAction)}
-   * 
+   *
    * @since 3.10.0-M4
    */
   public static String getKeyStrokePrettyPrinted(String s) {

@@ -17,6 +17,7 @@ import org.eclipse.scout.commons.ConfigurationUtility;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
 import org.eclipse.scout.commons.annotations.Order;
+import org.eclipse.scout.commons.annotations.OrderedCollection;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.exception.VetoException;
 import org.eclipse.scout.commons.holders.IHolder;
@@ -108,7 +109,7 @@ public abstract class AbstractDesktopExtension implements IDesktopExtension {
   }
 
   @Override
-  public void contributeOutlines(Collection<IOutline> outlines) {
+  public void contributeOutlines(OrderedCollection<IOutline> outlines) {
     List<Class<? extends IOutline>> contributedOutlines = getConfiguredOutlines();
     if (contributedOutlines == null) {
       return;
@@ -116,7 +117,7 @@ public abstract class AbstractDesktopExtension implements IDesktopExtension {
     for (Class<? extends IOutline> element : contributedOutlines) {
       try {
         IOutline o = element.newInstance();
-        outlines.add(o);
+        outlines.addOrdered(o);
       }
       catch (Throwable t) {
         SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + element.getName() + "'.", t));
@@ -150,7 +151,7 @@ public abstract class AbstractDesktopExtension implements IDesktopExtension {
    * Called while this desktop extension is initialized.
    * <p>
    * Subclasses can override this method. The default simply returns {@link ContributionCommand.Continue}.
-   * 
+   *
    * @return {@code ContributionCommand.Continue} if further extensions should be processed,
    *         {@code ContributionCommand.Stop} otherwise
    * @throws ProcessingException
@@ -169,7 +170,7 @@ public abstract class AbstractDesktopExtension implements IDesktopExtension {
    * Called after the core desktop was opened and displayed on the GUI.
    * <p>
    * Subclasses can override this method. The default simply returns {@link ContributionCommand.Continue}.
-   * 
+   *
    * @return {@code ContributionCommand.Continue} if further extensions should be processed,
    *         {@code ContributionCommand.Stop} otherwise
    * @throws ProcessingException
@@ -184,7 +185,7 @@ public abstract class AbstractDesktopExtension implements IDesktopExtension {
    * Called just after the core desktop receives the request to close the desktop.
    * This allows the desktop extension to execute custom code before the desktop gets into its closing state.
    * By throwing an explicit {@link VetoException} the closing process will be stopped.
-   * 
+   *
    * @return {@code ContributionCommand.Continue} if further extensions should be processed,
    *         {@code ContributionCommand.Stop} otherwise
    * @throws ProcessingException
@@ -199,7 +200,7 @@ public abstract class AbstractDesktopExtension implements IDesktopExtension {
    * Called before the core desktop is being closed.
    * <p>
    * Subclasses can override this method. The default simply returns {@link ContributionCommand.Continue}.
-   * 
+   *
    * @return {@code ContributionCommand.Continue} if further extensions should be processed,
    *         {@code ContributionCommand.Stop} otherwise
    * @throws ProcessingException
@@ -214,7 +215,7 @@ public abstract class AbstractDesktopExtension implements IDesktopExtension {
    * Called after a UI has been attached to the core desktop. The desktop must not necessarily be open.
    * <p>
    * Subclasses can override this method. The default simply returns {@link ContributionCommand.Continue}.
-   * 
+   *
    * @return {@code ContributionCommand.Continue} if further extensions should be processed,
    *         {@code ContributionCommand.Stop} otherwise
    * @throws ProcessingException
@@ -229,7 +230,7 @@ public abstract class AbstractDesktopExtension implements IDesktopExtension {
    * Called after a UI has been detached from the core desktop. The desktop must not necessarily be open.
    * <p>
    * Subclasses can override this method. The default simply returns {@link ContributionCommand.Continue}.
-   * 
+   *
    * @return {@code ContributionCommand.Continue} if further extensions should be processed,
    *         {@code ContributionCommand.Stop} otherwise
    * @throws ProcessingException
@@ -244,7 +245,7 @@ public abstract class AbstractDesktopExtension implements IDesktopExtension {
    * Called whenever a new outline has been activated on the core desktop.
    * <p>
    * Subclasses can override this method. The default simply returns {@link ContributionCommand.Continue}.
-   * 
+   *
    * @param oldOutline
    *          old outline that was active before
    * @param newOutline
@@ -267,7 +268,7 @@ public abstract class AbstractDesktopExtension implements IDesktopExtension {
    * or even replace it with a different instance.
    * <p>
    * Subclasses can override this method. The default simply returns {@link ContributionCommand.Continue}.
-   * 
+   *
    * @param formHolder
    *          contains the form that will be added to the core desktop
    * @return {@code ContributionCommand.Continue} if further extensions should be processed,
@@ -281,7 +282,7 @@ public abstract class AbstractDesktopExtension implements IDesktopExtension {
    * Called whenever a new page has been activated (selected) on the core desktop.
    * <p>
    * Subclasses can override this method. The default simply returns {@link ContributionCommand.Continue}.
-   * 
+   *
    * @param oldForm
    *          is the search form of the old (not selected anymore) page or {@code null}
    * @param newForm
@@ -300,7 +301,7 @@ public abstract class AbstractDesktopExtension implements IDesktopExtension {
    * Called whenever a new page has been activated (selected) on the core desktop.
    * <p>
    * Subclasses can override this method. The default simply returns {@link ContributionCommand.Continue}.
-   * 
+   *
    * @param oldForm
    *          is the detail form of the old (not selected anymore) page or {@code null}
    * @param newForm
@@ -319,7 +320,7 @@ public abstract class AbstractDesktopExtension implements IDesktopExtension {
    * Called whenever a new page has been activated (selected) on the core desktop.
    * <p>
    * Subclasses can override this method. The default simply returns {@link ContributionCommand.Continue}.
-   * 
+   *
    * @param oldTable
    *          is the table of the old (not selected anymore) table page or {@code null}
    * @param newTable
@@ -338,7 +339,7 @@ public abstract class AbstractDesktopExtension implements IDesktopExtension {
    * Called after a table page was loaded or reloaded.
    * <p>
    * Subclasses can override this method. The default simply returns {@link ContributionCommand.Continue}.
-   * 
+   *
    * @param tablePage
    *          the table page that has been (re)loaded
    * @return {@code ContributionCommand.Continue} if further extensions should be processed,
@@ -359,7 +360,7 @@ public abstract class AbstractDesktopExtension implements IDesktopExtension {
    * called on each and then checked if the menu is visible.
    * <p>
    * Subclasses can override this method. The default simply returns {@link ContributionCommand.Continue}.
-   * 
+   *
    * @param menus
    *          a live list to add menus to the tray
    * @return {@code ContributionCommand.Continue} if further extensions should be processed,
@@ -377,7 +378,7 @@ public abstract class AbstractDesktopExtension implements IDesktopExtension {
    * are automatically added to the core desktop which holds this extension.
    * <p>
    * Subclasses can override this method. Default is {@code null}.
-   * 
+   *
    * @return an array of outline type tokens
    * @see IOutline
    */

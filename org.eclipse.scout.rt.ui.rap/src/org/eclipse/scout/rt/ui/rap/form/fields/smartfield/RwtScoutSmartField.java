@@ -428,7 +428,7 @@ public class RwtScoutSmartField extends RwtScoutValueFieldComposite<IContentAssi
       }
       m_proposalPopup.showPart();
     }
-    catch (Throwable e1) {
+    catch (Exception e1) {
       LOG.error(e1.getLocalizedMessage(), e1);
     }
   }

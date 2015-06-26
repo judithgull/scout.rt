@@ -21,6 +21,9 @@ import org.eclipse.scout.commons.annotations.ConfigProperty;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.decimalfield.IDecimalFieldExtension;
+import org.eclipse.scout.rt.client.ui.form.fields.AbstractBasicField;
+import org.eclipse.scout.rt.client.ui.form.fields.IBasicFieldUIFacade;
 import org.eclipse.scout.rt.client.ui.form.fields.numberfield.AbstractNumberField;
 import org.eclipse.scout.rt.client.ui.valuecontainer.IDecimalValueContainer;
 
@@ -28,8 +31,7 @@ import org.eclipse.scout.rt.client.ui.valuecontainer.IDecimalValueContainer;
 public abstract class AbstractDecimalField<T extends Number> extends AbstractNumberField<T> implements IDecimalField<T> {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractDecimalField.class);
 
-  @SuppressWarnings("deprecation")
-  private IDecimalFieldUIFacade m_uiFacade;
+  private IBasicFieldUIFacade m_uiFacade;
 
   public AbstractDecimalField() {
     this(true);
@@ -121,7 +123,6 @@ public abstract class AbstractDecimalField<T extends Number> extends AbstractNum
     return RoundingMode.HALF_UP;
   }
 
-  @SuppressWarnings("deprecation")
   @Override
   protected void initConfig() {
     m_uiFacade = new P_UIFacade();
@@ -132,9 +133,6 @@ public abstract class AbstractDecimalField<T extends Number> extends AbstractNum
     setPercent(getConfiguredPercent());
     setFractionDigits(getConfiguredFractionDigits());
     setMultiplier(getConfiguredMultiplier());
-    if (getConfiguredFormat() != null) {
-      getFormatInternal().applyPattern(getConfiguredFormat());
-    }
   }
 
   @Override
@@ -147,7 +145,7 @@ public abstract class AbstractDecimalField<T extends Number> extends AbstractNum
       //
       if (isInitialized()) {
         if (shouldUpdateDisplayText(false)) {
-          setDisplayText(execFormatValue(getValue()));
+          setDisplayText(interceptFormatValue(getValue()));
         }
       }
     }
@@ -171,7 +169,7 @@ public abstract class AbstractDecimalField<T extends Number> extends AbstractNum
       setFormat(format);
       if (isInitialized()) {
         if (shouldUpdateDisplayText(false)) {
-          setDisplayText(execFormatValue(getValue()));
+          setDisplayText(interceptFormatValue(getValue()));
         }
       }
     }
@@ -204,7 +202,7 @@ public abstract class AbstractDecimalField<T extends Number> extends AbstractNum
 
       if (isInitialized()) {
         if (shouldUpdateDisplayText(false)) {
-          setDisplayText(execFormatValue(getValue()));
+          setDisplayText(interceptFormatValue(getValue()));
         }
       }
     }
@@ -258,16 +256,15 @@ public abstract class AbstractDecimalField<T extends Number> extends AbstractNum
     return getFormatInternal().getMultiplier();
   }
 
-  @SuppressWarnings("deprecation")
   @Override
-  public IDecimalFieldUIFacade getUIFacade() {
+  public IBasicFieldUIFacade getUIFacade() {
     return m_uiFacade;
   }
 
   /**
    * Rounds the parsed value according {@link #getRoundingMode()} and {@link #getParsingFractionDigits()}. (The maximum
    * fraction digits used for parsing is adapted to {@link #getMultiplier()} if needed.)
-   * 
+   *
    * @throws ArithmeticException
    *           if roundingMode is {@link RoundingMode#UNNECESSARY} but rounding would be needed
    */
@@ -279,11 +276,7 @@ public abstract class AbstractDecimalField<T extends Number> extends AbstractNum
     return valBeforeRounding.round(new MathContext(precision, getRoundingMode()));
   }
 
-  /**
-   * When {@link IDecimalFieldUIFacade} is removed, this class will implement IBasicFieldUIFacade.
-   */
-  @SuppressWarnings("deprecation")
-  private class P_UIFacade implements IDecimalFieldUIFacade {
+  private class P_UIFacade extends AbstractBasicField.P_UIFacade implements IBasicFieldUIFacade {
     @Override
     public boolean setTextFromUI(String newText, boolean whileTyping) {
       if (newText != null && newText.length() == 0) {
@@ -294,5 +287,17 @@ public abstract class AbstractDecimalField<T extends Number> extends AbstractNum
       return parseValue(newText);
     }
 
+  }
+
+  protected static class LocalDecimalFieldExtension<T extends Number, OWNER extends AbstractDecimalField<T>> extends LocalNumberFieldExtension<T, OWNER> implements IDecimalFieldExtension<T, OWNER> {
+
+    public LocalDecimalFieldExtension(OWNER owner) {
+      super(owner);
+    }
+  }
+
+  @Override
+  protected IDecimalFieldExtension<T, ? extends AbstractDecimalField<T>> createLocalExtension() {
+    return new LocalDecimalFieldExtension<T, AbstractDecimalField<T>>(this);
   }
 }

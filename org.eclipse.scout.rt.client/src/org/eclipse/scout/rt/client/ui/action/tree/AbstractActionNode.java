@@ -11,23 +11,32 @@
 package org.eclipse.scout.rt.client.ui.action.tree;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.ConfigurationUtility;
 import org.eclipse.scout.commons.ITypeWithClassId;
+import org.eclipse.scout.commons.annotations.OrderedCollection;
+import org.eclipse.scout.commons.annotations.OrderedComparator;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.extension.ui.action.tree.IActionNodeExtension;
 import org.eclipse.scout.rt.client.ui.action.AbstractAction;
 import org.eclipse.scout.rt.client.ui.action.IAction;
 import org.eclipse.scout.rt.client.ui.action.IActionVisitor;
+import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
+import org.eclipse.scout.rt.shared.extension.ContributionComposite;
+import org.eclipse.scout.rt.shared.extension.IContributionOwner;
 import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.service.SERVICES;
 
-public abstract class AbstractActionNode<T extends IActionNode> extends AbstractAction implements IActionNode<T> {
+public abstract class AbstractActionNode<T extends IActionNode> extends AbstractAction implements IActionNode<T>, IContributionOwner {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractActionNode.class);
   private T m_parent;
+  private IContributionOwner m_contributionHolder;
 
   public AbstractActionNode() {
     super();
@@ -37,14 +46,28 @@ public abstract class AbstractActionNode<T extends IActionNode> extends Abstract
     super(callInitializer);
   }
 
+  @Override
+  public final List<Object> getAllContributions() {
+    return m_contributionHolder.getAllContributions();
+  }
+
+  @Override
+  public final <TYPE> List<TYPE> getContributionsByClass(Class<TYPE> type) {
+    return m_contributionHolder.getContributionsByClass(type);
+  }
+
+  @Override
+  public final <TYPE> TYPE getContribution(Class<TYPE> contribution) {
+    return m_contributionHolder.getContribution(contribution);
+  }
+
   /*
    * Configuration
    */
-  private List<? extends Class<? extends IActionNode>> getConfiguredChildActions() {
+  private List<Class<? extends IActionNode>> getConfiguredChildActions() {
     Class[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
     List<Class<IActionNode>> filtered = ConfigurationUtility.filterClasses(dca, IActionNode.class);
-    List<Class<? extends IActionNode>> foca = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(filtered, IActionNode.class);
-    return ConfigurationUtility.removeReplacedClasses(foca);
+    return ConfigurationUtility.removeReplacedClasses(filtered);
   }
 
   @Override
@@ -52,39 +75,43 @@ public abstract class AbstractActionNode<T extends IActionNode> extends Abstract
   protected void initConfig() {
     super.initConfig();
     // menus
-    List<T> nodeList = new ArrayList<T>();
-    List<? extends Class<? extends IActionNode>> ma = getConfiguredChildActions();
-    for (Class<? extends IActionNode> a : ma) {
+    List<Class<? extends IActionNode>> configuredChildActions = getConfiguredChildActions();
+    OrderedCollection<T> actionNodes = new OrderedCollection<T>();
+    for (Class<? extends IActionNode> a : configuredChildActions) {
 
       try {
         IActionNode node = ConfigurationUtility.newInnerInstance(this, a);
         node.setParent(this);
-        nodeList.add((T) node);
+        actionNodes.addOrdered((T) node);
       }
       catch (Exception e) {
         SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + a.getName() + "'.", e));
       }
     }
-
+    m_contributionHolder = new ContributionComposite(this);
+    List<IActionNode> contributedActions = m_contributionHolder.getContributionsByClass(IActionNode.class);
+    for (IActionNode n : contributedActions) {
+      actionNodes.addOrdered((T) n);
+    }
     try {
-      injectActionNodesInternal(nodeList);
+      injectActionNodesInternal(actionNodes);
     }
     catch (Exception e) {
       LOG.error("error occured while dynamically contribute action nodes.", e);
     }
     // add
-    setChildActions(nodeList);
+    setChildActions(actionNodes.getOrderedList());
   }
 
   /**
    * Override this internal method only in order to make use of dynamic menus<br>
-   * Used to manage menu list and add/remove menus
-   * 
+   * Used to add/remove menus.<br>
+   * To change the order or specify the insert position use {@link IMenu#setOrder(double)}.
+   *
    * @param fieldList
-   *          live and mutable list of configured menus, not yet initialized
-   *          and added to composite field
+   *          live and mutable collection of configured menus, not yet initialized
    */
-  protected void injectActionNodesInternal(List<T> nodeList) {
+  protected void injectActionNodesInternal(OrderedCollection<T> actionNodes) {
   }
 
   @Override
@@ -117,23 +144,6 @@ public abstract class AbstractActionNode<T extends IActionNode> extends Abstract
     m_parent = parent;
   }
 
-  /**
-   * override to prepare child menus as well
-   * 
-   * @throws ProcessingException
-   */
-  @SuppressWarnings("deprecation")
-  @Override
-  protected void prepareActionInternal() throws ProcessingException {
-    super.prepareActionInternal();
-    // child menus
-    if (hasChildActions()) {
-      for (T node : getChildActionsInternal()) {
-        node.prepareAction();
-      }
-    }
-  }
-
   private List<T> getChildActionsInternal() {
     return propertySupport.getPropertyList(PROP_CHILD_ACTIONS);
   }
@@ -154,7 +164,7 @@ public abstract class AbstractActionNode<T extends IActionNode> extends Abstract
   }
 
   @Override
-  public void setChildActions(List<? extends T> newList) {
+  public void setChildActions(Collection<? extends T> newList) {
     // remove old
     removeChildActions(getChildActionsInternal());
     // add new
@@ -167,7 +177,7 @@ public abstract class AbstractActionNode<T extends IActionNode> extends Abstract
   }
 
   @Override
-  public void addChildActions(List<? extends T> actionList) {
+  public void addChildActions(Collection<? extends T> actionList) {
     List<T> normalizedList = CollectionUtility.arrayListWithoutNullElements(actionList);
     if (!normalizedList.isEmpty()) {
       setContainerOnActions(normalizedList);
@@ -176,6 +186,7 @@ public abstract class AbstractActionNode<T extends IActionNode> extends Abstract
         childList = new ArrayList<T>(normalizedList.size());
       }
       childList.addAll(normalizedList);
+      Collections.sort(childList, new OrderedComparator());
       propertySupport.setPropertyAlwaysFire(PROP_CHILD_ACTIONS, childList);
     }
   }
@@ -186,7 +197,7 @@ public abstract class AbstractActionNode<T extends IActionNode> extends Abstract
   }
 
   @Override
-  public void removeChildActions(List<? extends T> actionList) {
+  public void removeChildActions(Collection<? extends T> actionList) {
     List<T> normalizedList = CollectionUtility.arrayListWithoutNullElements(actionList);
     if (!normalizedList.isEmpty()) {
       List<T> childList = getChildActionsInternal();
@@ -226,6 +237,18 @@ public abstract class AbstractActionNode<T extends IActionNode> extends Abstract
       }
     }
     return IActionVisitor.CONTINUE;
+  }
+
+  protected static class LocalActionNodeExtension<T extends IActionNode, OWNER extends AbstractActionNode<T>> extends LocalActionExtension<OWNER> implements IActionNodeExtension<T, OWNER> {
+
+    public LocalActionNodeExtension(OWNER owner) {
+      super(owner);
+    }
+  }
+
+  @Override
+  protected IActionNodeExtension<T, ? extends AbstractActionNode<T>> createLocalExtension() {
+    return new LocalActionNodeExtension<T, AbstractActionNode<T>>(this);
   }
 
 }

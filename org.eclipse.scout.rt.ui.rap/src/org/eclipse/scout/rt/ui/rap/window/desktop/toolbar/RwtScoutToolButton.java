@@ -27,10 +27,12 @@ public class RwtScoutToolButton extends RwtScoutComposite<IAction> implements IR
   private final boolean m_textVisible;
   private String m_variantInActive;
   private String m_variantActive;
+  private boolean m_radioBehaviour;
 
-  public RwtScoutToolButton(boolean textVisible, boolean iconVisible, String variantInActive, String variantActive) {
+  public RwtScoutToolButton(boolean textVisible, boolean iconVisible, boolean radioBehaviour, String variantInActive, String variantActive) {
     m_textVisible = textVisible;
     m_iconVisible = iconVisible;
+    m_radioBehaviour = radioBehaviour;
     m_variantInActive = variantInActive;
     m_variantActive = variantActive;
   }
@@ -45,7 +47,13 @@ public class RwtScoutToolButton extends RwtScoutComposite<IAction> implements IR
 
       @Override
       public void widgetSelected(SelectionEvent e) {
-        handleUiSelection();
+        e.doit = false;
+        if (!m_radioBehaviour) {
+          handleUiSelection(getUiField().getSelection());
+        }
+        else if (getUiField().getSelection()) {
+          handleUiSelection(getUiField().getSelection());
+        }
       }
     });
   }
@@ -66,11 +74,12 @@ public class RwtScoutToolButton extends RwtScoutComposite<IAction> implements IR
     return (Button) super.getUiField();
   }
 
-  protected void handleUiSelection() {
+  protected void handleUiSelection(final boolean selection) {
     //notify Scout
     Runnable t = new Runnable() {
       @Override
       public void run() {
+        getScoutObject().getUIFacade().setSelectedFromUI(selection);
         getScoutObject().getUIFacade().fireActionFromUI();
       }
     };
@@ -122,7 +131,7 @@ public class RwtScoutToolButton extends RwtScoutComposite<IAction> implements IR
   }
 
   /**
-   * @since 4.1.0 (backported)
+   * @since 4.1.0
    */
   protected void updateTooltipTextFromScout() {
     getUiField().setToolTipText(getScoutObject().getTooltipText());

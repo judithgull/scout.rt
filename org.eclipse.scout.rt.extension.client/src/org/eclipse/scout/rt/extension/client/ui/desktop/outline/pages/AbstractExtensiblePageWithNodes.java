@@ -10,9 +10,9 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.extension.client.ui.desktop.outline.pages;
 
-import java.util.Collection;
 import java.util.List;
 
+import org.eclipse.scout.commons.annotations.OrderedCollection;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 import org.eclipse.scout.rt.client.ui.desktop.outline.pages.AbstractPageWithNodes;
@@ -26,7 +26,7 @@ import org.eclipse.scout.rt.extension.client.ui.action.menu.MenuExtensionUtility
  * <li>adding, removing and modifying statically configured pages</li>
  * <li>adding, removing and modifying statically configured menus</li>
  * </ul>
- * 
+ *
  * @since 3.9.0
  */
 public abstract class AbstractExtensiblePageWithNodes extends AbstractPageWithNodes implements IExtensibleScoutObject {
@@ -71,14 +71,14 @@ public abstract class AbstractExtensiblePageWithNodes extends AbstractPageWithNo
   }
 
   @Override
-  protected void createChildPagesInternal(Collection<IPage> pageList) throws ProcessingException {
+  protected void createChildPagesInternal(List<IPage> pageList) throws ProcessingException {
     super.createChildPagesInternal(pageList);
     PageExtensionUtility.adaptPageWithNodes(this, pageList);
   }
 
   @Override
-  protected void injectMenusInternal(List<IMenu> menuList) {
-    super.injectMenusInternal(menuList);
-    MenuExtensionUtility.adaptMenus(this, this, menuList);
+  protected void injectMenusInternal(OrderedCollection<IMenu> menus) {
+    super.injectMenusInternal(menus);
+    MenuExtensionUtility.adaptMenus(this, this, menus);
   }
 }

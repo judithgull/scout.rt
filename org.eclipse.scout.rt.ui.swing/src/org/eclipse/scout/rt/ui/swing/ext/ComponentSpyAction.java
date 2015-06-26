@@ -602,11 +602,7 @@ public class ComponentSpyAction extends AbstractAction {
     }
   }
 
-  static interface ITreeVisitor {
+  interface ITreeVisitor {
     void visit(TreeNode node);
-  }
-
-  public static void main(String[] args) {
-    new ComponentSpyAction().actionPerformed(null);
   }
 }

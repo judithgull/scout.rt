@@ -22,10 +22,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
 import org.eclipse.scout.commons.CollectionUtility;
+import org.eclipse.scout.commons.CompareUtility;
 import org.eclipse.scout.commons.CompositeLong;
 import org.eclipse.scout.commons.CompositeObject;
 import org.eclipse.scout.commons.ConfigurationUtility;
@@ -35,30 +37,50 @@ import org.eclipse.scout.commons.TypeCastUtility;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
 import org.eclipse.scout.commons.annotations.Order;
+import org.eclipse.scout.commons.annotations.OrderedCollection;
 import org.eclipse.scout.commons.beans.AbstractPropertyObserver;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.extension.ui.action.tree.MoveActionNodesHandler;
+import org.eclipse.scout.rt.client.extension.ui.basic.activitymap.ActivityMapChains.ActivityMapActivityCellSelectedChain;
+import org.eclipse.scout.rt.client.extension.ui.basic.activitymap.ActivityMapChains.ActivityMapCellActionChain;
+import org.eclipse.scout.rt.client.extension.ui.basic.activitymap.ActivityMapChains.ActivityMapCreateTimeScaleChain;
+import org.eclipse.scout.rt.client.extension.ui.basic.activitymap.ActivityMapChains.ActivityMapDecorateActivityCellChain;
+import org.eclipse.scout.rt.client.extension.ui.basic.activitymap.ActivityMapChains.ActivityMapDecorateMajorTimeColumnChain;
+import org.eclipse.scout.rt.client.extension.ui.basic.activitymap.ActivityMapChains.ActivityMapDecorateMinorTimeColumnChain;
+import org.eclipse.scout.rt.client.extension.ui.basic.activitymap.ActivityMapChains.ActivityMapDisposeActivityMapChain;
+import org.eclipse.scout.rt.client.extension.ui.basic.activitymap.ActivityMapChains.ActivityMapInitActivityMapChain;
+import org.eclipse.scout.rt.client.extension.ui.basic.activitymap.IActivityMapExtension;
 import org.eclipse.scout.rt.client.ui.action.ActionUtility;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.root.IActivityMapContextMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.root.internal.ActivityMapContextMenu;
+import org.eclipse.scout.rt.shared.extension.AbstractExtension;
+import org.eclipse.scout.rt.shared.extension.ContributionComposite;
+import org.eclipse.scout.rt.shared.extension.IContributionOwner;
+import org.eclipse.scout.rt.shared.extension.IExtensibleObject;
+import org.eclipse.scout.rt.shared.extension.IExtension;
+import org.eclipse.scout.rt.shared.extension.ObjectExtensions;
 import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.service.SERVICES;
 
-public abstract class AbstractActivityMap<RI, AI> extends AbstractPropertyObserver implements IActivityMap<RI, AI> {
+public abstract class AbstractActivityMap<RI, AI> extends AbstractPropertyObserver implements IActivityMap<RI, AI>, IContributionOwner, IExtensibleObject {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractActivityMap.class);
 
   private boolean m_initialized;
   private EventListenerList m_listenerList;
   private IActivityMapUIFacade m_activityMapUIFacade;
   private long m_minimumActivityDuration;// millis
-  private HashMap<RI/* resourceId */, List<ActivityCell<RI, AI>>> m_resourceIdToActivities;
-  private HashMap<CompositeObject/* resourceId,activityId */, ActivityCell<RI, AI>> m_activities;
-  private HashSet<RI/* resourceId */> m_selectedResourceIds;
+  private Map<RI/* resourceId */, List<ActivityCell<RI, AI>>> m_resourceIdToActivities;
+  private Map<CompositeObject/* resourceId,activityId */, ActivityCell<RI, AI>> m_activities;
+  private Set<RI/* resourceId */> m_selectedResourceIds;
   private int m_tableChanging;
-  private ArrayList<ActivityMapEvent> m_eventBuffer = new ArrayList<ActivityMapEvent>();
-  private List<IMenu> m_menus;
+  private List<ActivityMapEvent> m_eventBuffer = new ArrayList<ActivityMapEvent>();
   private IActivityCellObserver<RI, AI> m_cellObserver;
   private boolean m_timeScaleValid;
+  private IContributionOwner m_contributionHolder;
+  private final ObjectExtensions<AbstractActivityMap<RI, AI>, IActivityMapExtension<RI, AI, ? extends AbstractActivityMap<RI, AI>>> m_objectExtensions;
 
   private Class<RI> m_resourceIdClass;
   private Class<AI> m_activityIdClass;
@@ -68,14 +90,30 @@ public abstract class AbstractActivityMap<RI, AI> extends AbstractPropertyObserv
   }
 
   public AbstractActivityMap(boolean callInitializer) {
+    m_objectExtensions = new ObjectExtensions<AbstractActivityMap<RI, AI>, IActivityMapExtension<RI, AI, ? extends AbstractActivityMap<RI, AI>>>(this);
     if (callInitializer) {
       callInitializer();
     }
   }
 
+  @Override
+  public final List<Object> getAllContributions() {
+    return m_contributionHolder.getAllContributions();
+  }
+
+  @Override
+  public final <T> List<T> getContributionsByClass(Class<T> type) {
+    return m_contributionHolder.getContributionsByClass(type);
+  }
+
+  @Override
+  public final <T> T getContribution(Class<T> contribution) {
+    return m_contributionHolder.getContribution(contribution);
+  }
+
   protected void callInitializer() {
     if (!m_initialized) {
-      initConfig();
+      interceptInitConfig();
       m_initialized = true;
     }
   }
@@ -112,12 +150,24 @@ public abstract class AbstractActivityMap<RI, AI> extends AbstractPropertyObserv
     return false;
   }
 
+  /**
+   * Configures the first hour of the day. A value of <code>8</code> will be considered as 8 a.m. - 9 a.m. , so that the
+   * first entry can start at 8 a.m. The very first possible value is <code>0</code> which is considered as 12 a.m.
+   * (beginning of the day)
+   *
+   * @return
+   */
   @ConfigProperty(ConfigProperty.HOUR_OF_DAY)
   @Order(110)
   protected int getConfiguredFirstHourOfDay() {
     return 8;
   }
 
+  /**
+   * Configures the last hour of the day. A value of <code>16</code> will be considered as 4 p.m. - 5 p.m. , so that the
+   * last possible entry can last to 5 p.m. The very last possible value is <code>23</code> which is considered as 11
+   * p.m. - 12 a.m. (midnight)
+   */
   @ConfigProperty(ConfigProperty.HOUR_OF_DAY)
   @Order(130)
   protected int getConfiguredLastHourOfDay() {
@@ -140,7 +190,7 @@ public abstract class AbstractActivityMap<RI, AI> extends AbstractPropertyObserv
    * Indicates whether this ActivityMap should draw the
    * red and green bordered rectangle sections
    * around the area selected by the mouse.
-   * 
+   *
    * @return true if the colored sections should be displayed,
    *         false if not. Default is true.
    */
@@ -153,8 +203,7 @@ public abstract class AbstractActivityMap<RI, AI> extends AbstractPropertyObserv
   protected List<Class<? extends IMenu>> getDeclaredMenus() {
     Class[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
     List<Class<IMenu>> filtered = ConfigurationUtility.filterClasses(dca, IMenu.class);
-    List<Class<? extends IMenu>> foca = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(filtered, IMenu.class);
-    return ConfigurationUtility.removeReplacedClasses(foca);
+    return ConfigurationUtility.removeReplacedClasses(filtered);
   }
 
   /**
@@ -223,6 +272,15 @@ public abstract class AbstractActivityMap<RI, AI> extends AbstractPropertyObserv
   protected void execDecorateMinorTimeColumn(TimeScale scale, MajorTimeColumn majorColumn, MinorTimeColumn minorColumn) throws ProcessingException {
   }
 
+  protected final void interceptInitConfig() {
+    m_objectExtensions.initConfig(createLocalExtension(), new Runnable() {
+      @Override
+      public void run() {
+        initConfig();
+      }
+    });
+  }
+
   protected void initConfig() {
     m_listenerList = new EventListenerList();
     m_activityMapUIFacade = createUIFacade();
@@ -239,24 +297,31 @@ public abstract class AbstractActivityMap<RI, AI> extends AbstractPropertyObserv
     setLastHourOfDay(getConfiguredLastHourOfDay());
     setDrawSections(getConfiguredDrawSections());
     // menus
-    List<IMenu> menuList = new ArrayList<IMenu>();
-    for (Class<? extends IMenu> menuClazz : getDeclaredMenus()) {
+    List<Class<? extends IMenu>> declaredMenus = getDeclaredMenus();
+    OrderedCollection<IMenu> menus = new OrderedCollection<IMenu>();
+    for (Class<? extends IMenu> menuClazz : declaredMenus) {
       try {
         IMenu menu = ConfigurationUtility.newInnerInstance(this, menuClazz);
-        menuList.add(menu);
+        menus.addOrdered(menu);
       }
       catch (Exception e) {
         SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + menuClazz.getName() + "'.", e));
       }
     }
+    m_contributionHolder = new ContributionComposite(this);
+    List<IMenu> contributedMenus = m_contributionHolder.getContributionsByClass(IMenu.class);
+    menus.addAllOrdered(contributedMenus);
 
     try {
-      injectMenusInternal(menuList);
+      injectMenusInternal(menus);
     }
     catch (Exception e) {
       LOG.error("error occured while dynamically contributing menus.", e);
     }
-    m_menus = menuList;
+    new MoveActionNodesHandler<IMenu>(menus).moveModelObjects();
+    IActivityMapContextMenu contextMenu = new ActivityMapContextMenu(this, menus.getOrderedList());
+    setContextMenu(contextMenu);
+
     // local property observer
     addPropertyChangeListener(new PropertyChangeListener() {
       @Override
@@ -296,7 +361,7 @@ public abstract class AbstractActivityMap<RI, AI> extends AbstractPropertyObserv
           ActivityCell<RI, AI> cell = (ActivityCell<RI, AI>) e.getNewValue();
           if (cell != null) {
             try {
-              execActivityCellSelected(cell);
+              interceptActivityCellSelected(cell);
             }
             catch (ProcessingException t) {
               SERVICES.getService(IExceptionHandlerService.class).handleException(t);
@@ -311,14 +376,29 @@ public abstract class AbstractActivityMap<RI, AI> extends AbstractPropertyObserv
     createTimeScale();
   }
 
+  @Override
+  public final List<? extends IActivityMapExtension<RI, AI, ? extends AbstractActivityMap<RI, AI>>> getAllExtensions() {
+    return m_objectExtensions.getAllExtensions();
+  }
+
+  protected IActivityMapExtension<RI, AI, ? extends AbstractActivityMap<RI, AI>> createLocalExtension() {
+    return new LocalActivityMapExtension<RI, AI, AbstractActivityMap<RI, AI>>(this);
+  }
+
+  @Override
+  public <T extends IExtension<?>> T getExtension(Class<T> c) {
+    return m_objectExtensions.getExtension(c);
+  }
+
   /**
    * Override this internal method only in order to make use of dynamic menus<br>
-   * Used to manage menu list and add/remove menus
-   * 
-   * @param menuList
-   *          live and mutable list of configured menus
+   * Used to manage menu list and add/remove menus.<br>
+   * To change the order or specify the insert position use {@link IMenu#setOrder(double)}.
+   *
+   * @param menus
+   *          live and mutable collection of configured menus
    */
-  protected void injectMenusInternal(List<IMenu> menuList) {
+  protected void injectMenusInternal(OrderedCollection<IMenu> menus) {
   }
 
   protected IActivityMapUIFacade createUIFacade() {
@@ -332,7 +412,7 @@ public abstract class AbstractActivityMap<RI, AI> extends AbstractPropertyObserv
   @Override
   public final void initActivityMap() throws ProcessingException {
     initActivityMapInternal();
-    execInitActivityMap();
+    interceptInitActivityMap();
     // init actions
     ActionUtility.initActions(getMenus());
   }
@@ -344,7 +424,7 @@ public abstract class AbstractActivityMap<RI, AI> extends AbstractPropertyObserv
   public final void disposeActivityMap() {
     disposeActivityMapInternal();
     try {
-      execDisposeActivityMap();
+      interceptDisposeActivityMap();
     }
     catch (Throwable t) {
       LOG.warn(getClass().getName(), t);
@@ -368,7 +448,7 @@ public abstract class AbstractActivityMap<RI, AI> extends AbstractPropertyObserv
   @Override
   public void createTimeScale() {
     try {
-      TimeScale scale = execCreateTimeScale();
+      TimeScale scale = interceptCreateTimeScale();
       setTimeScale(scale);
     }
     catch (ProcessingException t) {
@@ -570,6 +650,25 @@ public abstract class AbstractActivityMap<RI, AI> extends AbstractPropertyObserv
     m_selectedResourceIds.clear();
     m_selectedResourceIds.addAll(internalResourceIds);
     propertySupport.setProperty(PROP_SELECTED_RESOURCE_IDS, internalResourceIds);
+
+    // check whether current selected activity cell needs to be updated
+    if (CollectionUtility.size(internalResourceIds) != 1) {
+      // at most one activity cell might be selected
+      setSelectedActivityCell(null);
+      return;
+    }
+
+    ActivityCell<RI, AI> selectedCell = getSelectedActivityCell();
+    if (selectedCell == null) {
+      // nothing selected
+      return;
+    }
+
+    RI resourceId = CollectionUtility.firstElement(resourceIds);
+    if (CompareUtility.notEquals(resourceId, selectedCell.getResourceId())) {
+      // selected cell does not belong to selected resources
+      setSelectedActivityCell(null);
+    }
   }
 
   @SuppressWarnings("unchecked")
@@ -619,64 +718,35 @@ public abstract class AbstractActivityMap<RI, AI> extends AbstractPropertyObserv
   }
 
   @Override
+  public void setMenus(List<? extends IMenu> menus) {
+    getContextMenu().setChildActions(menus);
+  }
+
+  @Override
+  public void addMenu(IMenu menu) {
+    List<IMenu> menus = getMenus();
+    menus.add(menu);
+    setMenus(menus);
+  }
+
+  protected void setContextMenu(IActivityMapContextMenu contextMenu) {
+    propertySupport.setProperty(PROP_CONTEXT_MENU, contextMenu);
+  }
+
+  @Override
+  public IActivityMapContextMenu getContextMenu() {
+    return (IActivityMapContextMenu) propertySupport.getProperty(PROP_CONTEXT_MENU);
+  }
+
+  @Override
   public List<IMenu> getMenus() {
-    return CollectionUtility.arrayList(m_menus);
-  }
-
-  private List<IMenu> fireEditActivityPopup(ActivityCell<RI, AI> cell) {
-    if (cell != null) {
-      ActivityMapEvent e = new ActivityMapEvent(this, ActivityMapEvent.TYPE_EDIT_ACTIVITY_POPUP, cell);
-      // single observer for declared menus
-      addEditActivityPopupMenus(e);
-      fireActivityMapEventInternal(e);
-      return e.getPopupMenus();
-    }
-    else {
-      return CollectionUtility.emptyArrayList();
-    }
-  }
-
-  private void addEditActivityPopupMenus(ActivityMapEvent e) {
-    for (IMenu menu : getMenus()) {
-      if (menu.isSingleSelectionAction()) {
-        menu.prepareAction();
-        if (menu.isVisible()) {
-          e.addPopupMenu(menu);
-        }
-      }
-    }
-  }
-
-  private List<IMenu> fireNewActivityPopup() {
-    ActivityMapEvent e = new ActivityMapEvent(this, ActivityMapEvent.TYPE_NEW_ACTIVITY_POPUP);
-    // single observer for declared menus
-    addNewActivityPopupMenus(e);
-    fireActivityMapEventInternal(e);
-    return e.getPopupMenus();
-  }
-
-  private void addNewActivityPopupMenus(ActivityMapEvent e) {
-    for (IMenu menu : getMenus()) {
-      // pass 1
-      if (menu.isSingleSelectionAction()) {
-        // ignore
-      }
-      else if (menu.isMultiSelectionAction()) {
-        // ignore
-      }
-      else {
-        menu.prepareAction();
-        if (menu.isVisible()) {
-          e.addPopupMenu(menu);
-        }
-      }
-    }
+    return getContextMenu().getChildActions();
   }
 
   private void fireCellAction(RI resourceId, MinorTimeColumn column, ActivityCell<RI, AI> activityCell) {
     // single observer
     try {
-      execCellAction(resourceId, column, activityCell);
+      interceptCellAction(resourceId, column, activityCell);
     }
     catch (ProcessingException t) {
       SERVICES.getService(IExceptionHandlerService.class).handleException(t);
@@ -749,7 +819,7 @@ public abstract class AbstractActivityMap<RI, AI> extends AbstractPropertyObserv
      * coalesce all events of same type and sort according to their type,
      * eventually merge
      */
-    ArrayList<ActivityMapEvent> list = m_eventBuffer;
+    List<ActivityMapEvent> list = m_eventBuffer;
     m_eventBuffer = new ArrayList<ActivityMapEvent>();
     if (list.size() > 0) {
       HashMap<Integer, List<ActivityMapEvent>> coalesceMap = new HashMap<Integer, List<ActivityMapEvent>>();
@@ -785,14 +855,6 @@ public abstract class AbstractActivityMap<RI, AI> extends AbstractPropertyObserv
           }
           case ActivityMapEvent.TYPE_CELL_ACTION: {
             sortedCoalescedMap.put(50, subList.get(lastIndex));// use last
-            break;
-          }
-          case ActivityMapEvent.TYPE_EDIT_ACTIVITY_POPUP: {
-            sortedCoalescedMap.put(70, subList.get(lastIndex));// use last
-            break;
-          }
-          case ActivityMapEvent.TYPE_NEW_ACTIVITY_POPUP: {
-            sortedCoalescedMap.put(80, subList.get(lastIndex));// use last
             break;
           }
           default: {
@@ -1071,6 +1133,29 @@ public abstract class AbstractActivityMap<RI, AI> extends AbstractPropertyObserv
       //
       propertySupport.setProperty(PROP_SELECTED_BEGIN_TIME, beginTime);
       propertySupport.setProperty(PROP_SELECTED_END_TIME, endTime);
+
+      // update selected activity cell based on selected time range.
+      // this is a work around for enforcing an owner value change event on context menus. Actually the empty selection event
+      // should be handled correctly in the GUI.
+      List<RI> selectedResourceIds = getSelectedResourceIds();
+      if (selectedResourceIds.size() == 1) {
+        RI resourceId = CollectionUtility.firstElement(selectedResourceIds);
+        List<ActivityCell<RI, AI>> activityCells = getActivityCells(resourceId);
+        for (ActivityCell<RI, AI> cell : activityCells) {
+
+          if (CompareUtility.equals(cell.getBeginTime(), beginTime) &&
+              (CompareUtility.equals(cell.getEndTime(), endTime)
+              // see TimeScaleBuilder, end time is sometimes actual end time minus 1ms
+              || (cell != null
+                  && cell.getEndTime() != null
+                  && endTime != null
+                  && cell.getEndTime().getTime() == endTime.getTime() + 1))) {
+            setSelectedActivityCell(cell);
+            return;
+          }
+        }
+      }
+      setSelectedActivityCell(null);
     }
     finally {
       setActivityMapChanging(false);
@@ -1096,7 +1181,7 @@ public abstract class AbstractActivityMap<RI, AI> extends AbstractPropertyObserv
       cell.setObserver(null);
       //
       decorateActivityCellInternal(cell);
-      execDecorateActivityCell(cell);
+      interceptDecorateActivityCell(cell);
     }
     catch (ProcessingException t) {
       SERVICES.getService(IExceptionHandlerService.class).handleException(t);
@@ -1307,16 +1392,6 @@ public abstract class AbstractActivityMap<RI, AI> extends AbstractPropertyObserv
     }
 
     @Override
-    public List<IMenu> fireEditActivityPopupFromUI() {
-      return fireEditActivityPopup(getSelectedActivityCell());
-    }
-
-    @Override
-    public List<IMenu> fireNewActivityPopupFromUI() {
-      return fireNewActivityPopup();
-    }
-
-    @Override
     public void setDaysFromUI(Date[] days) {
       setDays(days);
     }
@@ -1334,5 +1409,105 @@ public abstract class AbstractActivityMap<RI, AI> extends AbstractPropertyObserv
       MinorTimeColumn column = getTimeScale().getMinorTimeColumn((normalizedRange[0] + normalizedRange[1]) / 2);
       fireCellAction(resourceId, column, activityCell);
     }
+  }
+
+  /**
+   * The extension delegating to the local methods. This Extension is always at the end of the chain and will not call
+   * any further chain elements.
+   */
+  protected static class LocalActivityMapExtension<RI, AI, OWNER extends AbstractActivityMap<RI, AI>> extends AbstractExtension<OWNER> implements IActivityMapExtension<RI, AI, OWNER> {
+
+    public LocalActivityMapExtension(OWNER owner) {
+      super(owner);
+    }
+
+    @Override
+    public void execDecorateMinorTimeColumn(ActivityMapDecorateMinorTimeColumnChain<RI, AI> chain, TimeScale scale, MajorTimeColumn majorColumn, MinorTimeColumn minorColumn) throws ProcessingException {
+      getOwner().execDecorateMinorTimeColumn(scale, majorColumn, minorColumn);
+    }
+
+    @Override
+    public void execActivityCellSelected(ActivityMapActivityCellSelectedChain<RI, AI> chain, ActivityCell<RI, AI> cell) throws ProcessingException {
+      getOwner().execActivityCellSelected(cell);
+    }
+
+    @Override
+    public void execDisposeActivityMap(ActivityMapDisposeActivityMapChain<RI, AI> chain) throws ProcessingException {
+      getOwner().execDisposeActivityMap();
+    }
+
+    @Override
+    public TimeScale execCreateTimeScale(ActivityMapCreateTimeScaleChain<RI, AI> chain) throws ProcessingException {
+      return getOwner().execCreateTimeScale();
+    }
+
+    @Override
+    public void execDecorateActivityCell(ActivityMapDecorateActivityCellChain<RI, AI> chain, ActivityCell<RI, AI> cell) throws ProcessingException {
+      getOwner().execDecorateActivityCell(cell);
+    }
+
+    @Override
+    public void execInitActivityMap(ActivityMapInitActivityMapChain<RI, AI> chain) throws ProcessingException {
+      getOwner().execInitActivityMap();
+    }
+
+    @Override
+    public void execCellAction(ActivityMapCellActionChain<RI, AI> chain, RI resourceId, MinorTimeColumn column, ActivityCell<RI, AI> activityCell) throws ProcessingException {
+      getOwner().execCellAction(resourceId, column, activityCell);
+    }
+
+    @Override
+    public void execDecorateMajorTimeColumn(ActivityMapDecorateMajorTimeColumnChain<RI, AI> chain, TimeScale scale, MajorTimeColumn columns) throws ProcessingException {
+      getOwner().execDecorateMajorTimeColumn(scale, columns);
+    }
+
+  }
+
+  protected final void interceptDecorateMinorTimeColumn(TimeScale scale, MajorTimeColumn majorColumn, MinorTimeColumn minorColumn) throws ProcessingException {
+    List<? extends IActivityMapExtension<RI, AI, ? extends AbstractActivityMap<RI, AI>>> extensions = getAllExtensions();
+    ActivityMapDecorateMinorTimeColumnChain<RI, AI> chain = new ActivityMapDecorateMinorTimeColumnChain<RI, AI>(extensions);
+    chain.execDecorateMinorTimeColumn(scale, majorColumn, minorColumn);
+  }
+
+  protected final void interceptActivityCellSelected(ActivityCell<RI, AI> cell) throws ProcessingException {
+    List<? extends IActivityMapExtension<RI, AI, ? extends AbstractActivityMap<RI, AI>>> extensions = getAllExtensions();
+    ActivityMapActivityCellSelectedChain<RI, AI> chain = new ActivityMapActivityCellSelectedChain<RI, AI>(extensions);
+    chain.execActivityCellSelected(cell);
+  }
+
+  protected final void interceptDisposeActivityMap() throws ProcessingException {
+    List<? extends IActivityMapExtension<RI, AI, ? extends AbstractActivityMap<RI, AI>>> extensions = getAllExtensions();
+    ActivityMapDisposeActivityMapChain<RI, AI> chain = new ActivityMapDisposeActivityMapChain<RI, AI>(extensions);
+    chain.execDisposeActivityMap();
+  }
+
+  protected final TimeScale interceptCreateTimeScale() throws ProcessingException {
+    List<? extends IActivityMapExtension<RI, AI, ? extends AbstractActivityMap<RI, AI>>> extensions = getAllExtensions();
+    ActivityMapCreateTimeScaleChain<RI, AI> chain = new ActivityMapCreateTimeScaleChain<RI, AI>(extensions);
+    return chain.execCreateTimeScale();
+  }
+
+  protected final void interceptDecorateActivityCell(ActivityCell<RI, AI> cell) throws ProcessingException {
+    List<? extends IActivityMapExtension<RI, AI, ? extends AbstractActivityMap<RI, AI>>> extensions = getAllExtensions();
+    ActivityMapDecorateActivityCellChain<RI, AI> chain = new ActivityMapDecorateActivityCellChain<RI, AI>(extensions);
+    chain.execDecorateActivityCell(cell);
+  }
+
+  protected final void interceptInitActivityMap() throws ProcessingException {
+    List<? extends IActivityMapExtension<RI, AI, ? extends AbstractActivityMap<RI, AI>>> extensions = getAllExtensions();
+    ActivityMapInitActivityMapChain<RI, AI> chain = new ActivityMapInitActivityMapChain<RI, AI>(extensions);
+    chain.execInitActivityMap();
+  }
+
+  protected final void interceptCellAction(RI resourceId, MinorTimeColumn column, ActivityCell<RI, AI> activityCell) throws ProcessingException {
+    List<? extends IActivityMapExtension<RI, AI, ? extends AbstractActivityMap<RI, AI>>> extensions = getAllExtensions();
+    ActivityMapCellActionChain<RI, AI> chain = new ActivityMapCellActionChain<RI, AI>(extensions);
+    chain.execCellAction(resourceId, column, activityCell);
+  }
+
+  protected final void interceptDecorateMajorTimeColumn(TimeScale scale, MajorTimeColumn columns) throws ProcessingException {
+    List<? extends IActivityMapExtension<RI, AI, ? extends AbstractActivityMap<RI, AI>>> extensions = getAllExtensions();
+    ActivityMapDecorateMajorTimeColumnChain<RI, AI> chain = new ActivityMapDecorateMajorTimeColumnChain<RI, AI>(extensions);
+    chain.execDecorateMajorTimeColumn(scale, columns);
   }
 }

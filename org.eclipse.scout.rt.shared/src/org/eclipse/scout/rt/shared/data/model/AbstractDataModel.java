@@ -11,25 +11,30 @@
 package org.eclipse.scout.rt.shared.data.model;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.ConfigurationUtility;
+import org.eclipse.scout.commons.annotations.OrderedCollection;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.shared.extension.ContributionComposite;
+import org.eclipse.scout.rt.shared.extension.ExtensionUtility;
+import org.eclipse.scout.rt.shared.extension.IContributionOwner;
 import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.service.SERVICES;
 
-public abstract class AbstractDataModel implements IDataModel, Serializable {
+public abstract class AbstractDataModel implements IDataModel, Serializable, IContributionOwner {
   private static final long serialVersionUID = 1L;
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractDataModel.class);
 
   private boolean m_calledInitializer;
   private List<IDataModelAttribute> m_attributes;
   private List<IDataModelEntity> m_entities;
+  private IContributionOwner m_contributionHolder;
 
   public AbstractDataModel() {
     this(true);
@@ -42,6 +47,21 @@ public abstract class AbstractDataModel implements IDataModel, Serializable {
     }
   }
 
+  @Override
+  public final List<Object> getAllContributions() {
+    return m_contributionHolder.getAllContributions();
+  }
+
+  @Override
+  public final <T> List<T> getContributionsByClass(Class<T> type) {
+    return m_contributionHolder.getContributionsByClass(type);
+  }
+
+  @Override
+  public final <T> T getContribution(Class<T> contribution) {
+    return m_contributionHolder.getContribution(contribution);
+  }
+
   protected void callInitializer() {
     if (!m_calledInitializer) {
       m_calledInitializer = true;
@@ -49,50 +69,73 @@ public abstract class AbstractDataModel implements IDataModel, Serializable {
     }
   }
 
-  protected List<IDataModelAttribute> createAttributes() {
-    Class[] all = ConfigurationUtility.getDeclaredPublicClasses(getClass());
+  protected List<IDataModelAttribute> createAttributes(Object holder) {
+    Class[] all = ConfigurationUtility.getDeclaredPublicClasses(holder.getClass());
     List<Class<IDataModelAttribute>> filtered = ConfigurationUtility.filterClasses(all, IDataModelAttribute.class);
-    List<Class<? extends IDataModelAttribute>> sortedAndFiltered = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(filtered, IDataModelAttribute.class);
-    List<IDataModelAttribute> attributes = new ArrayList<IDataModelAttribute>(sortedAndFiltered.size());
-    for (Class<? extends IDataModelAttribute> attributeClazz : sortedAndFiltered) {
+
+    List<IDataModelAttribute> contributedAttributes = m_contributionHolder.getContributionsByClass(IDataModelAttribute.class);
+
+    OrderedCollection<IDataModelAttribute> attributes = new OrderedCollection<IDataModelAttribute>();
+    for (Class<? extends IDataModelAttribute> attributeClazz : filtered) {
       try {
-        attributes.add(ConfigurationUtility.newInnerInstance(this, attributeClazz));
+        IDataModelAttribute a = ConfigurationUtility.newInnerInstance(holder, attributeClazz);
+        attributes.addOrdered(a);
       }
       catch (Exception e) {
         SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + attributeClazz.getName() + "'.", e));
       }
     }
-    return attributes;
+    attributes.addAllOrdered(contributedAttributes);
+    ExtensionUtility.moveModelObjects(attributes);
+    return attributes.getOrderedList();
   }
 
-  protected List<IDataModelEntity> createEntities() {
-    Class[] all = ConfigurationUtility.getDeclaredPublicClasses(getClass());
+  protected List<IDataModelEntity> createEntities(Object holder) {
+    Class[] all = ConfigurationUtility.getDeclaredPublicClasses(holder.getClass());
     List<Class<IDataModelEntity>> filtered = ConfigurationUtility.filterClasses(all, IDataModelEntity.class);
-    List<Class<? extends IDataModelEntity>> sortedAndFiltered = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(filtered, IDataModelEntity.class);
-    List<IDataModelEntity> entities = new ArrayList<IDataModelEntity>(sortedAndFiltered.size());
-    for (Class<? extends IDataModelEntity> dataModelEntityClazz : sortedAndFiltered) {
+    List<IDataModelEntity> contributedEntities = m_contributionHolder.getContributionsByClass(IDataModelEntity.class);
+
+    OrderedCollection<IDataModelEntity> entities = new OrderedCollection<IDataModelEntity>();
+    for (Class<? extends IDataModelEntity> dataModelEntityClazz : filtered) {
       try {
-        entities.add(ConfigurationUtility.newInnerInstance(this, dataModelEntityClazz));
+        entities.addOrdered(ConfigurationUtility.newInnerInstance(holder, dataModelEntityClazz));
       }
       catch (Exception e) {
         SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + dataModelEntityClazz.getName() + "'.", e));
       }
     }
-    return entities;
+
+    entities.addAllOrdered(contributedEntities);
+
+    ExtensionUtility.moveModelObjects(entities);
+    return entities.getOrderedList();
   }
 
-  @SuppressWarnings("deprecation")
+  protected List<IDataModelAttribute> createAttributes() {
+    return createAttributes(this);
+  }
+
+  protected List<IDataModelEntity> createEntities() {
+    return createEntities(this);
+  }
+
   protected void initConfig() {
+    m_contributionHolder = new ContributionComposite(this);
+
     // attributes
     m_attributes = createAttributes();
     for (IDataModelAttribute a : m_attributes) {
-      a.setParentEntity(null);
+      if (a instanceof AbstractDataModelAttribute) {
+        ((AbstractDataModelAttribute) a).setParentEntity(null);
+      }
     }
     // entities
     m_entities = createEntities();
-    HashMap<Class<? extends IDataModelEntity>, IDataModelEntity> instanceMap = new HashMap<Class<? extends IDataModelEntity>, IDataModelEntity>();
+    Map<Class<? extends IDataModelEntity>, IDataModelEntity> instanceMap = new HashMap<Class<? extends IDataModelEntity>, IDataModelEntity>(m_entities.size());
     for (IDataModelEntity e : m_entities) {
-      e.setParentEntity(null);
+      if (e instanceof AbstractDataModelEntity) {
+        ((AbstractDataModelEntity) e).setParentEntity(null);
+      }
       instanceMap.put(e.getClass(), e);
     }
     for (IDataModelEntity e : m_entities) {

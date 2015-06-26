@@ -26,6 +26,8 @@ import org.eclipse.scout.commons.RunnableWithData;
 import org.eclipse.scout.commons.WeakEventListener;
 import org.eclipse.scout.commons.job.JobEx;
 import org.eclipse.scout.rt.client.ui.action.ActionUtility;
+import org.eclipse.scout.rt.client.ui.action.IActionFilter;
+import org.eclipse.scout.rt.client.ui.action.menu.root.ICalendarContextMenu;
 import org.eclipse.scout.rt.client.ui.basic.calendar.CalendarComponent;
 import org.eclipse.scout.rt.client.ui.basic.calendar.ICalendar;
 import org.eclipse.scout.rt.ui.swt.SwtMenuUtility;
@@ -94,13 +96,26 @@ public class SwtScoutCalendar extends SwtCalendar {
   }
 
   @Override
-  public void showGeneralContextMenu(Menu manager) {
-    SwtMenuUtility.fillMenu(manager, SwtMenuUtility.collectEmptySpaceMenus(m_scoutCalendarModel, m_field.getEnvironment()), ActionUtility.createVisibleFilter(), m_field.getEnvironment());
-  }
+  public void showContextMenu(Menu manager) {
+    final ICalendarContextMenu contextMenu = m_scoutCalendarModel.getContextMenu();
 
-  @Override
-  public void showItemContextMenu(Menu manager, Object item) {
-    SwtMenuUtility.fillMenu(manager, SwtMenuUtility.collectComponentMenus(m_scoutCalendarModel, m_field.getEnvironment()), ActionUtility.createVisibleFilter(), m_field.getEnvironment());
+    Runnable t = new Runnable() {
+      @Override
+      public void run() {
+        IActionFilter aboutToShowFilter = ActionUtility.createMenuFilterMenuTypes(contextMenu.getCurrentMenuTypes(), false);
+        contextMenu.callAboutToShow(aboutToShowFilter);
+      }
+    };
+    JobEx job = m_field.getEnvironment().invokeScoutLater(t, 1200);
+    try {
+      job.join(1200);
+    }
+    catch (InterruptedException ex) {
+      //nop
+    }
+
+    IActionFilter displayFilter = ActionUtility.createMenuFilterMenuTypes(contextMenu.getCurrentMenuTypes(), true);
+    SwtMenuUtility.fillMenu(manager, contextMenu.getChildActions(), displayFilter, m_field.getEnvironment());
   }
 
   @Override
@@ -373,9 +388,7 @@ public class SwtScoutCalendar extends SwtCalendar {
               RunnableWithData r = new RunnableWithData() {
                 @Override
                 public void run() {
-                  if (cc != null) {
-                    m_field.getScoutObject().getCalendar().getUIFacade().setSelectionFromUI(d, cc);
-                  }
+                  m_field.getScoutObject().getCalendar().getUIFacade().setSelectionFromUI(d, cc);
                   //refreshLayout();
                 }
               };

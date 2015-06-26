@@ -12,8 +12,9 @@ package org.eclipse.scout.rt.ui.rap.action;
 
 import java.util.List;
 
-import org.eclipse.rap.rwt.internal.theme.AbstractThemeAdapter;
+import org.eclipse.rap.rwt.internal.theme.ThemeAdapter;
 import org.eclipse.rap.rwt.internal.theme.WidgetMatcher;
+import org.eclipse.rap.rwt.theme.BoxDimensions;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.action.tree.IActionNode;
@@ -89,10 +90,17 @@ public class MenuSizeEstimator {
     return height;
   }
 
-  private class MenuThemeAdapter extends AbstractThemeAdapter {
+  private class MenuThemeAdapter extends ThemeAdapter {
 
     public Rectangle getPadding(String cssElement, Widget widget) {
-      return getCssBoxDimensions(cssElement, "padding", widget);
+      return createRectangle(getCssBoxDimensions(cssElement, "padding", widget).dimensions);
+    }
+
+    private Rectangle createRectangle(BoxDimensions boxdim) {
+      return new Rectangle(boxdim.left,
+          boxdim.top,
+          boxdim.left + boxdim.right,
+          boxdim.top + boxdim.bottom);
     }
 
     public int getBorderWidth(String cssElement, Widget widget) {

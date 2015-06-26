@@ -15,7 +15,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.jface.viewers.DoubleClickEvent;
 import org.eclipse.jface.viewers.IDoubleClickListener;
@@ -28,7 +27,6 @@ import org.eclipse.jface.viewers.StructuredSelection;
 import org.eclipse.jface.viewers.TreeExpansionEvent;
 import org.eclipse.jface.viewers.TreePath;
 import org.eclipse.jface.viewers.TreeViewer;
-import org.eclipse.jface.viewers.ViewerCell;
 import org.eclipse.rap.rwt.RWT;
 import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.StringUtility;
@@ -44,7 +42,7 @@ import org.eclipse.scout.rt.client.ui.action.ActionUtility;
 import org.eclipse.scout.rt.client.ui.action.IActionFilter;
 import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
 import org.eclipse.scout.rt.client.ui.action.menu.TreeMenuType;
-import org.eclipse.scout.rt.client.ui.action.menu.root.IContextMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.root.ITreeContextMenu;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITree;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
 import org.eclipse.scout.rt.client.ui.basic.tree.TreeEvent;
@@ -70,6 +68,7 @@ import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Menu;
+import org.eclipse.swt.widgets.TreeItem;
 
 /**
  * @since 3.8.0
@@ -79,6 +78,8 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(RwtScoutTree.class);
 
   private P_ScoutTreeListener m_scoutTreeListener;
+
+  ITreeNode m_contextNode;
 
   private TreeViewer m_treeViewer;
 
@@ -101,7 +102,6 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
     setUiField(viewer.getTree());
 
     initNodeHeight();
-    initializeTreeModel();
 
     viewer.getTree().setData(RWT.MARKUP_ENABLED, Boolean.TRUE);
     viewer.getTree().setData(MarkupValidator.MARKUP_VALIDATION_DISABLED, Boolean.TRUE);
@@ -111,6 +111,7 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
     viewer.addDoubleClickListener(new P_RwtDoubleClickListener());
 
     P_RwtTreeListener treeListener = new P_RwtTreeListener();
+    //selection events do not contain correct position of the node
     viewer.getTree().addListener(SWT.MouseDown, treeListener);
     viewer.getTree().addListener(SWT.MouseUp, treeListener);
     viewer.getTree().addListener(SWT.MenuDetect, treeListener);
@@ -143,7 +144,6 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
   }
 
   protected void initializeTreeModel() {
-    // model
     RwtScoutTreeModel model = createTreeModel();
     getUiTreeViewer().setContentProvider(model);
     getUiTreeViewer().setLabelProvider(model);
@@ -202,6 +202,8 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
       m_scoutTreeListener = new P_ScoutTreeListener();
       getScoutObject().addUITreeListener(m_scoutTreeListener);
     }
+    initializeTreeModel();
+
     if (getScoutObject().isRootNodeVisible()) {
       setExpansionFromScout(getScoutObject().getRootNode());
     }
@@ -388,7 +390,7 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
 
   /**
    * Update the given node.
-   * 
+   *
    * @since 3.10.0-M5
    */
   protected void updateTreeNode(ITreeNode node) {
@@ -556,14 +558,14 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
     }
   }
 
-  protected void handleUiNodeClick(final ITreeNode node) {
+  protected void handleUiNodeClick(final ITreeNode node, final int rwtMouseButton) {
     if (getScoutObject() != null) {
       if (node != null) {
         // notify Scout
         Runnable t = new Runnable() {
           @Override
           public void run() {
-            getScoutObject().getUIFacade().fireNodeClickFromUI(node);
+            getScoutObject().getUIFacade().fireNodeClickFromUI(node, RwtUtility.rwtToScoutMouseButton(rwtMouseButton));
           }
         };
         getUiEnvironment().invokeScoutLater(t, 0);
@@ -758,7 +760,8 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
       else {
         handleUiNodeAction(nodes[0]);
         if (getScoutObject().isCheckable()) {
-          handleUiNodeClick(nodes[0]);
+          // on double click it is always the left mouse button
+          handleUiNodeClick(nodes[0], 1);
         }
       }
     }
@@ -773,7 +776,7 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
       @SuppressWarnings("unchecked")
       ITreeNode[] nodes = (ITreeNode[]) sel.toList().toArray(new ITreeNode[sel.size()]);
       if (nodes != null && nodes.length > 0) {
-        handleUiNodeClick(nodes[0]);
+        handleUiNodeClick(nodes[0], event.button);
       }
       event.doit = false;
     }
@@ -785,11 +788,13 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
     @Override
     public void handleEvent(Event event) {
       switch (event.type) {
+        case SWT.MouseDown: {
+          m_contextNode = findTreeNode(event);
+          break;
+        }
         case SWT.MouseUp: {
-          ViewerCell cell = getUiTreeViewer().getCell(new Point(event.x, event.y));
-          if (cell != null && cell.getElement() instanceof ITreeNode) {
-            ITreeNode nodeToClick = (ITreeNode) cell.getElement();
-            handleUiNodeClick(nodeToClick);
+          if (m_contextNode != null) {
+            handleUiNodeClick(m_contextNode, event.button);
           }
           break;
         }
@@ -803,6 +808,19 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
           break;
         }
       }
+    }
+
+    private ITreeNode findTreeNode(Event event) {
+      if (event.data instanceof TreeItem) {
+        TreeItem item = (TreeItem) event.data;
+        if (event.x >= item.getBounds().x) {
+          if (item.getData() instanceof ITreeNode) {
+            return (ITreeNode) item.getData();
+          }
+        }
+      }
+      //not found
+      return null;
     }
   }
 
@@ -856,16 +874,18 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
         return;
       }
 
-      final AtomicReference<IContextMenu> scoutMenusRef = new AtomicReference<IContextMenu>();
+      ITreeContextMenu contextMenu = getScoutObject().getContextMenu();
+      final IActionFilter aboutToShowFilter;
+      if ((getUiField().getContextItem() == null)) {
+        aboutToShowFilter = ActionUtility.createMenuFilterMenuTypes(CollectionUtility.hashSet(TreeMenuType.EmptySpace), false);
+      }
+      else {
+        aboutToShowFilter = ActionUtility.createMenuFilterMenuTypes(contextMenu.getCurrentMenuTypes(), false);
+      }
       Runnable t = new Runnable() {
-        @SuppressWarnings("deprecation")
         @Override
         public void run() {
-          IContextMenu contextMenu = getScoutObject().getContextMenu();
-          // manually call about to show
-          contextMenu.aboutToShow();
-          contextMenu.prepareAction();
-          scoutMenusRef.set(contextMenu);
+          getScoutObject().getContextMenu().callAboutToShow(aboutToShowFilter);
         }
       };
       JobEx job = getUiEnvironment().invokeScoutLater(t, 1200);
@@ -875,17 +895,15 @@ public class RwtScoutTree extends RwtScoutComposite<ITree> implements IRwtScoutT
       catch (InterruptedException ex) {
         //nop
       }
-      IContextMenu contextMenu = scoutMenusRef.get();
-      if (contextMenu != null) {
-        IActionFilter filter = null;
-        if ((getUiField().getContextItem() == null)) {
-          filter = ActionUtility.createMenuFilterVisibleAndMenuTypes(TreeMenuType.EmptySpace);
-        }
-        else {
-          filter = contextMenu.getActiveFilter();
-        }
-        RwtMenuUtility.fillMenu(((Menu) e.getSource()), contextMenu.getChildActions(), filter, getUiEnvironment());
+      final IActionFilter displayFilter;
+      if ((getUiField().getContextItem() == null)) {
+        displayFilter = ActionUtility.createMenuFilterMenuTypes(CollectionUtility.hashSet(TreeMenuType.EmptySpace), true);
       }
+      else {
+        displayFilter = ActionUtility.createMenuFilterMenuTypes(contextMenu.getCurrentMenuTypes(), true);
+      }
+
+      RwtMenuUtility.fillMenu(((Menu) e.getSource()), contextMenu.getChildActions(), displayFilter, getUiEnvironment());
     }
 
   } // end class P_ContextMenuListener

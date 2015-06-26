@@ -13,6 +13,7 @@ package org.eclipse.scout.rt.ui.rap.window.desktop.toolbar;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.util.HashMap;
+import java.util.Map;
 
 import org.eclipse.rap.rwt.RWT;
 import org.eclipse.scout.commons.logger.IScoutLogger;
@@ -37,7 +38,7 @@ import org.eclipse.swt.widgets.Label;
 
 /**
  * <h3>ViewButtonBar</h3> ...
- * 
+ *
  * @author Andreas Hoegger
  * @since 3.7.0 June 2011
  */
@@ -51,7 +52,7 @@ public class RwtScoutToolButtonBar extends RwtScoutComposite<IDesktop> implement
   private static final String VARIANT_TOOL_BUTTON_BUTTON_ACTIVE = "toolButton-active";
   private static final String VARIANT_TOOL_BUTTON = "toolButton";
 
-  private HashMap<IToolButton, IRwtScoutToolButton> m_toolTabItems;
+  private Map<IToolButton, IRwtScoutToolButton> m_toolTabItems;
   private Label m_toolButtonsLabel;
 
   private PropertyChangeListener m_toolbuttonPropertyListener = new PropertyChangeListener() {
@@ -116,7 +117,7 @@ public class RwtScoutToolButtonBar extends RwtScoutComposite<IDesktop> implement
       String activeVariant = VARIANT_TOOL_BUTTON_BUTTON_ACTIVE;
       variant += "-" + simpleClassName;
       activeVariant += "-" + simpleClassName;
-      IRwtScoutToolButton uiToolButton = new RwtScoutToolButton(false, true, variant, activeVariant);
+      IRwtScoutToolButton uiToolButton = new RwtScoutToolButton(false, true, false, variant, activeVariant);
       uiToolButton.createUiField(m_toolButtonContainer, scoutButton, getUiEnvironment());
       m_toolTabItems.put(scoutButton, uiToolButton);
     }
@@ -185,6 +186,7 @@ public class RwtScoutToolButtonBar extends RwtScoutComposite<IDesktop> implement
       public void run() {
         for (IToolButton scoutButton : getScoutObject().getToolButtons()) {
           if (scoutButton.isSelected()) {
+            scoutButton.getUIFacade().setSelectedFromUI(false);
             scoutButton.getUIFacade().fireActionFromUI();
           }
         }

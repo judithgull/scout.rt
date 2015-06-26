@@ -14,13 +14,18 @@ import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
+import org.eclipse.scout.rt.client.extension.ui.basic.table.columns.IDoubleColumnExtension;
 import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
 import org.eclipse.scout.rt.client.ui.form.fields.doublefield.AbstractDoubleField;
 import org.eclipse.scout.rt.client.ui.form.fields.doublefield.IDoubleField;
 
 /**
  * Column holding Double
+ *
+ * @deprecated Will be removed in N release. Use {@link AbstractBigDecimalColumn} instead.
  */
+@SuppressWarnings("deprecation")
+@Deprecated
 @ClassId("fc6f348b-e7dc-4654-8b7c-f4c9f2f5cd08")
 public abstract class AbstractDoubleColumn extends AbstractDecimalColumn<Double> implements IDoubleColumn {
 
@@ -76,6 +81,18 @@ public abstract class AbstractDoubleColumn extends AbstractDecimalColumn<Double>
   protected IDoubleField getEditorField() {
     return new AbstractDoubleField() {
     };
+  }
+
+  protected static class LocalDoubleColumnExtension<OWNER extends AbstractDoubleColumn> extends LocalDecimalColumnExtension<Double, OWNER> implements IDoubleColumnExtension<OWNER> {
+
+    public LocalDoubleColumnExtension(OWNER owner) {
+      super(owner);
+    }
+  }
+
+  @Override
+  protected IDoubleColumnExtension<? extends AbstractDoubleColumn> createLocalExtension() {
+    return new LocalDoubleColumnExtension<AbstractDoubleColumn>(this);
   }
 
 }

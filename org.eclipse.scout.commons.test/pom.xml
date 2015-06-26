@@ -16,7 +16,7 @@
   <parent>
     <groupId>org.eclipse.scout.rt</groupId>
     <artifactId>org.eclipse.scout.rt.parent</artifactId>
-    <version>4.0.0-SNAPSHOT</version>
+    <version>5.0.0-SNAPSHOT</version>
     <relativePath>../org.eclipse.scout.rt.parent</relativePath>
   </parent>
 
@@ -41,6 +41,7 @@
               <!-- <debugPort>18081</debugPort> -->
               <excludes>
                 <exclude>**/Mail*Test.java</exclude>
+                <exclude>**/WordMail*Test.java</exclude>
               </excludes>
             </configuration>
           </plugin>

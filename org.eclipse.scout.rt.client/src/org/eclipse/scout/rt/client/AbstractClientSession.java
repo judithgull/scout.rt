@@ -12,14 +12,20 @@ package org.eclipse.scout.rt.client;
 
 import java.beans.PropertyChangeListener;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.Vector;
 
 import javax.security.auth.Subject;
 
 import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Status;
+import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.equinox.app.IApplication;
 import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.EventListenerList;
@@ -32,6 +38,9 @@ import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.commons.security.SimplePrincipal;
+import org.eclipse.scout.rt.client.extension.ClientSessionChains.ClientSessionLoadSessionChain;
+import org.eclipse.scout.rt.client.extension.ClientSessionChains.ClientSessionStoreSessionChain;
+import org.eclipse.scout.rt.client.extension.IClientSessionExtension;
 import org.eclipse.scout.rt.client.services.common.clientnotification.ClientNotificationConsumerEvent;
 import org.eclipse.scout.rt.client.services.common.clientnotification.IClientNotificationConsumerListener;
 import org.eclipse.scout.rt.client.services.common.clientnotification.IClientNotificationConsumerService;
@@ -45,6 +54,10 @@ import org.eclipse.scout.rt.client.ui.desktop.internal.VirtualDesktop;
 import org.eclipse.scout.rt.shared.OfflineState;
 import org.eclipse.scout.rt.shared.ScoutTexts;
 import org.eclipse.scout.rt.shared.TextsThreadLocal;
+import org.eclipse.scout.rt.shared.extension.AbstractExtension;
+import org.eclipse.scout.rt.shared.extension.IExtensibleObject;
+import org.eclipse.scout.rt.shared.extension.IExtension;
+import org.eclipse.scout.rt.shared.extension.ObjectExtensions;
 import org.eclipse.scout.rt.shared.services.common.context.SharedContextChangedNotification;
 import org.eclipse.scout.rt.shared.services.common.context.SharedVariableMap;
 import org.eclipse.scout.rt.shared.services.common.prefs.IUserPreferencesStorageService;
@@ -55,7 +68,7 @@ import org.osgi.framework.Bundle;
 import org.osgi.service.prefs.BackingStoreException;
 import org.osgi.service.prefs.Preferences;
 
-public abstract class AbstractClientSession implements IClientSession {
+public abstract class AbstractClientSession implements IClientSession, IExtensibleObject {
 
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractClientSession.class);
 
@@ -78,11 +91,13 @@ public abstract class AbstractClientSession implements IClientSession {
   private String m_virtualSessionId;
   private IMemoryPolicy m_memoryPolicy;
   private IIconLocator m_iconLocator;
-  private final HashMap<String, Object> m_clientSessionData;
+  private final Map<String, Object> m_clientSessionData;
   private ScoutTexts m_scoutTexts;
   private Locale m_locale;
   private UserAgent m_userAgent;
   private Vector<ILocaleListener> m_localeListener = new Vector<ILocaleListener>();
+  private long m_maxShutdownWaitTime = 4567;
+  private final ObjectExtensions<AbstractClientSession, IClientSessionExtension<? extends AbstractClientSession>> m_objectExtensions;
 
   public AbstractClientSession(boolean autoInitConfig) {
     m_clientSessionData = new HashMap<String, Object>();
@@ -90,9 +105,33 @@ public abstract class AbstractClientSession implements IClientSession {
     m_isStopping = false;
     m_sharedVariableMap = new SharedVariableMap();
     m_locale = LocaleThreadLocal.get();
+    m_objectExtensions = new ObjectExtensions<AbstractClientSession, IClientSessionExtension<? extends AbstractClientSession>>(this);
     if (autoInitConfig) {
-      initConfig();
+      interceptInitConfig();
     }
+  }
+
+  @Override
+  public final List<? extends IClientSessionExtension<? extends AbstractClientSession>> getAllExtensions() {
+    return m_objectExtensions.getAllExtensions();
+  }
+
+  @Override
+  public <T extends IExtension<?>> T getExtension(Class<T> c) {
+    return m_objectExtensions.getExtension(c);
+  }
+
+  protected IClientSessionExtension<? extends AbstractClientSession> createLocalExtension() {
+    return new LocalClientSessionExtension<AbstractClientSession>(this);
+  }
+
+  protected final void interceptInitConfig() {
+    m_objectExtensions.initConfig(createLocalExtension(), new Runnable() {
+      @Override
+      public void run() {
+        initConfig();
+      }
+    });
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
@@ -129,6 +168,9 @@ public abstract class AbstractClientSession implements IClientSession {
     if (locale != null) {
       Locale oldLocale = m_locale;
       m_locale = locale;
+      if (!locale.equals(LocaleThreadLocal.get())) {
+        LocaleThreadLocal.set(locale);
+      }
       if (!locale.equals(oldLocale)) {
         notifyLocaleListeners(locale);
       }
@@ -249,7 +291,7 @@ public abstract class AbstractClientSession implements IClientSession {
       m_scoutTexts = new ScoutTexts();
       // explicitly set the just created instance to the ThreadLocal because it was not available yet, when the job was started.
       TextsThreadLocal.set(m_scoutTexts);
-      execLoadSession();
+      interceptLoadSession();
       setActive(true);
     }
     catch (Throwable t) {
@@ -352,34 +394,99 @@ public abstract class AbstractClientSession implements IClientSession {
     }
     m_exitCode = exitCode;
     try {
-      execStoreSession();
+      interceptStoreSession();
     }
     catch (Throwable t) {
-      LOG.error("store session", t);
+      LOG.error("Failed to store the client session.", t);
     }
     if (m_desktop != null) {
       try {
         m_desktop.closeInternal();
       }
       catch (Throwable t) {
-        LOG.error("close desktop", t);
+        LOG.error("Failed to close the desktop.", t);
       }
       m_desktop = null;
     }
     if (!m_localeListener.isEmpty()) {
       m_localeListener.clear();
     }
-    try {
-      if (getServiceTunnel() != null) {
-        SERVICES.getService(ILogoutService.class).logout();
+
+    if (getMaxShutdownWaitTime() > 0) {
+      scheduleSessionInactivation();
+    }
+    else {
+      inactivateSession();
+    }
+  }
+
+  /**
+   * Delay the client session inactivation for a maximal period of time until all client jobs of this session have
+   * finished. This method does not block the caller.
+   */
+  protected void scheduleSessionInactivation() {
+    new ClientAsyncJob("Wait for client jobs to finish before inactivating the session", this) {
+      @Override
+      protected IStatus runStatus(IProgressMonitor monitor) {
+        final long timeout = getMaxShutdownWaitTime();
+
+        // Wait for the client jobs to finish for a maximal period of time.
+        for (ClientJob clientJob : findClientJobs()) {
+          try {
+            clientJob.join(timeout);
+          }
+          catch (InterruptedException e) {
+            LOG.info(String.format("Interrupted while waiting for the client job to finish. [job=%s]", clientJob), e);
+          }
+        }
+
+        // Inactivate the client session.
+        inactivateSession();
+
+        return Status.OK_STATUS;
+      }
+    }.schedule();
+  }
+
+  /**
+   * Finds all client jobs that belong to this client session. If called on behalf of a client job, that job is not
+   * returned.
+   *
+   * @return {@link Set} of client jobs.
+   */
+  protected Set<ClientJob> findClientJobs() {
+    Job currentJob = ClientJob.getJobManager().currentJob();
+    Set<ClientJob> clientJobs = new HashSet<ClientJob>();
+    for (Job job : Job.getJobManager().find(ClientJob.class)) {
+      ClientJob candidateJob = (ClientJob) job;
+      if (candidateJob.getClientSession() == AbstractClientSession.this && candidateJob != currentJob) {
+        clientJobs.add(candidateJob);
       }
     }
-    catch (Throwable t) {
-      LOG.info("logout on server", t);
+    return clientJobs;
+  }
+
+  protected void inactivateSession() {
+    Set<ClientJob> runningClientJobs = findClientJobs();
+    if (!runningClientJobs.isEmpty()) {
+      LOG.warn(""
+          + "Some running client jobs found while client session is going to shutdown. "
+          + "If waiting for a condition or running a scheduled executor, the associated worker threads may never been released. "
+          + "Please ensure to terminate all client jobs when the session is going down. [session={0}, user={1}, jobs={2}]"
+          , new Object[]{AbstractClientSession.this, getUserId(), runningClientJobs});
+    }
+
+    if (getServiceTunnel() != null) {
+      try {
+        SERVICES.getService(ILogoutService.class).logout();
+      }
+      catch (Throwable e) {
+        LOG.info("Failed to logout from server.", e);
+      }
     }
     setActive(false);
     if (LOG.isInfoEnabled()) {
-      LOG.info("end session event loop");
+      LOG.info("Client session was shutdown successfully [session={0}, user={1}]", AbstractClientSession.this, getUserId());
     }
   }
 
@@ -399,15 +506,6 @@ public abstract class AbstractClientSession implements IClientSession {
 
   protected void setServiceTunnel(IClientServiceTunnel tunnel) {
     m_serviceTunnel = tunnel;
-  }
-
-  /**
-   * @deprecated: use setServiceTunnel(IClientServiceTunnel) instead. Will be removed in the 5.0 Release.
-   */
-  @Deprecated
-  @SuppressWarnings("deprecation")
-  protected void setServiceTunnel(org.eclipse.scout.rt.client.servicetunnel.IServiceTunnel tunnel) {
-    setServiceTunnel((IClientServiceTunnel) tunnel);
   }
 
   @Override
@@ -534,5 +632,56 @@ public abstract class AbstractClientSession implements IClientSession {
       ILocaleListener listener = (ILocaleListener) it.next();
       listener.localeChanged(event);
     }
+  }
+
+  /**
+   * Sets the maximum time (in milliseconds) to wait for each client job to finish when stopping the session before
+   * it is set to inactive. When a value &lt;= 0 is set, the session is set to inactive immediately, without
+   * waiting for client jobs to finish.
+   */
+  public void setMaxShutdownWaitTime(long maxShutdownWaitTime) {
+    m_maxShutdownWaitTime = maxShutdownWaitTime;
+  }
+
+  /**
+   * @return the maximum time (in milliseconds) to wait for each client job to finish when stopping the session before
+   *         it is set to inactive. The default value is 4567, which should be reasonable for most use cases.
+   */
+  public long getMaxShutdownWaitTime() {
+    return m_maxShutdownWaitTime;
+  }
+
+  /**
+   * The extension delegating to the local methods. This Extension is always at the end of the chain and will not call
+   * any further chain elements.
+   */
+  protected static class LocalClientSessionExtension<OWNER extends AbstractClientSession> extends AbstractExtension<OWNER> implements IClientSessionExtension<OWNER> {
+
+    public LocalClientSessionExtension(OWNER owner) {
+      super(owner);
+    }
+
+    @Override
+    public void execStoreSession(ClientSessionStoreSessionChain chain) throws ProcessingException {
+      getOwner().execStoreSession();
+    }
+
+    @Override
+    public void execLoadSession(ClientSessionLoadSessionChain chain) throws ProcessingException {
+      getOwner().execLoadSession();
+    }
+
+  }
+
+  protected final void interceptStoreSession() throws ProcessingException {
+    List<? extends IClientSessionExtension<? extends AbstractClientSession>> extensions = getAllExtensions();
+    ClientSessionStoreSessionChain chain = new ClientSessionStoreSessionChain(extensions);
+    chain.execStoreSession();
+  }
+
+  protected final void interceptLoadSession() throws ProcessingException {
+    List<? extends IClientSessionExtension<? extends AbstractClientSession>> extensions = getAllExtensions();
+    ClientSessionLoadSessionChain chain = new ClientSessionLoadSessionChain(extensions);
+    chain.execLoadSession();
   }
 }

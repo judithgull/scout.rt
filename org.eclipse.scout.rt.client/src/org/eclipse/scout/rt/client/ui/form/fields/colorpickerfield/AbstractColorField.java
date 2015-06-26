@@ -20,6 +20,7 @@ import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.colorpickerfield.IColorFieldExtension;
 import org.eclipse.scout.rt.client.ui.form.fields.AbstractBasicField;
 import org.eclipse.scout.rt.shared.AbstractIcons;
 import org.eclipse.scout.rt.shared.ScoutTexts;
@@ -76,9 +77,9 @@ public abstract class AbstractColorField extends AbstractBasicField<String> impl
         int r = Integer.valueOf(matcher.group(1));
         int g = Integer.valueOf(matcher.group(2));
         int b = Integer.valueOf(matcher.group(3));
-        if (r < 0 || r > 255 ||
-            g < 0 || g > 255 ||
-            b < 0 || b > 255) {
+        if (r < 0 || r > 255
+            || g < 0 || g > 255
+            || b < 0 || b > 255) {
           throw new ProcessingException(ScoutTexts.get("InvalidValueMessageX", text));
         }
         String hexValue = ColorUtility.rgbToText(r, g, b).toUpperCase();
@@ -102,7 +103,7 @@ public abstract class AbstractColorField extends AbstractBasicField<String> impl
   }
 
   // ---------------------------------------------------------------------------------
-  private class P_UiFacade implements IColorFieldUiFacade {
+  private class P_UiFacade extends AbstractBasicField.P_UIFacade implements IColorFieldUiFacade {
     @Override
     public boolean setTextFromUI(String newText, boolean whileTyping) {
       if (newText != null && newText.length() == 0) {
@@ -123,6 +124,18 @@ public abstract class AbstractColorField extends AbstractBasicField<String> impl
       }
     }
 
+  }
+
+  protected static class LocalColorFieldExtension<OWNER extends AbstractColorField> extends LocalBasicFieldExtension<String, OWNER> implements IColorFieldExtension<OWNER> {
+
+    public LocalColorFieldExtension(OWNER owner) {
+      super(owner);
+    }
+  }
+
+  @Override
+  protected IColorFieldExtension<? extends AbstractColorField> createLocalExtension() {
+    return new LocalColorFieldExtension<AbstractColorField>(this);
   }
 
 }

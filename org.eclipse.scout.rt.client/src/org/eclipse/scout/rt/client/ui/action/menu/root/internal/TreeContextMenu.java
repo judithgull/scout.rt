@@ -11,16 +11,15 @@
 package org.eclipse.scout.rt.client.ui.action.menu.root.internal;
 
 import java.beans.PropertyChangeEvent;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
-import org.eclipse.scout.commons.exception.ProcessingException;
-import org.eclipse.scout.commons.logger.IScoutLogger;
-import org.eclipse.scout.commons.logger.ScoutLogManager;
-import org.eclipse.scout.rt.client.ui.action.ActionUtility;
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.rt.client.ui.action.IAction;
 import org.eclipse.scout.rt.client.ui.action.IActionVisitor;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.MenuUtility;
 import org.eclipse.scout.rt.client.ui.action.menu.root.AbstractPropertyObserverContextMenu;
 import org.eclipse.scout.rt.client.ui.action.menu.root.ITreeContextMenu;
 import org.eclipse.scout.rt.client.ui.basic.table.ITable;
@@ -28,14 +27,12 @@ import org.eclipse.scout.rt.client.ui.basic.tree.ITree;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
 import org.eclipse.scout.rt.client.ui.basic.tree.TreeAdapter;
 import org.eclipse.scout.rt.client.ui.basic.tree.TreeEvent;
-import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
-import org.eclipse.scout.service.SERVICES;
 
 /**
  *
  */
 public class TreeContextMenu extends AbstractPropertyObserverContextMenu<ITree> implements ITreeContextMenu {
-  private static final IScoutLogger LOG = ScoutLogManager.getLogger(TreeContextMenu.class);
+  private Set<? extends ITreeNode> m_currentSelection;
 
   /**
    * @param owner
@@ -48,26 +45,26 @@ public class TreeContextMenu extends AbstractPropertyObserverContextMenu<ITree> 
   protected void initConfig() {
     super.initConfig();
     getOwner().addTreeListener(new P_OwnerTreeListener());
-    // set active filter
-    setActiveFilter(ActionUtility.createMenuFilterVisibleForTreeSelection(getOwner().getSelectedNodes()));
+    // init current menu types
+    setCurrentMenuTypes(MenuUtility.getMenuTypesForTreeSelection(getOwner().getSelectedNodes()));
     calculateLocalVisibility();
   }
 
   @Override
-  protected void afterChildMenusAdd(List<? extends IMenu> newChildMenus) {
+  protected void afterChildMenusAdd(Collection<? extends IMenu> newChildMenus) {
     super.afterChildMenusAdd(newChildMenus);
     handleOwnerEnabledChanged();
   }
 
   @Override
-  protected void afterChildMenusRemove(List<? extends IMenu> childMenusToRemove) {
+  protected void afterChildMenusRemove(Collection<? extends IMenu> childMenusToRemove) {
     super.afterChildMenusRemove(childMenusToRemove);
     handleOwnerEnabledChanged();
   }
 
   /**
-  *
-  */
+   *
+   */
   protected void handleOwnerEnabledChanged() {
     if (getOwner() != null) {
       final boolean enabled = getOwner().isEnabled();
@@ -86,30 +83,55 @@ public class TreeContextMenu extends AbstractPropertyObserverContextMenu<ITree> 
     }
   }
 
-  /**
-  *
-  */
+  @Override
+  public void callOwnerValueChanged() {
+    handleOwnerValueChanged();
+  }
+
   protected void handleOwnerValueChanged() {
     if (getOwner() != null) {
       final Set<ITreeNode> ownerSelection = getOwner().getSelectedNodes();
-      acceptVisitor(new IActionVisitor() {
-        @Override
-        public int visit(IAction action) {
-          if (action instanceof IMenu) {
-            IMenu menu = (IMenu) action;
-            try {
-              menu.handleOwnerValueChanged(ownerSelection);
-            }
-            catch (ProcessingException ex) {
-              SERVICES.getService(IExceptionHandlerService.class).handleException(ex);
-            }
-          }
-          return CONTINUE;
-        }
-      });
-      // set active filter
-      setActiveFilter(ActionUtility.createMenuFilterVisibleForTreeSelection(ownerSelection));
+      m_currentSelection = CollectionUtility.hashSet(ownerSelection);
+      setCurrentMenuTypes(MenuUtility.getMenuTypesForTreeSelection(ownerSelection));
+      acceptVisitor(new MenuOwnerChangedVisitor(ownerSelection, getCurrentMenuTypes()));
+      // update menu types
       calculateLocalVisibility();
+      calculateEnableState(ownerSelection);
+    }
+  }
+
+  /**
+   * @param ownerSelection
+   */
+  protected void calculateEnableState(Collection<? extends ITreeNode> ownerSelection) {
+    boolean enabled = true;
+    for (ITreeNode node : ownerSelection) {
+      if (!node.isEnabled()) {
+        enabled = false;
+        break;
+      }
+    }
+    final boolean inheritedEnability = enabled;
+    acceptVisitor(new IActionVisitor() {
+      @Override
+      public int visit(IAction action) {
+        if (action instanceof IMenu) {
+          IMenu menu = (IMenu) action;
+          if (!menu.hasChildActions() && menu.isInheritAccessibility()) {
+            menu.setEnabledInheritAccessibility(inheritedEnability);
+          }
+        }
+        return CONTINUE;
+      }
+    });
+  }
+
+  /**
+   * @param nodes
+   */
+  protected void handleNodesUpdated(Collection<ITreeNode> nodes) {
+    if (CollectionUtility.containsAny(nodes, m_currentSelection)) {
+      calculateEnableState(m_currentSelection);
     }
   }
 
@@ -126,6 +148,9 @@ public class TreeContextMenu extends AbstractPropertyObserverContextMenu<ITree> 
     public void treeChanged(TreeEvent e) {
       if (e.getType() == TreeEvent.TYPE_NODES_SELECTED) {
         handleOwnerValueChanged();
+      }
+      else if (e.getType() == TreeEvent.TYPE_NODES_UPDATED) {
+        handleNodesUpdated(e.getNodes());
       }
     }
   }

@@ -2,7 +2,7 @@
 <feature
       id="org.eclipse.scout.rt.rap"
       label="%featureName"
-      version="4.0.0.qualifier"
+      version="5.0.0.qualifier"
       provider-name="%providerName"
       license-feature="org.eclipse.license"
       license-feature-version="0.0.0">
@@ -20,24 +20,19 @@
    </license>
 
    <url>
-      <update label="%updateSiteName" url="http://download.eclipse.org/releases/luna"/>
-      <discovery label="%updateSiteName" url="http://download.eclipse.org/releases/luna"/>
+      <update label="%updateSiteName" url="http://download.eclipse.org/releases/mars"/>
+      <discovery label="%updateSiteName" url="http://download.eclipse.org/releases/mars"/>
    </url>
 
    <requires>
-      <import feature="org.eclipse.rap.feature" version="2.0.0" match="compatible"/>
-      <import feature="org.eclipse.scout.rt.client" version="4.0.0" match="compatible"/>
+      <import feature="org.eclipse.rap.feature" version="2.3.0" match="greaterOrEqual"/>
+      <import feature="org.eclipse.scout.rt.client" version="5.0.0" match="compatible"/>
+      <import plugin="org.apache.commons.io"/>
+      <import plugin="org.apache.commons.fileupload"/>
    </requires>
 
    <plugin
          id="org.eclipse.scout.rt.ui.rap"
-         download-size="0"
-         install-size="0"
-         version="0.0.0"
-         unpack="false"/>
-
-   <plugin
-         id="org.eclipse.scout.rt.ui.rap.workbench"
          download-size="0"
          install-size="0"
          version="0.0.0"
@@ -67,6 +62,20 @@
 
    <plugin
          id="org.eclipse.scout.rt.ui.rap.mobile"
+         download-size="0"
+         install-size="0"
+         version="0.0.0"
+         unpack="false"/>
+
+   <plugin
+         id="org.apache.commons.io"
+         download-size="0"
+         install-size="0"
+         version="0.0.0"
+         unpack="false"/>
+
+   <plugin
+         id="org.apache.commons.fileupload"
          download-size="0"
          install-size="0"
          version="0.0.0"

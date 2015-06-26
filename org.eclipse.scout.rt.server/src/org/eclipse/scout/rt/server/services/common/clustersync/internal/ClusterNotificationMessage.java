@@ -14,17 +14,11 @@ import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificat
 import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificationMessage;
 import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificationMessageProperties;
 
-/**
- *
- */
 public class ClusterNotificationMessage implements IClusterNotificationMessage {
   private static final long serialVersionUID = -4471640837086802256L;
   private final IClusterNotification m_notification;
   private final IClusterNotificationMessageProperties m_props;
 
-  /**
-   *
-   */
   public ClusterNotificationMessage(IClusterNotification notification, IClusterNotificationMessageProperties props) {
     m_notification = notification;
     m_props = props;
@@ -38,6 +32,19 @@ public class ClusterNotificationMessage implements IClusterNotificationMessage {
   @Override
   public IClusterNotificationMessageProperties getProperties() {
     return m_props;
+  }
+
+  @Override
+  public String toString() {
+    return "ClusterNotificationMessage [m_notification=" + m_notification + ", m_props=" + m_props + "]";
+  }
+
+  @Override
+  public boolean coalesce(IClusterNotificationMessage newMessage) {
+    return (m_notification == newMessage.getNotification()) ||
+        (newMessage.getNotification().getClass() == m_notification.getClass()
+            && newMessage.getProperties().equals(m_props)
+            && newMessage.getNotification().coalesce(m_notification));
   }
 
 }

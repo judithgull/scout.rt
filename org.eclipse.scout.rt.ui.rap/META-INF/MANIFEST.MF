@@ -2,19 +2,21 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: Scout UI RAP
 Bundle-SymbolicName: org.eclipse.scout.rt.ui.rap;singleton:=true
-Bundle-Version: 4.0.0.qualifier
+Bundle-Version: 5.0.0.qualifier
 Bundle-Activator: org.eclipse.scout.rt.ui.rap.Activator
 Bundle-Vendor: Eclipse Scout Project
 Require-Bundle: org.eclipse.core.runtime;bundle-version="[3.4.0,4.0.0)";visibility:=reexport,
  org.eclipse.equinox.http.registry;bundle-version="[1.0.100,2.0.0)",
- org.eclipse.scout.rt.shared;bundle-version="[3.7.0,4.1.0)";visibility:=reexport,
- org.eclipse.scout.service;bundle-version="[3.7.0,4.1.0)",
- org.eclipse.scout.rt.server.commons;bundle-version="[4.0.0,4.1.0)",
- org.eclipse.rap.jface;bundle-version="[2.0.0,3.0.0)";visibility:=reexport,
- org.eclipse.rap.jface.databinding;bundle-version="[2.0.0,3.0.0)";visibility:=reexport,
- org.eclipse.rap.ui.forms;bundle-version="[2.0.0,3.0.0)";visibility:=reexport,
- org.eclipse.rap.ui;bundle-version="[2.0.0,3.0.0)";visibility:=reexport,
- org.eclipse.scout.rt.client;bundle-version="[4.0.0,4.1.0)";visibility:=reexport
+ org.eclipse.scout.rt.shared;bundle-version="[5.0.0,5.1.0)";visibility:=reexport,
+ org.eclipse.scout.service;bundle-version="[5.0.0,5.1.0)",
+ org.eclipse.scout.rt.server.commons;bundle-version="[5.0.0,5.1.0)",
+ org.eclipse.rap.jface;bundle-version="[2.3.0,4.0.0)";visibility:=reexport,
+ org.eclipse.rap.jface.databinding;bundle-version="[2.3.0,4.0.0)";visibility:=reexport,
+ org.eclipse.rap.fileupload;bundle-version="[3.0.0,4.0.0)";visibility:=reexport,
+ org.eclipse.rap.filedialog;bundle-version="[3.0.0,4.0.0)";visibility:=reexport,
+ org.eclipse.rap.ui.forms;bundle-version="[2.3.0,4.0.0)";visibility:=reexport,
+ org.eclipse.rap.ui;bundle-version="[2.3.0,4.0.0)";visibility:=reexport,
+ org.eclipse.scout.rt.client;bundle-version="[5.0.0,5.1.0)";visibility:=reexport
 Import-Package: javax.servlet;version="[2.5.0,4.0.0)",
  javax.servlet.http;version="[2.5.0,4.0.0)"
 Export-Package: org.eclipse.scout.rt.ui.rap,
@@ -48,6 +50,7 @@ Export-Package: org.eclipse.scout.rt.ui.rap,
  org.eclipse.scout.rt.ui.rap.form.fields.composer,
  org.eclipse.scout.rt.ui.rap.form.fields.datefield,
  org.eclipse.scout.rt.ui.rap.form.fields.datefield.chooser,
+ org.eclipse.scout.rt.ui.rap.form.fields.filechooserfield,
  org.eclipse.scout.rt.ui.rap.form.fields.groupbox,
  org.eclipse.scout.rt.ui.rap.form.fields.groupbox.layout,
  org.eclipse.scout.rt.ui.rap.form.fields.htmlfield,
@@ -75,6 +78,7 @@ Export-Package: org.eclipse.scout.rt.ui.rap,
  org.eclipse.scout.rt.ui.rap.internal.servletfilter,
  org.eclipse.scout.rt.ui.rap.keystroke,
  org.eclipse.scout.rt.ui.rap.login.internal,
+ org.eclipse.scout.rt.ui.rap.patches,
  org.eclipse.scout.rt.ui.rap.services.common.clipboard,
  org.eclipse.scout.rt.ui.rap.services.common.icon,
  org.eclipse.scout.rt.ui.rap.servletfilter,
@@ -91,8 +95,7 @@ Export-Package: org.eclipse.scout.rt.ui.rap,
  org.eclipse.scout.rt.ui.rap.window.dialog,
  org.eclipse.scout.rt.ui.rap.window.filechooser,
  org.eclipse.scout.rt.ui.rap.window.filedownloader,
- org.eclipse.scout.rt.ui.rap.window.layout,
  org.eclipse.scout.rt.ui.rap.window.messagebox,
  org.eclipse.scout.rt.ui.rap.window.popup
-Bundle-RequiredExecutionEnvironment: JavaSE-1.6
+Bundle-RequiredExecutionEnvironment: JavaSE-1.7
 Bundle-ActivationPolicy: lazy

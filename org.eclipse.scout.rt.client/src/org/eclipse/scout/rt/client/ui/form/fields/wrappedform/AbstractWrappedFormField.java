@@ -20,6 +20,7 @@ import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.commons.xmlparser.SimpleXmlElement;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.wrappedform.IWrappedFormFieldExtension;
 import org.eclipse.scout.rt.client.ui.desktop.outline.pages.ISearchForm;
 import org.eclipse.scout.rt.client.ui.form.IForm;
 import org.eclipse.scout.rt.client.ui.form.IFormFieldVisitor;
@@ -28,6 +29,7 @@ import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.service.SERVICES;
 
+@SuppressWarnings("deprecation")
 @ClassId("535cfd11-39cf-4804-beef-2bc1bc3d34cc")
 public abstract class AbstractWrappedFormField<T extends IForm> extends AbstractFormField implements IWrappedFormField<T> {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractWrappedFormField.class);
@@ -220,5 +222,17 @@ public abstract class AbstractWrappedFormField<T extends IForm> extends Abstract
       fireSubtreePropertyChange(e);
     }
   }// end private class
+
+  protected static class LocalWrappedFormFieldExtension<T extends IForm, OWNER extends AbstractWrappedFormField<T>> extends LocalFormFieldExtension<OWNER> implements IWrappedFormFieldExtension<T, OWNER> {
+
+    public LocalWrappedFormFieldExtension(OWNER owner) {
+      super(owner);
+    }
+  }
+
+  @Override
+  protected IWrappedFormFieldExtension<T, ? extends AbstractWrappedFormField<T>> createLocalExtension() {
+    return new LocalWrappedFormFieldExtension<T, AbstractWrappedFormField<T>>(this);
+  }
 
 }

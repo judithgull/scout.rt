@@ -15,7 +15,6 @@ import static org.junit.Assert.fail;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 
 import javax.swing.JPanel;
@@ -88,7 +87,7 @@ public class SwingScoutModelFinderUiTest {
     EasyMock.replay(clientSession);
 
     SwingUtilities.invokeAndWait(new Runnable() {
-      final ISwingEnvironment env = new AbstractSwingApplication() {
+      final ISwingEnvironment m_env = new AbstractSwingApplication() {
 
         @Override
         protected IClientSession getClientSession() {
@@ -101,7 +100,7 @@ public class SwingScoutModelFinderUiTest {
       public void run() {
         try {
           //create swing environment
-          env.showGUI(clientSession);
+          m_env.showGUI(clientSession);
 
           //form fields
           AllFieldsTestForm testScoutForm = new AllFieldsTestForm();
@@ -111,6 +110,7 @@ public class SwingScoutModelFinderUiTest {
 
         }
         catch (ProcessingException e) {
+          LOG.error(e.getMessage(), e);
           fail("" + e.getMessage());
         }
 
@@ -118,7 +118,7 @@ public class SwingScoutModelFinderUiTest {
 
       private void testFormField(IFormField formFieldModel) {
         JPanel testContainer = new JPanel();
-        ISwingScoutFormField formField = env.createFormField(testContainer, formFieldModel);
+        ISwingScoutFormField formField = m_env.createFormField(testContainer, formFieldModel);
         Object resolvedScoutModel = m_swingScoutModelFinder.getScoutModel(formField.getSwingField());
         assertEquals("Finding scout model failed ", formFieldModel, resolvedScoutModel);
       }
@@ -248,14 +248,6 @@ public class SwingScoutModelFinderUiTest {
       public class DateField extends AbstractDateField {
       }
 
-//      @Order(70.0)
-//      public class DateField2 extends AbstractDateField {
-//        @Override
-//        protected boolean getConfiguredHasTime() {
-//          return true;
-//        }
-//      }
-
       @Order(80.0)
       public class GroupBox extends AbstractGroupBox {
 
@@ -336,7 +328,7 @@ public class SwingScoutModelFinderUiTest {
 
   public static class PageWithTableOutline extends AbstractOutline {
     @Override
-    protected void execCreateChildPages(Collection<IPage> pageList) throws ProcessingException {
+    protected void execCreateChildPages(List<IPage> pageList) throws ProcessingException {
       pageList.add(new PageWithTable());
     }
   }
@@ -349,11 +341,11 @@ public class SwingScoutModelFinderUiTest {
     }
 
     @Override
-    protected Object[][] execLoadTableData(SearchFilter filter) throws ProcessingException {
-      return new Object[][]{
+    protected void execLoadData(SearchFilter filter) throws ProcessingException {
+      importTableData(new Object[][]{
           new Object[]{1L, "Apache"},
           new Object[]{2L, "Eclipse"},
-          new Object[]{3L, "Oracle"},};
+          new Object[]{3L, "Oracle"},});
     }
 
     @Override

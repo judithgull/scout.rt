@@ -28,8 +28,13 @@ import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ClientAsyncJob;
 import org.eclipse.scout.rt.client.ClientSyncJob;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.IFormFieldExtension;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.smartfield.IMixedSmartFieldExtension;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.smartfield.MixedSmartFieldChains.MixedSmartFieldConvertKeyToValueChain;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.smartfield.MixedSmartFieldChains.MixedSmartFieldConvertValueToKeyChain;
 import org.eclipse.scout.rt.client.services.lookup.FormFieldProvisioningContext;
 import org.eclipse.scout.rt.client.services.lookup.ILookupCallProvisioningService;
+import org.eclipse.scout.rt.client.ui.form.fields.AbstractFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.ParsingFailedStatus;
 import org.eclipse.scout.rt.client.ui.form.fields.button.IButton;
 import org.eclipse.scout.rt.shared.ScoutTexts;
@@ -44,12 +49,12 @@ import org.eclipse.scout.service.SERVICES;
  * The default implementation of {@link #convertKeyToValue(Object)} and {@link #convertValueToKey(Object)} methods works
  * for any case where <VALUE_TYPE extends LOOKUP_CALL_KEY_TYPE>. For all other cases provide your own conversion
  * methods.
- * 
- * @param <VALUE_TYPE>
- * @param <LOOKUP_CALL_KEY_TYPE>
+ *
+ * @param <VALUE>
+ * @param <LOOKUP_KEY>
  */
 @ScoutSdkIgnore
-public class AbstractMixedSmartField<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE> extends AbstractContentAssistField<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE> {
+public abstract class AbstractMixedSmartField<VALUE, LOOKUP_KEY> extends AbstractContentAssistField<VALUE, LOOKUP_KEY> implements IMixedSmartField<VALUE, LOOKUP_KEY> {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractMixedSmartField.class);
   private P_GetLookupRowByKeyJob m_currentGetLookupRowByKeyJob;
   private P_UIFacade m_uiFacade;
@@ -64,28 +69,28 @@ public class AbstractMixedSmartField<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE> extends A
 
   /**
    * the default implementation simply casts one to the other type
-   * 
+   *
    * @param key
    * @return
    */
   @SuppressWarnings("unchecked")
   @ConfigOperation
   @Order(400)
-  protected VALUE_TYPE execConvertKeyToValue(LOOKUP_CALL_KEY_TYPE key) {
-    return (VALUE_TYPE) key;
+  protected VALUE execConvertKeyToValue(LOOKUP_KEY key) {
+    return (VALUE) key;
   }
 
   /**
    * the default implementation simply casts one to the other type
-   * 
+   *
    * @param key
    * @return
    */
   @SuppressWarnings("unchecked")
   @ConfigOperation
   @Order(410)
-  protected LOOKUP_CALL_KEY_TYPE execConvertValueToKey(VALUE_TYPE value) {
-    return (LOOKUP_CALL_KEY_TYPE) value;
+  protected LOOKUP_KEY execConvertValueToKey(VALUE value) {
+    return (LOOKUP_KEY) value;
   }
 
   @Override
@@ -100,17 +105,17 @@ public class AbstractMixedSmartField<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE> extends A
   }
 
   @Override
-  public LOOKUP_CALL_KEY_TYPE getValueAsLookupKey() {
-    return execConvertValueToKey(getValue());
+  public LOOKUP_KEY getValueAsLookupKey() {
+    return interceptConvertValueToKey(getValue());
   }
 
   @Override
-  protected VALUE_TYPE parseValueInternal(String text) throws ProcessingException {
+  protected VALUE parseValueInternal(String text) throws ProcessingException {
     if (text != null && text.length() == 0) {
       text = null;
     }
-    IContentAssistFieldProposalForm<LOOKUP_CALL_KEY_TYPE> smartForm = getProposalForm();
-    ILookupRow<LOOKUP_CALL_KEY_TYPE> acceptedProposalRow = null;
+    IContentAssistFieldProposalForm<LOOKUP_KEY> smartForm = getProposalForm();
+    ILookupRow<LOOKUP_KEY> acceptedProposalRow = null;
     if (smartForm != null && StringUtility.equalsIgnoreNewLines(smartForm.getSearchText(), text)) {
       acceptedProposalRow = smartForm.getAcceptedProposal();
     }
@@ -126,7 +131,7 @@ public class AbstractMixedSmartField<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE> extends A
         // changed
         if (acceptedProposalRow != null) {
           setCurrentLookupRow(acceptedProposalRow);
-          return execConvertKeyToValue(acceptedProposalRow.getKey());
+          return interceptConvertKeyToValue(acceptedProposalRow.getKey());
         }
         else if (text == null) {
           setCurrentLookupRow(EMPTY_LOOKUP_ROW);
@@ -134,13 +139,13 @@ public class AbstractMixedSmartField<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE> extends A
         }
         else {
           doSearch(text, false, true);
-          IContentAssistFieldDataFetchResult<LOOKUP_CALL_KEY_TYPE> fetchResult = getLookupRowFetcher().getResult();
+          IContentAssistFieldDataFetchResult<LOOKUP_KEY> fetchResult = getLookupRowFetcher().getResult();
           if (fetchResult != null && fetchResult.getLookupRows() != null && fetchResult.getLookupRows().size() == 1) {
             acceptedProposalRow = CollectionUtility.firstElement(fetchResult.getLookupRows());
           }
           if (acceptedProposalRow != null) {
             setCurrentLookupRow(acceptedProposalRow);
-            return execConvertKeyToValue(acceptedProposalRow.getKey());
+            return interceptConvertKeyToValue(acceptedProposalRow.getKey());
           }
           else {
             // no match possible and proposal is inactive; reject change
@@ -162,9 +167,9 @@ public class AbstractMixedSmartField<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE> extends A
   }
 
   @Override
-  public void acceptProposal(ILookupRow<LOOKUP_CALL_KEY_TYPE> row) {
+  public void acceptProposal(ILookupRow<LOOKUP_KEY> row) {
     setCurrentLookupRow(row);
-    setValue(execConvertKeyToValue(row.getKey()));
+    setValue(interceptConvertKeyToValue(row.getKey()));
   }
 
   @Override
@@ -178,22 +183,17 @@ public class AbstractMixedSmartField<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE> extends A
   }
 
   @Override
-  protected void installLookupRowContext(ILookupRow<LOOKUP_CALL_KEY_TYPE> row) {
+  protected void installLookupRowContext(ILookupRow<LOOKUP_KEY> row) {
     setCurrentLookupRow(row);
     super.installLookupRowContext(row);
   }
 
   @Override
-  protected String formatValueInternal(VALUE_TYPE validKey) {
-    // check if current context row is still valid
-    if (getCurrentLookupRow() != null) {
-      if (validKey == getCurrentLookupRow().getKey() || (validKey != null && validKey.equals(getCurrentLookupRow().getKey()))) {
-        // still valid
-      }
-      else {
-        setCurrentLookupRow(null);
-      }
+  protected String formatValueInternal(VALUE validKey) {
+    if (!isCurrentLookupRowValid(validKey)) {
+      setCurrentLookupRow(null);
     }
+
     /*
      * Ticket 76232
      */
@@ -222,7 +222,7 @@ public class AbstractMixedSmartField<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE> extends A
       if (getLookupCall() != null) {
         try {
           if (getLookupCall() instanceof LocalLookupCall) {
-            List<? extends ILookupRow<LOOKUP_CALL_KEY_TYPE>> rows = callKeyLookup(execConvertValueToKey(validKey));
+            List<? extends ILookupRow<LOOKUP_KEY>> rows = callKeyLookup(interceptConvertValueToKey(validKey));
             if (rows != null && !rows.isEmpty()) {
               installLookupRowContext(rows.get(0));
             }
@@ -233,8 +233,8 @@ public class AbstractMixedSmartField<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE> extends A
           else {
             // enqueue LookupRow fetcher
             // this will lateron call installLookupRowContext()
-            ILookupCall<LOOKUP_CALL_KEY_TYPE> call = SERVICES.getService(ILookupCallProvisioningService.class).newClonedInstance(getLookupCall(), new FormFieldProvisioningContext(AbstractMixedSmartField.this));
-            prepareKeyLookup(call, execConvertValueToKey(validKey));
+            ILookupCall<LOOKUP_KEY> call = SERVICES.getService(ILookupCallProvisioningService.class).newClonedInstance(getLookupCall(), new FormFieldProvisioningContext(AbstractMixedSmartField.this));
+            prepareKeyLookup(call, interceptConvertValueToKey(validKey));
             m_currentGetLookupRowByKeyJob = new P_GetLookupRowByKeyJob(call);
             m_currentGetLookupRowByKeyJob.schedule();
           }
@@ -251,7 +251,7 @@ public class AbstractMixedSmartField<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE> extends A
   public void refreshDisplayText() {
     if (getLookupCall() != null && getValue() != null) {
       try {
-        List<? extends ILookupRow<LOOKUP_CALL_KEY_TYPE>> rows = callKeyLookup(execConvertValueToKey(getValue()));
+        List<? extends ILookupRow<LOOKUP_KEY>> rows = callKeyLookup(interceptConvertValueToKey(getValue()));
         if (rows != null && !rows.isEmpty()) {
           installLookupRowContext(rows.get(0));
         }
@@ -263,15 +263,15 @@ public class AbstractMixedSmartField<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE> extends A
   }
 
   @Override
-  protected IContentAssistFieldProposalForm<LOOKUP_CALL_KEY_TYPE> createProposalForm() throws ProcessingException {
+  protected IContentAssistFieldProposalForm<LOOKUP_KEY> createProposalForm() throws ProcessingException {
     return createProposalForm(false);
   }
 
   @Override
-  protected void handleProposalFormClosed(IContentAssistFieldProposalForm<LOOKUP_CALL_KEY_TYPE> proposalForm) throws ProcessingException {
+  protected void handleProposalFormClosed(IContentAssistFieldProposalForm<LOOKUP_KEY> proposalForm) throws ProcessingException {
     if (getProposalForm() == proposalForm) {
       if (proposalForm.getCloseSystemType() == IButton.SYSTEM_TYPE_OK) {
-        ILookupRow<LOOKUP_CALL_KEY_TYPE> row = proposalForm.getAcceptedProposal();
+        ILookupRow<LOOKUP_KEY> row = proposalForm.getAcceptedProposal();
         if (row != null) {
           acceptProposal(row);
         }
@@ -284,8 +284,8 @@ public class AbstractMixedSmartField<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE> extends A
   }
 
   @Override
-  protected void handleFetchResult(IContentAssistFieldDataFetchResult<LOOKUP_CALL_KEY_TYPE> result) {
-    IContentAssistFieldProposalForm<LOOKUP_CALL_KEY_TYPE> smartForm = getProposalForm();
+  protected void handleFetchResult(IContentAssistFieldDataFetchResult<LOOKUP_KEY> result) {
+    IContentAssistFieldProposalForm<LOOKUP_KEY> smartForm = getProposalForm();
     if (smartForm != null && result != null) {
       smartForm.dataFetchedDelegate(result, getBrowseMaxRowCount());
     }
@@ -353,7 +353,7 @@ public class AbstractMixedSmartField<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE> extends A
         newText = BROWSE_ALL_TEXT;
       }
       try {
-        IContentAssistFieldProposalForm<LOOKUP_CALL_KEY_TYPE> smartForm = getProposalForm();
+        IContentAssistFieldProposalForm<LOOKUP_KEY> smartForm = getProposalForm();
         if (smartForm == null) {
           setActiveFilter(TriState.TRUE);
           smartForm = createProposalForm();
@@ -410,16 +410,16 @@ public class AbstractMixedSmartField<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE> extends A
   }
 
   private class P_GetLookupRowByKeyJob extends ClientSyncJob {
-    private List<ILookupRow<LOOKUP_CALL_KEY_TYPE>> m_rows;
+    private List<ILookupRow<LOOKUP_KEY>> m_rows;
     private final ClientAsyncJob m_backgroundJob;
 
-    public P_GetLookupRowByKeyJob(final ILookupCall<LOOKUP_CALL_KEY_TYPE> call) {
+    public P_GetLookupRowByKeyJob(final ILookupCall<LOOKUP_KEY> call) {
       super("Fetch smartfield data for " + getLabel(), getCurrentSession());
       // immediately start a thread that fetches data async
       m_backgroundJob = new ClientAsyncJob("Fetch smartfield data", ClientSyncJob.getCurrentSession()) {
         @Override
         protected void runVoid(IProgressMonitor monitor) throws Throwable {
-          List<ILookupRow<LOOKUP_CALL_KEY_TYPE>> result = new ArrayList<ILookupRow<LOOKUP_CALL_KEY_TYPE>>(call.getDataByKey());
+          List<ILookupRow<LOOKUP_KEY>> result = new ArrayList<ILookupRow<LOOKUP_KEY>>(call.getDataByKey());
           filterKeyLookup(call, result);
           m_rows = cleanupResultList(result);
         }
@@ -454,5 +454,39 @@ public class AbstractMixedSmartField<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE> extends A
         }
       }
     }
+  }
+
+  protected static class LocalMixedSmartFieldExtension<VALUE, LOOKUP_KEY, OWNER extends AbstractMixedSmartField<VALUE, LOOKUP_KEY>> extends LocalContentAssistFieldExtension<VALUE, LOOKUP_KEY, OWNER> implements IMixedSmartFieldExtension<VALUE, LOOKUP_KEY, OWNER> {
+
+    public LocalMixedSmartFieldExtension(OWNER owner) {
+      super(owner);
+    }
+
+    @Override
+    public LOOKUP_KEY execConvertValueToKey(MixedSmartFieldConvertValueToKeyChain<VALUE, LOOKUP_KEY> chain, VALUE value) {
+      return getOwner().execConvertValueToKey(value);
+    }
+
+    @Override
+    public VALUE execConvertKeyToValue(MixedSmartFieldConvertKeyToValueChain<VALUE, LOOKUP_KEY> chain, LOOKUP_KEY key) {
+      return getOwner().execConvertKeyToValue(key);
+    }
+  }
+
+  @Override
+  protected IMixedSmartFieldExtension<VALUE, LOOKUP_KEY, ? extends AbstractMixedSmartField<VALUE, LOOKUP_KEY>> createLocalExtension() {
+    return new LocalMixedSmartFieldExtension<VALUE, LOOKUP_KEY, AbstractMixedSmartField<VALUE, LOOKUP_KEY>>(this);
+  }
+
+  protected final LOOKUP_KEY interceptConvertValueToKey(VALUE value) {
+    List<? extends IFormFieldExtension<? extends AbstractFormField>> extensions = getAllExtensions();
+    MixedSmartFieldConvertValueToKeyChain<VALUE, LOOKUP_KEY> chain = new MixedSmartFieldConvertValueToKeyChain<VALUE, LOOKUP_KEY>(extensions);
+    return chain.execConvertValueToKey(value);
+  }
+
+  protected final VALUE interceptConvertKeyToValue(LOOKUP_KEY key) {
+    List<? extends IFormFieldExtension<? extends AbstractFormField>> extensions = getAllExtensions();
+    MixedSmartFieldConvertKeyToValueChain<VALUE, LOOKUP_KEY> chain = new MixedSmartFieldConvertKeyToValueChain<VALUE, LOOKUP_KEY>(extensions);
+    return chain.execConvertKeyToValue(key);
   }
 }

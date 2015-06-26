@@ -11,6 +11,7 @@
 package org.eclipse.scout.rt.client.ui.form.fields.stringfield;
 
 import java.net.URL;
+import java.util.List;
 
 import org.eclipse.scout.commons.IOUtility;
 import org.eclipse.scout.commons.StringUtility;
@@ -22,9 +23,15 @@ import org.eclipse.scout.commons.dnd.TransferObject;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.IFormFieldExtension;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.stringfield.IStringFieldExtension;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.stringfield.StringFieldChains.StringFieldDragRequestChain;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.stringfield.StringFieldChains.StringFieldDropRequestChain;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.stringfield.StringFieldChains.StringFieldLinkActionChain;
 import org.eclipse.scout.rt.client.ui.IDNDSupport;
 import org.eclipse.scout.rt.client.ui.desktop.outline.pages.ISearchForm;
 import org.eclipse.scout.rt.client.ui.form.fields.AbstractBasicField;
+import org.eclipse.scout.rt.client.ui.form.fields.AbstractFormField;
 import org.eclipse.scout.rt.shared.data.form.ValidationRule;
 
 @ClassId("d8b1f73a-4415-4477-8408-e6ada9e69551")
@@ -42,6 +49,11 @@ public abstract class AbstractStringField extends AbstractBasicField<String> imp
 
   public AbstractStringField(boolean callInitializer) {
     super(callInitializer);
+  }
+
+  @Override
+  protected IStringFieldExtension<? extends AbstractStringField> createLocalExtension() {
+    return new LocalStringFieldExtension<AbstractStringField>(this);
   }
 
   /*
@@ -120,12 +132,30 @@ public abstract class AbstractStringField extends AbstractBasicField<String> imp
     return true;
   }
 
+  /**
+   * Configures the drop support of this string field.
+   * <p>
+   * Subclasses can override this method. Default is {@code 0} (no drop support).
+   *
+   * @return {@code 0} for no support or one or more of {@link IDNDSupport#TYPE_FILE_TRANSFER},
+   *         {@link IDNDSupport#TYPE_IMAGE_TRANSFER}, {@link IDNDSupport#TYPE_JAVA_ELEMENT_TRANSFER} or
+   *         {@link IDNDSupport#TYPE_TEXT_TRANSFER} (e.g. {@code TYPE_TEXT_TRANSFER | TYPE_FILE_TRANSFER}).
+   */
   @ConfigProperty(ConfigProperty.DRAG_AND_DROP_TYPE)
   @Order(400)
   protected int getConfiguredDropType() {
     return 0;
   }
 
+  /**
+   * Configures the drag support of this string field.
+   * <p>
+   * Subclasses can override this method. Default is {@code 0} (no drag support).
+   *
+   * @return {@code 0} for no support or one or more of {@link IDNDSupport#TYPE_FILE_TRANSFER},
+   *         {@link IDNDSupport#TYPE_IMAGE_TRANSFER}, {@link IDNDSupport#TYPE_JAVA_ELEMENT_TRANSFER} or
+   *         {@link IDNDSupport#TYPE_TEXT_TRANSFER} (e.g. {@code TYPE_TEXT_TRANSFER | TYPE_FILE_TRANSFER}).
+   */
   @ConfigProperty(ConfigProperty.DRAG_AND_DROP_TYPE)
   @Order(410)
   protected int getConfiguredDragType() {
@@ -343,7 +373,7 @@ public abstract class AbstractStringField extends AbstractBasicField<String> imp
     propertySupport.setPropertyString(PROP_FORMAT, s);
     if (isInitialized()) {
       if (shouldUpdateDisplayText(false)) {
-        String t = execFormatValue(getValue());
+        String t = interceptFormatValue(getValue());
         setDisplayText(t);
       }
     }
@@ -393,7 +423,7 @@ public abstract class AbstractStringField extends AbstractBasicField<String> imp
     return propertySupport.getPropertyInt(PROP_DROP_TYPE);
   }
 
-  private class P_UIFacade implements IStringFieldUIFacade {
+  private class P_UIFacade extends AbstractBasicField.P_UIFacade implements IStringFieldUIFacade {
 
     @Override
     public boolean setTextFromUI(String newText, boolean whileTyping) {
@@ -415,7 +445,7 @@ public abstract class AbstractStringField extends AbstractBasicField<String> imp
     public void fireLinkActionFromUI(String text) {
       URL url = IOUtility.urlTextToUrl(text);
       try {
-        execLinkAction(url);
+        interceptLinkAction(url);
       }
       catch (ProcessingException e) {
         LOG.warn("execLinkAction failed", e);
@@ -445,12 +475,12 @@ public abstract class AbstractStringField extends AbstractBasicField<String> imp
 
     @Override
     public TransferObject fireDragRequestFromUI() {
-      return execDragRequest();
+      return interceptDragRequest();
     }
 
     @Override
     public void fireDropActionFromUi(TransferObject scoutTransferable) {
-      execDropRequest(scoutTransferable);
+      interceptDropRequest(scoutTransferable);
     }
   }
 
@@ -459,11 +489,11 @@ public abstract class AbstractStringField extends AbstractBasicField<String> imp
    */
   @Override
   public boolean isSpellCheckEnabled() {
-    return (!this.isDecorationLink() &&
-        !this.isFormatUpper() &&
-        !this.isFormatLower() &&
-        this.isEnabled() &&
-        this.isEnabledGranted() && (!(this.getForm() instanceof ISearchForm)));
+    return (!this.isDecorationLink()
+        && !this.isFormatUpper()
+        && !this.isFormatLower()
+        && this.isEnabled()
+        && this.isEnabledGranted() && (!(this.getForm() instanceof ISearchForm)));
   }
 
   /**
@@ -484,7 +514,53 @@ public abstract class AbstractStringField extends AbstractBasicField<String> imp
    */
   @Override
   public void setSpellCheckAsYouTypeEnabled(boolean monitorSpelling) {
-    m_monitorSpelling = new Boolean(monitorSpelling);
+    m_monitorSpelling = Boolean.valueOf(monitorSpelling);
+  }
+
+  /**
+   * The extension delegating to the local methods. This Extension is always at the end of the chain and will not call
+   * any further chain elements.
+   */
+  protected static class LocalStringFieldExtension<OWNER_FIELD extends AbstractStringField> extends AbstractBasicField.LocalBasicFieldExtension<String, OWNER_FIELD>
+      implements IStringFieldExtension<OWNER_FIELD> {
+
+    public LocalStringFieldExtension(OWNER_FIELD owner) {
+      super(owner);
+    }
+
+    @Override
+    public void execDropRequest(StringFieldDropRequestChain chain, TransferObject transferObject) {
+      getOwner().execDropRequest(transferObject);
+    }
+
+    @Override
+    public void execLinkAction(StringFieldLinkActionChain chain, URL url) throws ProcessingException {
+      getOwner().execLinkAction(url);
+    }
+
+    @Override
+    public TransferObject execDragRequest(StringFieldDragRequestChain chain) {
+      return getOwner().execDragRequest();
+    }
+
+  }
+
+  protected final void interceptDropRequest(TransferObject transferObject) {
+    List<? extends IFormFieldExtension<? extends AbstractFormField>> extensions = getAllExtensions();
+    StringFieldDropRequestChain chain = new StringFieldDropRequestChain(extensions);
+    chain.execDropRequest(transferObject);
+  }
+
+  protected final void interceptLinkAction(URL url) throws ProcessingException {
+    List<? extends IFormFieldExtension<? extends AbstractFormField>> extensions = getAllExtensions();
+    StringFieldLinkActionChain chain = new StringFieldLinkActionChain(extensions);
+    chain.execLinkAction(url);
+  }
+
+  protected final TransferObject interceptDragRequest() {
+    List<? extends IFormFieldExtension<? extends AbstractFormField>> extensions = getAllExtensions();
+    StringFieldDragRequestChain chain = new StringFieldDragRequestChain(extensions);
+    return chain.execDragRequest();
   }
 
 }

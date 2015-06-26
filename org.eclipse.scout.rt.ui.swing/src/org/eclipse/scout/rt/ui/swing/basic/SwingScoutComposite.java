@@ -136,6 +136,9 @@ public abstract class SwingScoutComposite<T extends IPropertyObserver> implement
     return b;
   }
 
+  /**
+   * Create and initialize UI component for Scout model object
+   */
   @Override
   public void createField(T scoutObject, ISwingEnvironment environment) {
     m_scoutObject = scoutObject;
@@ -167,14 +170,7 @@ public abstract class SwingScoutComposite<T extends IPropertyObserver> implement
       }
       cacheSwingClientProperties();
       connectToScout();
-      installContextMenu();
     }
-  }
-
-  /**
-   *
-   */
-  protected void installContextMenu() {
   }
 
   @Override
@@ -194,7 +190,7 @@ public abstract class SwingScoutComposite<T extends IPropertyObserver> implement
     if (fld != null) {
       // opaque
       if (!existsClientProperty(fld, CLIENT_PROP_INITIAL_OPAQUE)) {
-        putClientProperty(fld, CLIENT_PROP_INITIAL_OPAQUE, new Boolean(fld.isOpaque()));
+        putClientProperty(fld, CLIENT_PROP_INITIAL_OPAQUE, Boolean.valueOf(fld.isOpaque()));
       }
       // background
       if (!existsClientProperty(fld, CLIENT_PROP_INITIAL_BACKGROUND)) {
@@ -260,6 +256,9 @@ public abstract class SwingScoutComposite<T extends IPropertyObserver> implement
     return m_scoutObject;
   }
 
+  /**
+   * Connect child components and attach to Scout model.
+   */
   @Override
   public final void connectToScout() {
     if (!m_connectedToScout) {
@@ -303,6 +302,9 @@ public abstract class SwingScoutComposite<T extends IPropertyObserver> implement
     }
   }
 
+  /**
+   * Disconnect child components and detach to Scout model.
+   */
   @Override
   public final void disconnectFromScout() {
     if (m_connectedToScout) {
@@ -382,7 +384,9 @@ public abstract class SwingScoutComposite<T extends IPropertyObserver> implement
   }
 
   /**
-   * override this method to set scout properties on swing components
+   * Attach Scout Model: <br>
+   * Adds property change listener to Scout model object.
+   * Override this method to set scout properties initially on swing components
    */
   protected void attachScout() {
     if (m_scoutObject != null && m_scoutPropertyListener == null) {
@@ -392,6 +396,7 @@ public abstract class SwingScoutComposite<T extends IPropertyObserver> implement
   }
 
   /**
+   * Detach Scout Model: <br>
    * override this method to remove listeners from scout model
    */
   protected void detachScout() {

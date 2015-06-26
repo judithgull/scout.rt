@@ -28,6 +28,13 @@ public final class NumberUtility {
   private NumberUtility() {
   }
 
+  /**
+   * Converts a Number to a Double.
+   *
+   * @param The
+   *          Number to be converted.
+   * @return The converted Double. Returns <code>null</code> when the input parameter is <code>null</code>.
+   */
   public static Double toDouble(Number n) {
     if (n == null) {
       return null;
@@ -41,6 +48,13 @@ public final class NumberUtility {
     }
   }
 
+  /**
+   * Converts a Number to an Integer.
+   *
+   * @param The
+   *          Number to be converted.
+   * @return The converted Integer. Returns <code>null</code> when the input parameter is <code>null</code>.
+   */
   public static Integer toInteger(Number n) {
     if (n == null) {
       return null;
@@ -48,6 +62,13 @@ public final class NumberUtility {
     return n.intValue();
   }
 
+  /**
+   * Converts a Number to a Long.
+   *
+   * @param The
+   *          Number to be converted.
+   * @return The converted Long. Returns <code>null</code> when the input parameter is <code>null</code>.
+   */
   public static Long toLong(Number n) {
     if (n == null) {
       return null;
@@ -56,10 +77,10 @@ public final class NumberUtility {
   }
 
   /**
-   * Converts a Number into a BigDecimal using it's String representation. If the <code>number</code>'s String
-   * representation cannot be converted to a BigDecimal this method returns <code>null</code> (E.g. for Double and
+   * Converts a Number into a BigDecimal using its String representation. If the <code>number</code>'s String
+   * representation cannot be converted to a BigDecimal this method returns <code>null</code> (e.g. for Double and
    * Floats special values: NaN, POSITIVE_INFINITY and NEGATIVE_INFINITY).
-   * 
+   *
    * @param number
    */
   public static BigDecimal numberToBigDecimal(Number number) {
@@ -76,6 +97,13 @@ public final class NumberUtility {
     return retVal;
   }
 
+  /**
+   * Converts a Double to a BigDecimal.
+   *
+   * @param The
+   *          Double to be converted.
+   * @return The converted BigDecimal. Returns <code>null</code> when the input parameter is <code>null</code>.
+   */
   public static BigDecimal toBigDecimal(Double d) {
     if (d == null) {
       return null;
@@ -83,6 +111,13 @@ public final class NumberUtility {
     return BigDecimal.valueOf(d);
   }
 
+  /**
+   * Converts a Long to a BigInteger.
+   *
+   * @param The
+   *          Long to be converted.
+   * @return The converted BigInteger. Returns <code>null</code> when the input parameter is <code>null</code>.
+   */
   public static BigInteger toBigInteger(Long l) {
     if (l == null) {
       return null;
@@ -90,6 +125,15 @@ public final class NumberUtility {
     return BigInteger.valueOf(l);
   }
 
+  /**
+   * Computes the average value of a vararg of doubles.
+   *
+   * @param The
+   *          vararg of doubles.
+   * @return The average value. Returns 0 if the parameter is null or an empty array.
+   * @deprecated will be removed in 5.1.0; no replacement
+   */
+  @Deprecated
   public static double avg(double... a) {
     if (a == null) {
       return 0;
@@ -104,6 +148,13 @@ public final class NumberUtility {
     }
   }
 
+  /**
+   * Computes the median of a vararg of doubles.
+   *
+   * @param The
+   *          vararg of doubles.
+   * @return The median. Returns 0 if the parameter is null or an empty array.
+   */
   public static double median(double... a) {
     if (a == null) {
       return 0;
@@ -120,14 +171,37 @@ public final class NumberUtility {
     }
   }
 
+  /**
+   * Checks whether the bit at a given position is set.
+   *
+   * @param value
+   * @param index
+   * @return <code>true</code> if the bit at position index is set, <code>false</code> otherwise.
+   */
   public static boolean hasBit(int value, int index) {
     return getBit(value, index);
   }
 
+  /**
+   * Checks whether the bit at a given position is set.
+   *
+   * @param value
+   * @param index
+   * @return <code>true</code> if the bit at position index is set, <code>false</code> otherwise.
+   */
   public static boolean getBit(int value, int index) {
     return (value & (1 << index)) != 0;
   }
 
+  /**
+   * Computes the sum of a vararg of doubles.
+   *
+   * @param The
+   *          vararg of doubles.
+   * @return The sum. Returns 0 if the parameter is null or the length of the vararg is 0.
+   * @deprecated use {@link NumberUtility#sum(Number...)} instead; will be removed in 5.1.0;
+   */
+  @Deprecated
   public static double sum(double... a) {
     if (a == null) {
       return 0;
@@ -143,10 +217,10 @@ public final class NumberUtility {
   }
 
   /**
-   * null lenient
-   * 
+   * Computes the sum of a Collection of Numbers. Is <code>null</code> lenient.
+   *
    * @param numbers
-   * @return the sum of all numbers passt in the given list. Null elements are not considered.
+   * @return the sum of all numbers passed in the given list. Null elements are not considered.
    */
   public static BigDecimal sum(Collection<? extends Number> numbers) {
     BigDecimal sum = BigDecimal.ZERO;
@@ -163,7 +237,7 @@ public final class NumberUtility {
 
   /**
    * Calculates the sum over an array of numbers. Array elements that have no valid BigDecimal representation (e.g.
-   * Double.NaN) are treated as BigDecimal.ZERO.
+   * Double.NaN) are treated as <code>BigDecimal.ZERO</code>.
    */
   public static BigDecimal sum(Number... a) {
     if (a == null) {
@@ -180,6 +254,15 @@ public final class NumberUtility {
     return sum;
   }
 
+  /**
+   * Computes the sum of a vararg of longs.
+   *
+   * @param The
+   *          vararg of longs.
+   * @return The sum. Returns 0 if the parameter is null or the length of the vararg is 0.
+   * @deprecated use {@link NumberUtility#sum(Number...)} instead; will be removed in 5.1.0;
+   */
+  @Deprecated
   public static long sum(long... a) {
     if (a == null) {
       return 0;
@@ -194,6 +277,13 @@ public final class NumberUtility {
     return sum;
   }
 
+  /**
+   * Computes the minimum value of a vararg of doubles.
+   *
+   * @param The
+   *          vararg of doubles.
+   * @return The minimum. Returns 0 if the parameter is null or the length of the vararg is 0.
+   */
   public static double min(double... a) {
     if (a == null) {
       return 0;
@@ -208,6 +298,13 @@ public final class NumberUtility {
     return min;
   }
 
+  /**
+   * Computes the maximum value of a vararg of doubles.
+   *
+   * @param The
+   *          vararg of doubles.
+   * @return The maximum. Returns 0 if the parameter is null or the length of the vararg is 0.
+   */
   public static double max(double... a) {
     if (a == null) {
       return 0;
@@ -222,18 +319,31 @@ public final class NumberUtility {
     return max;
   }
 
+  /**
+   * @return a random long using <code>RANDOMIZER.nextLong()</code>
+   */
   public static long randomLong() {
     return RANDOMIZER.nextLong();
   }
 
+  /**
+   * @return a random int using <code>RANDOMIZER.nextInt()</code>
+   */
   public static int randomInt() {
     return RANDOMIZER.nextInt();
   }
 
+  /**
+   * @param size
+   * @return a random int using <code>RANDOMIZER.nextInt(size)</code>
+   */
   public static int randomInt(int size) {
     return RANDOMIZER.nextInt(size);
   }
 
+  /**
+   * @return a random double using <code>RANDOMIZER.nextDouble()</code>
+   */
   public static double randomDouble() {
     return RANDOMIZER.nextDouble();
   }
@@ -257,17 +367,36 @@ public final class NumberUtility {
     return Math.round(value / precision) * precision;
   }
 
+  /**
+   * Sets a bit of a value at a given position.
+   *
+   * @param value
+   * @param index
+   * @return The value with the bit at the given index set to 1.
+   */
   public static int setBit(int value, int index) {
     return value | (1 << index);
   }
 
+  /**
+   * Clears a bit of a value at a given position.
+   *
+   * @param value
+   * @param index
+   * @return The value with the bit at the given index set to 0.
+   */
   public static int clearBit(int value, int index) {
     return value & (value ^ (1 << index));
   }
 
+  /**
+   * Calculates the signum of a Number
+   *
+   * @return The signum.
+   */
   public static Number sign(Number n) {
     if (n == null) {
-      return new Integer(0);
+      return Integer.valueOf(0);
     }
     double d = n.doubleValue();
     if (d < 0) {
@@ -279,27 +408,50 @@ public final class NumberUtility {
     return new Integer(0);
   }
 
+  /**
+   * Converts a String to an int
+   *
+   * @return the converted int. Returns 0 if the parameter is <code>null</code>.
+   */
   public static int parseInt(String s) {
-    if (s == null) {
+    if (StringUtility.isNullOrEmpty(s)) {
       return 0;
     }
-    return TypeCastUtility.castValue(s, Integer.class);
+    Integer intValue = TypeCastUtility.castValue(s, Integer.class);
+    return intValue;
   }
 
+  /**
+   * Converts a String to a long
+   *
+   * @return The converted long. Returns 0 if the parameter is <code>null</code>.
+   */
   public static long parseLong(String s) {
-    if (s == null) {
+    if (StringUtility.isNullOrEmpty(s)) {
       return 0;
     }
-    return TypeCastUtility.castValue(s, Long.class);
+    Long longValue = TypeCastUtility.castValue(s, Long.class);
+    return longValue;
   }
 
+  /**
+   * Converts a String to a double
+   *
+   * @return The converted double. Returns 0 if the parameter is <code>null</code>.
+   */
   public static double parseDouble(String s) {
-    if (s == null) {
+    if (StringUtility.isNullOrEmpty(s)) {
       return 0;
     }
-    return TypeCastUtility.castValue(s, Double.class);
+    Double doubleValue = TypeCastUtility.castValue(s, Double.class);
+    return doubleValue;
   }
 
+  /**
+   * Formats a number with the <code>LocaleThreadLocal</code>
+   *
+   * @return The formatted number. Returns an empty string if the parameter is <code>null</code>.
+   */
   public static String format(Number n) {
     if (n == null) {
       return "";
@@ -308,6 +460,13 @@ public final class NumberUtility {
     return NumberFormat.getInstance(loc).format(n);
   }
 
+  /**
+   * Imitates the <code>nvl</code> function of Oracle SQL.
+   *
+   * @param value
+   * @param valueWhenNull
+   * @return value if value is not <code>null</code>, otherwise valueWhenNull.
+   */
   public static <T> T nvl(T value, T valueWhenNull) {
     if (value != null) {
       return value;
@@ -317,6 +476,13 @@ public final class NumberUtility {
     }
   }
 
+  /**
+   * Imitates the <code>nvl</code> function of Oracle SQL.
+   *
+   * @param value
+   * @param valueWhenNull
+   * @return value if value is not <code>null</code>, otherwise valueWhenNull
+   */
   public static int nvl(Integer value, Number valueWhenNull) {
     if (value != null) {
       return value;
@@ -326,6 +492,13 @@ public final class NumberUtility {
     }
   }
 
+  /**
+   * Imitates the <code>nvl</code> function of Oracle SQL.
+   *
+   * @param value
+   * @param valueWhenNull
+   * @return value if value is not <code>null</code>, otherwise valueWhenNull
+   */
   public static long nvl(Long value, Number valueWhenNull) {
     if (value != null) {
       return value;
@@ -345,6 +518,13 @@ public final class NumberUtility {
     return Math.floor(n.doubleValue());
   }
 
+  /**
+   * Converts a Long to an int with special attention to overflow issues.
+   *
+   * @return The converted int. If the Long is larger than Integer.MAX_VALUE, it returns Integer.MAX_VALUE.
+   *         If the Long is smaller than Integer.MIN_VALUE, it returns Integer.MIN_VALUE.
+   *         If the parameter is <code>null</code>, it returns 0.
+   */
   public static int longToInt(Long l) {
     if (l != null) {
       if (new Long(Integer.MAX_VALUE).compareTo(l) == -1) {
@@ -358,6 +538,13 @@ public final class NumberUtility {
     return 0;
   }
 
+  /**
+   * Converts an object to a BigDecimal using the string representation of the object.
+   *
+   * @return The converted BigDecimal. Returns <code>null</code> if the object is <code>null</code> or the string
+   *         representation of the object is a zero
+   *         length string.
+   */
   public static BigDecimal getBigDecimalValue(Object o) {
     if (o != null && o.toString().length() > 0) {
       return new BigDecimal(o.toString());
@@ -369,12 +556,14 @@ public final class NumberUtility {
 
   /**
    * Divides two double values, NPE save.
-   * 
+   *
    * @param numerator
    * @param denominator
    * @return null if the numerator is null or the denominator is null or 0.0.
-   *         Else it returns the devision result.
+   *         Else it returns the division result.
+   * @deprecated will be removed in 5.1.0; no replacement
    */
+  @Deprecated
   public static Double divide(Double numerator, Double denominator) {
     if (numerator == null || denominator == null || denominator.equals(0.0)) {
       return null;

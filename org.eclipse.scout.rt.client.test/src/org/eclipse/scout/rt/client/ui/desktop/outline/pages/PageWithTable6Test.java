@@ -13,7 +13,6 @@ package org.eclipse.scout.rt.client.ui.desktop.outline.pages;
 import static org.junit.Assert.assertArrayEquals;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -78,7 +77,7 @@ public class PageWithTable6Test {
 
   private static void assertMenus(PageWithTable.Table table, String[] expectedMenus) {
     List<String> actualMenus = new ArrayList<String>();
-    for (IMenu m : ActionUtility.visibleNormalizedActions(table.getContextMenu().getChildActions(), table.getContextMenu().getActiveFilter())) {
+    for (IMenu m : ActionUtility.normalizedActions(table.getContextMenu().getChildActions(), ActionUtility.createMenuFilterMenuTypes(table.getContextMenu().getCurrentMenuTypes(), true))) {
       if (m.isEnabled()) {
         actualMenus.add(m.getText());
       }
@@ -88,7 +87,7 @@ public class PageWithTable6Test {
 
   public static class Outline extends AbstractOutline {
     @Override
-    protected void execCreateChildPages(Collection<IPage> pageList) throws ProcessingException {
+    protected void execCreateChildPages(List<IPage> pageList) throws ProcessingException {
       pageList.add(new PageWithTable());
     }
   }
@@ -96,10 +95,10 @@ public class PageWithTable6Test {
   public static class PageWithTable extends AbstractPageWithTable<PageWithTable.Table> {
 
     @Override
-    protected Object[][] execLoadTableData(SearchFilter filter) throws ProcessingException {
-      return new Object[][]{
+    protected void execLoadData(SearchFilter filter) throws ProcessingException {
+      importTableData(new Object[][]{
           new Object[]{1, "Enabled Account"},
-          new Object[]{2, "Disabled Account"},};
+          new Object[]{2, "Disabled Account"},});
     }
 
     @Override

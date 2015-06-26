@@ -13,8 +13,9 @@ package org.eclipse.scout.rt.spec.client.gen.extract;
 import org.eclipse.scout.commons.ConfigurationUtility;
 import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.rt.shared.TEXTS;
-import org.eclipse.scout.rt.spec.client.AbstractTypeSpecTest;
+import org.eclipse.scout.rt.shared.services.common.code.ICodeType;
 import org.eclipse.scout.rt.spec.client.out.mediawiki.MediawikiUtility;
+import org.eclipse.scout.rt.spec.client.utility.SpecUtility;
 
 /**
  * Extractor for the entity's documented type (name with link to the doc section where the type is explained).
@@ -59,8 +60,8 @@ public class LinkableTypeExtractor<T> extends AbstractNamedTextExtractor<T> {
     Class hierarchyType = type;
     StringBuilder specType = new StringBuilder();
     while (hierarchyType != null) {
-      if (AbstractTypeSpecTest.isDocType(hierarchyType, m_supertype, m_assumeAllSubtypesDocumented)) {
-        String name = TEXTS.getWithFallback(ConfigurationUtility.getAnnotatedClassIdWithFallback(hierarchyType) + "_name", hierarchyType.getSimpleName());
+      if (SpecUtility.isDocType(hierarchyType, m_supertype, m_assumeAllSubtypesDocumented)) {
+        String name = getName(hierarchyType);
         specType.append(MediawikiUtility.createLink("c_" + ConfigurationUtility.getAnnotatedClassIdWithFallback(hierarchyType), name));
         break;
       }
@@ -70,5 +71,16 @@ public class LinkableTypeExtractor<T> extends AbstractNamedTextExtractor<T> {
       specType.append(type.getSimpleName());
     }
     return specType.toString();
+  }
+
+  private String getName(Class hierarchyType) {
+    String name;
+    if (ICodeType.class.isAssignableFrom(hierarchyType)) {
+      name = new CodeTypeNameExtractor(false).getText(hierarchyType);
+    }
+    else {
+      name = TEXTS.getWithFallback(ConfigurationUtility.getAnnotatedClassIdWithFallback(hierarchyType) + "_name", hierarchyType.getSimpleName());
+    }
+    return name;
   }
 }

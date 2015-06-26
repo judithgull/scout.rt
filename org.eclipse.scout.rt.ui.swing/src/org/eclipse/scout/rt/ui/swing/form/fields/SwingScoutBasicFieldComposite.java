@@ -24,20 +24,24 @@ import org.eclipse.scout.rt.client.ui.form.fields.IBasicField;
 
 /**
  * Common code for Swing fields corresponding to {@link IBasicField}.
- * 
+ *
  * @since 3.10.0-M3
  */
 public abstract class SwingScoutBasicFieldComposite<T extends IBasicField<?>> extends SwingScoutValueFieldComposite<T> {
 
   private boolean m_validateOnAnyKey;
+  protected boolean m_updateDisplayTextOnModify;
+  protected boolean m_updateDisplayTextOnModifyWasTrueSinceLastWriteDown;
 
   /**
    * attach Scout Model: set scout properties
    */
+  @SuppressWarnings("deprecation")
   @Override
   protected void attachScout() {
     IBasicField f = getScoutObject();
     setValidateOnAnyKeyFromScout(f.isValidateOnAnyKey());
+    setUpdateDisplayTextOnModifyFromScout(f.isUpdateDisplayTextOnModify());
 
     //super call must come after reading model properties:
     super.attachScout();
@@ -57,6 +61,13 @@ public abstract class SwingScoutBasicFieldComposite<T extends IBasicField<?>> ex
     m_validateOnAnyKey = b;
   }
 
+  protected void setUpdateDisplayTextOnModifyFromScout(boolean b) {
+    m_updateDisplayTextOnModify = b;
+    if (b) {
+      m_updateDisplayTextOnModifyWasTrueSinceLastWriteDown = true;
+    }
+  }
+
   @Override
   protected void setDisplayTextFromScout(String newText) {
     JTextComponent swingField = getSwingField();
@@ -70,8 +81,14 @@ public abstract class SwingScoutBasicFieldComposite<T extends IBasicField<?>> ex
     if (oldText.equals(newText)) {
       return;
     }
+    updateTextKeepCurserPosition(newText);
+  }
+
+  protected void updateTextKeepCurserPosition(String newText) {
     try {
       getUpdateSwingFromScoutLock().acquire();
+      JTextComponent swingField = getSwingField();
+      String oldText = swingField.getText();
       //
       int startIndex = -1;
       int endIndex = -1;
@@ -116,7 +133,7 @@ public abstract class SwingScoutBasicFieldComposite<T extends IBasicField<?>> ex
   protected boolean handleSwingInputVerifier() {
     final String text = getSwingField().getText();
     // only handle if text has changed
-    if (CompareUtility.equals(text, getScoutObject().getDisplayText()) && getScoutObject().getErrorStatus() == null) {
+    if (!m_updateDisplayTextOnModifyWasTrueSinceLastWriteDown && CompareUtility.equals(text, getScoutObject().getDisplayText()) && getScoutObject().getErrorStatus() == null) {
       return true;
     }
     // notify Scout
@@ -139,6 +156,9 @@ public abstract class SwingScoutBasicFieldComposite<T extends IBasicField<?>> ex
     if (!m_validateOnAnyKey) {
       setSelectionFromSwing();
     }
+    if (m_updateDisplayTextOnModifyWasTrueSinceLastWriteDown && !m_updateDisplayTextOnModify) {
+      m_updateDisplayTextOnModifyWasTrueSinceLastWriteDown = false;
+    }
     return true; // continue always
   }
 
@@ -156,11 +176,15 @@ public abstract class SwingScoutBasicFieldComposite<T extends IBasicField<?>> ex
   /**
    * scout property handler override
    */
+  @SuppressWarnings("deprecation")
   @Override
   protected void handleScoutPropertyChange(String name, Object newValue) {
     super.handleScoutPropertyChange(name, newValue);
     if (name.equals(IBasicField.PROP_VALIDATE_ON_ANY_KEY)) {
       setValidateOnAnyKeyFromScout(((Boolean) newValue).booleanValue());
+    }
+    if (name.equals(IBasicField.PROP_UPDATE_DISPLAY_TEXT_ON_MODIFY)) {
+      setUpdateDisplayTextOnModifyFromScout(((Boolean) newValue).booleanValue());
     }
   }
 
@@ -178,6 +202,7 @@ public abstract class SwingScoutBasicFieldComposite<T extends IBasicField<?>> ex
     @Override
     public void changedUpdate(DocumentEvent e) {
       setInputDirty(true);
+      setDisplayTextInScout();
       if (m_validateOnAnyKey) {
         if (getUpdateSwingFromScoutLock().isReleased()) {
           sendVerifyToScoutAndIgnoreResponses();
@@ -188,6 +213,7 @@ public abstract class SwingScoutBasicFieldComposite<T extends IBasicField<?>> ex
     @Override
     public void insertUpdate(DocumentEvent e) {
       setInputDirty(true);
+      setDisplayTextInScout();
       if (m_validateOnAnyKey) {
         if (getUpdateSwingFromScoutLock().isReleased()) {
           sendVerifyToScoutAndIgnoreResponses();
@@ -198,10 +224,25 @@ public abstract class SwingScoutBasicFieldComposite<T extends IBasicField<?>> ex
     @Override
     public void removeUpdate(DocumentEvent e) {
       setInputDirty(true);
+      setDisplayTextInScout();
       if (m_validateOnAnyKey) {
         if (getUpdateSwingFromScoutLock().isReleased()) {
           sendVerifyToScoutAndIgnoreResponses();
         }
+      }
+    }
+
+    private void setDisplayTextInScout() {
+      if (m_updateDisplayTextOnModify && getUpdateSwingFromScoutLock().isReleased()) {
+        final String text = getSwingField().getText();
+        // notify Scout
+        Runnable t = new Runnable() {
+          @Override
+          public void run() {
+            getScoutObject().getUIFacade().setDisplayTextFromUI(text);
+          }
+        };
+        getSwingEnvironment().invokeScoutLater(t, 0);
       }
     }
 

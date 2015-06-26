@@ -14,8 +14,8 @@ import java.util.List;
 
 import org.eclipse.scout.commons.holders.IHolder;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
-import org.eclipse.scout.rt.client.ui.action.menu.IValueFieldContextMenu;
 import org.eclipse.scout.rt.client.ui.action.menu.root.IContextMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.root.IValueFieldContextMenu;
 
 /**
  * Basic interface for all user fields where user inputs a value
@@ -23,7 +23,7 @@ import org.eclipse.scout.rt.client.ui.action.menu.root.IContextMenu;
  * @see ITextField, ISmartField, INumberField, IDateField, IFileChooser,
  *      IListBox, ITreeBox, ICheckBox, IRadioButton, IToogleButton
  */
-public interface IValueField<T> extends IFormField, IHolder<T> {
+public interface IValueField<VALUE> extends IFormField, IHolder<VALUE> {
   /*
    * Properties
    */
@@ -75,15 +75,15 @@ public interface IValueField<T> extends IFormField, IHolder<T> {
   /**
    * Value
    */
-  T getInitValue();
+  VALUE getInitValue();
 
-  void setInitValue(T initValue);
+  void setInitValue(VALUE initValue);
 
   /**
    * get currently validated value
    */
   @Override
-  T getValue();
+  VALUE getValue();
 
   /**
    * set a new value The new value is validated calls validateInternal and then
@@ -91,7 +91,7 @@ public interface IValueField<T> extends IFormField, IHolder<T> {
    * execChangedValue
    */
   @Override
-  void setValue(T o);
+  void setValue(VALUE o);
 
   /**
    * parse a new value The new value is parsed calls execParseValue which
@@ -117,16 +117,6 @@ public interface IValueField<T> extends IFormField, IHolder<T> {
    * @see setValue()
    */
   void fireValueChanged();
-
-  /**
-   * @param listener
-   */
-  void addValueFieldListener(ValueFieldListener listener);
-
-  /**
-   * @param listener
-   */
-  void removeValueFieldListener(ValueFieldListener listener);
 
   /**
    * @return the child list of {@link #getContextMenu()}

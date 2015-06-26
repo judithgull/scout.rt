@@ -218,8 +218,15 @@ public class VirtualDesktop implements IDesktop {
     throw createUnsupportedOperationException();
   }
 
+  @SuppressWarnings("deprecation")
   @Override
+  @Deprecated
   public void activateBookmark(Bookmark bm, boolean forceReload) throws ProcessingException {
+    throw createUnsupportedOperationException();
+  }
+
+  @Override
+  public void activateBookmark(Bookmark bm) throws ProcessingException {
     throw createUnsupportedOperationException();
   }
 
@@ -235,12 +242,6 @@ public class VirtualDesktop implements IDesktop {
 
   @Override
   public void openUrlInBrowser(String url, IUrlTarget target) {
-    throw createUnsupportedOperationException();
-  }
-
-  @SuppressWarnings("deprecation")
-  @Override
-  public void openBrowserWindow(String path) {
     throw createUnsupportedOperationException();
   }
 
@@ -276,6 +277,16 @@ public class VirtualDesktop implements IDesktop {
 
   @Override
   public void dataChanged(Object... dataTypes) {
+    throw createUnsupportedOperationException();
+  }
+
+  @Override
+  public void setDataChanging(boolean b) {
+    throw createUnsupportedOperationException();
+  }
+
+  @Override
+  public boolean isDataChanging() {
     throw createUnsupportedOperationException();
   }
 
@@ -440,7 +451,17 @@ public class VirtualDesktop implements IDesktop {
   }
 
   @Override
+  public <T extends IViewButton> T getViewButton(Class<? extends T> searchType) {
+    throw createUnsupportedOperationException();
+  }
+
+  @Override
   public List<IViewButton> getViewButtons() {
+    throw createUnsupportedOperationException();
+  }
+
+  @Override
+  public <T extends IToolButton> T getToolButton(Class<? extends T> searchType) {
     throw createUnsupportedOperationException();
   }
 
@@ -547,7 +568,6 @@ public class VirtualDesktop implements IDesktop {
 
   @Override
   public void changeVisibilityAfterOfflineSwitch() {
-    return;
   }
 
   @Override
@@ -557,15 +577,21 @@ public class VirtualDesktop implements IDesktop {
 
   @Override
   public void traverseFocusNext() {
+    throw createUnsupportedOperationException();
   }
 
   @Override
   public void traverseFocusPrevious() {
+    throw createUnsupportedOperationException();
   }
 
   @Override
   public List<IForm> getUnsavedForms() {
-    return null;
+    throw createUnsupportedOperationException();
   }
 
+  @Override
+  public IForm getActiveForm() {
+    throw createUnsupportedOperationException();
+  }
 }

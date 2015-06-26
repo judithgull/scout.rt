@@ -14,18 +14,20 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.eclipse.scout.commons.job.JobEx;
+import org.eclipse.jface.bindings.keys.KeyStroke;
+import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.action.ActionUtility;
 import org.eclipse.scout.rt.client.ui.action.IAction;
 import org.eclipse.scout.rt.client.ui.action.IActionFilter;
+import org.eclipse.scout.rt.client.ui.action.keystroke.KeyStrokeNormalizer;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 import org.eclipse.scout.rt.client.ui.action.menu.MenuUtility;
 import org.eclipse.scout.rt.client.ui.action.tree.IActionNode;
-import org.eclipse.scout.rt.client.ui.basic.calendar.ICalendar;
 import org.eclipse.scout.rt.ui.rap.action.MenuSizeEstimator;
 import org.eclipse.scout.rt.ui.rap.action.menu.RwtScoutMenuItem;
+import org.eclipse.scout.rt.ui.rap.util.RwtUtility;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.widgets.Menu;
@@ -57,46 +59,21 @@ public final class RwtMenuUtility {
     return new Point(proposedLocation.x, proposedLocation.y - menuHeight);
   }
 
-  public static List<IMenu> collectMenus(final ICalendar calendar, final boolean emptySpaceActions, final boolean componentActions, IRwtEnvironment uiEnvironment) {
-    final List<IMenu> menuList = new LinkedList<IMenu>();
-    Runnable t = new Runnable() {
-      @Override
-      public void run() {
-        if (emptySpaceActions) {
-          menuList.addAll(calendar.getUIFacade().fireNewPopupFromUI());
-        }
-        if (componentActions) {
-          menuList.addAll(calendar.getUIFacade().fireComponentPopupFromUI());
-        }
-      }
-    };
-
-    JobEx job = uiEnvironment.invokeScoutLater(t, 5000);
-    try {
-      job.join(1200);
-    }
-    catch (InterruptedException ex) {
-      LOG.warn("Exception occured while collecting menus.", ex);
-    }
-
-    return menuList;
-  }
-
   /**
    * NEW
-   * 
+   *
    * @param swtMenuItem
    * @param childActions
    */
   public static void fillMenu(Menu menu, List<IMenu> childActions, IActionFilter filter, IRwtEnvironment environment) {
-    for (IMenu childMenu : ActionUtility.visibleNormalizedActions(childActions, filter)) {
+    for (IMenu childMenu : ActionUtility.normalizedActions(childActions, filter)) {
       new RwtScoutMenuItem(childMenu, menu, filter, environment);
     }
   }
 
   /**
    * NEW
-   * 
+   *
    * @param parentMenu
    * @return
    */
@@ -120,7 +97,7 @@ public final class RwtMenuUtility {
 
   /**
    * NEW
-   * 
+   *
    * @param swtMenuItem
    * @param childActions
    */
@@ -133,7 +110,7 @@ public final class RwtMenuUtility {
 
   /**
    * Removes invisible actions. Also removes leading and trailing separators as well as multiple consecutive separators.
-   * 
+   *
    * @since 3.8.1
    */
   public static <T extends IActionNode<?>> List<T> cleanup(List<T> scoutActionNodes) {
@@ -196,5 +173,33 @@ public final class RwtMenuUtility {
     }
 
     return actionNode.getChildActions();
+  }
+
+  /**
+   * Returns a formatted version of the Scout keystroke passed as argument.
+   * Returns an empty string if it could not be formatted.
+   */
+  public static String formatKeystroke(String keyStroke) {
+    KeyStrokeNormalizer scoutKeystroke = new KeyStrokeNormalizer(keyStroke);
+    scoutKeystroke.normalize();
+
+    int naturalKey = KeyStroke.NO_KEY;
+    if (StringUtility.hasText(scoutKeystroke.getKey())) {
+      if (scoutKeystroke.getKey().length() == 1) {
+        naturalKey = scoutKeystroke.getKey().charAt(0);
+      }
+      else if (RwtUtility.getScoutRwtKeyMap().containsKey(scoutKeystroke.getKey().toLowerCase())) {
+        naturalKey = RwtUtility.getScoutRwtKeyMap().get(scoutKeystroke.getKey().toLowerCase());
+      }
+      else {
+        LOG.error("Was not able to create shortcut label for " + keyStroke);
+      }
+    }
+
+    if (naturalKey != KeyStroke.NO_KEY) {
+      KeyStroke ks = KeyStroke.getInstance(((scoutKeystroke.hasShift()) ? SWT.SHIFT : SWT.None) | ((scoutKeystroke.hasCtrl()) ? SWT.CONTROL : SWT.None) | ((scoutKeystroke.hasAlt()) ? SWT.ALT : SWT.None), naturalKey);
+      return ks.format();
+    }
+    return "";
   }
 }

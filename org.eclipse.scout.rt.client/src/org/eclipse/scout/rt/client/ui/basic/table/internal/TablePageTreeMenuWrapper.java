@@ -13,12 +13,12 @@ package org.eclipse.scout.rt.client.ui.basic.table.internal;
 import java.beans.PropertyChangeListener;
 import java.security.Permission;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
 import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.ITypeWithClassId;
-import org.eclipse.scout.commons.beans.IPropertyObserver;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.ui.action.IAction;
 import org.eclipse.scout.rt.client.ui.action.IActionUIFacade;
@@ -32,9 +32,9 @@ import org.eclipse.scout.rt.client.ui.action.menu.IMenuType;
 public class TablePageTreeMenuWrapper implements IMenu {
 
   private IMenu m_wrappedMenu;
-  private IPropertyObserver m_menuOwner;
   private List<IMenu> m_childMenus;
   private boolean m_localEnabled = true;
+  private boolean m_localEnabledInheritAccessibility = true;
   private Set<IMenuType> m_menuTypes;
 
   /**
@@ -77,42 +77,6 @@ public class TablePageTreeMenuWrapper implements IMenu {
     return m_wrappedMenu;
   }
 
-  @SuppressWarnings("deprecation")
-  @Override
-  public boolean isSingleSelectionAction() {
-    return m_wrappedMenu.isSingleSelectionAction();
-  }
-
-  @SuppressWarnings("deprecation")
-  @Override
-  public void setSingleSelectionAction(boolean b) {
-    throw new UnsupportedOperationException("read only wrapper");
-  }
-
-  @SuppressWarnings("deprecation")
-  @Override
-  public boolean isMultiSelectionAction() {
-    return m_wrappedMenu.isMultiSelectionAction();
-  }
-
-  @SuppressWarnings("deprecation")
-  @Override
-  public void setMultiSelectionAction(boolean b) {
-    throw new UnsupportedOperationException("read only wrapper");
-  }
-
-  @SuppressWarnings("deprecation")
-  @Override
-  public boolean isEmptySpaceAction() {
-    return m_wrappedMenu.isEmptySpaceAction();
-  }
-
-  @SuppressWarnings("deprecation")
-  @Override
-  public void setEmptySpaceAction(boolean b) {
-    throw new UnsupportedOperationException("read only wrapper");
-  }
-
   @Override
   public void handleOwnerValueChanged(Object newValue) throws ProcessingException {
     // void
@@ -149,7 +113,7 @@ public class TablePageTreeMenuWrapper implements IMenu {
   }
 
   @Override
-  public void setChildActions(List<? extends IMenu> actionList) {
+  public void setChildActions(Collection<? extends IMenu> actionList) {
     throw new UnsupportedOperationException("read only wrapper");
   }
 
@@ -159,7 +123,7 @@ public class TablePageTreeMenuWrapper implements IMenu {
   }
 
   @Override
-  public void addChildActions(List<? extends IMenu> actionList) {
+  public void addChildActions(Collection<? extends IMenu> actionList) {
     throw new UnsupportedOperationException("read only wrapper");
   }
 
@@ -169,7 +133,7 @@ public class TablePageTreeMenuWrapper implements IMenu {
   }
 
   @Override
-  public void removeChildActions(List<? extends IMenu> actionList) {
+  public void removeChildActions(Collection<? extends IMenu> actionList) {
     throw new UnsupportedOperationException("read only wrapper");
   }
 
@@ -270,7 +234,7 @@ public class TablePageTreeMenuWrapper implements IMenu {
 
   @Override
   public boolean isEnabled() {
-    return m_localEnabled && m_wrappedMenu.isEnabled();
+    return m_localEnabled && m_localEnabledInheritAccessibility && m_wrappedMenu.isEnabled();
   }
 
   @Override
@@ -321,6 +285,16 @@ public class TablePageTreeMenuWrapper implements IMenu {
   @Override
   public void setEnabledProcessingAction(boolean b) {
     throw new UnsupportedOperationException("read only wrapper");
+  }
+
+  @Override
+  public boolean isEnabledInheritAccessibility() {
+    return m_wrappedMenu.isEnabledInheritAccessibility();
+  }
+
+  @Override
+  public void setEnabledInheritAccessibility(boolean enabled) {
+    m_localEnabledInheritAccessibility = enabled;
   }
 
   @Override
@@ -427,6 +401,16 @@ public class TablePageTreeMenuWrapper implements IMenu {
   @Override
   public void removePropertyChangeListener(String propertyName, PropertyChangeListener listener) {
     m_wrappedMenu.removePropertyChangeListener(propertyName, listener);
+  }
+
+  @Override
+  public double getOrder() {
+    return m_wrappedMenu.getOrder();
+  }
+
+  @Override
+  public void setOrder(double order) {
+    m_wrappedMenu.setOrder(order);
   }
 
   @Override

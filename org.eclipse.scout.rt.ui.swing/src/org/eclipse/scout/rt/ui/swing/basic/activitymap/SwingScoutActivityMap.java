@@ -24,7 +24,9 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.SwingUtilities;
 
-import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
+import org.eclipse.scout.commons.CollectionUtility;
+import org.eclipse.scout.rt.client.ui.action.menu.ActivityMapMenuType;
+import org.eclipse.scout.rt.client.ui.action.menu.root.IContextMenu;
 import org.eclipse.scout.rt.client.ui.basic.activitymap.ActivityCell;
 import org.eclipse.scout.rt.client.ui.basic.activitymap.ActivityMapEvent;
 import org.eclipse.scout.rt.client.ui.basic.activitymap.ActivityMapListener;
@@ -37,6 +39,7 @@ import org.eclipse.scout.rt.ui.swing.ext.MouseClickedBugFix;
 import org.eclipse.scout.rt.ui.swing.ext.activitymap.ActivityMapSelectionEvent;
 import org.eclipse.scout.rt.ui.swing.ext.activitymap.ActivityMapSelectionListener;
 import org.eclipse.scout.rt.ui.swing.ext.activitymap.JActivityMap;
+import org.eclipse.scout.rt.ui.swing.form.fields.plannerfield.SwingScoutPlannerField;
 
 public class SwingScoutActivityMap extends SwingScoutComposite<IActivityMap<?, ?>> {
   private JScrollPane m_swingScrollPane;
@@ -45,11 +48,11 @@ public class SwingScoutActivityMap extends SwingScoutComposite<IActivityMap<?, ?
    */
   private JTable m_metricsTable;
   private ActivityMapListener m_scoutListener;
+  private SwingScoutPlannerField m_swingPlannerField;
 
   public SwingScoutActivityMap(JTable metricsTable) {
     // the master table is defining our header height and row heights
     m_metricsTable = metricsTable;
-    //keep empty
   }
 
   @Override
@@ -227,6 +230,7 @@ public class SwingScoutActivityMap extends SwingScoutComposite<IActivityMap<?, ?
     getSwingActivityMap().setModel(new SwingActivityMapModel(getScoutActivityMap(), m_metricsTable));
     getSwingActivityMap().setColumnModel(new SwingActivityMapColumnModel(getScoutActivityMap().getTimeScale()));
     getSwingActivityMap().getSelector().setDrawSections(getScoutActivityMap().isDrawSections());
+    getSwingActivityMap().setActivityMap(getScoutActivityMap());
     setSelectionFromScout();
   }
 
@@ -242,10 +246,19 @@ public class SwingScoutActivityMap extends SwingScoutComposite<IActivityMap<?, ?
     return m_swingScrollPane;
   }
 
+  public void setSwingPlannerField(SwingScoutPlannerField swingScoutPlannerField) {
+    m_swingPlannerField = swingScoutPlannerField;
+  }
+
+  public SwingScoutPlannerField getSwingPlannerField() {
+    return m_swingPlannerField;
+  }
+
   private void setTimeScaleFromScout(TimeScale scale) {
     getSwingActivityMap().setColumnModel(new SwingActivityMapColumnModel(scale));
     // re-set selection
     setSelectionFromScout();
+    getSwingPlannerField().updateSelectedDatesInMiniCalendar();
   }
 
   private void setResourceIdsFromScout() {
@@ -381,9 +394,9 @@ public class SwingScoutActivityMap extends SwingScoutComposite<IActivityMap<?, ?
     else if (name.equals(IActivityMap.PROP_SELECTED_ACTIVITY_CELL)) {
       setSelectedActivityCellFromScout((ActivityCell) newValue);
     }
-    else if (name.equals(IActivityMap.PROP_SELECTED_RESOURCE_IDS) ||
-        name.equals(IActivityMap.PROP_SELECTED_BEGIN_TIME) ||
-        name.equals(IActivityMap.PROP_SELECTED_END_TIME)) {
+    else if (name.equals(IActivityMap.PROP_SELECTED_RESOURCE_IDS)
+        || name.equals(IActivityMap.PROP_SELECTED_BEGIN_TIME)
+        || name.equals(IActivityMap.PROP_SELECTED_END_TIME)) {
       setSelectionFromScout();
     }
     else if (name.equals(IActivityMap.PROP_RESOURCE_IDS)) {
@@ -402,15 +415,18 @@ public class SwingScoutActivityMap extends SwingScoutComposite<IActivityMap<?, ?
     if (getUpdateSwingFromScoutLock().isAcquired()) {
       return;
     }
+
     //
     // notify Scout
     Runnable t = new Runnable() {
       @Override
       public void run() {
-        @SuppressWarnings("unchecked")
-        List<IMenu> scoutMenus = getScoutActivityMap().getUIFacade().fireNewActivityPopupFromUI();
+        IContextMenu contextMenu = getScoutObject().getContextMenu();
+
         // call swing menu
-        new SwingPopupWorker(getSwingEnvironment(), e.getComponent(), null, e.getPoint(), scoutMenus, false).enqueue();
+        SwingPopupWorker popupWorker = new SwingPopupWorker(getSwingEnvironment(), e.getComponent(), e.getPoint(), contextMenu, CollectionUtility.hashSet(ActivityMapMenuType.Selection));
+        popupWorker.setLightWeightPopup(false);
+        popupWorker.enqueue();
       }
     };
     getSwingEnvironment().invokeScoutLater(t, 5678);
@@ -418,21 +434,24 @@ public class SwingScoutActivityMap extends SwingScoutComposite<IActivityMap<?, ?
   }
 
   private void handleSwingEditActivityPopup(final MouseEvent e) {
-    if (getUpdateSwingFromScoutLock().isAcquired()) {
-      return;
-    }
-    //
-    // notify Scout
-    Runnable t = new Runnable() {
-      @Override
-      public void run() {
-        @SuppressWarnings("unchecked")
-        List<IMenu> scoutMenus = getScoutActivityMap().getUIFacade().fireEditActivityPopupFromUI();
-        // call swing menu
-        new SwingPopupWorker(getSwingEnvironment(), e.getComponent(), null, e.getPoint(), scoutMenus, false).enqueue();
-      }
-    };
-    getSwingEnvironment().invokeScoutLater(t, 5678);
-    // end notify
+    // disabled because it does not work since menu refactoring
+    // the context menu presented to the user are belonging to the selected range, not to the activity cell the context menu action takes place
+//    if (getUpdateSwingFromScoutLock().isAcquired()) {
+//      return;
+//    }
+//    //
+//    // notify Scout
+//    Runnable t = new Runnable() {
+//      @Override
+//      public void run() {
+//        IContextMenu contextMenu = getScoutObject().getContextMenu();
+//        // call swing menu
+//        SwingPopupWorker popupWorker = new SwingPopupWorker(getSwingEnvironment(), e.getComponent(), e.getPoint(), contextMenu, MenuUtility.getMenuTypesForActivityMapSelection(getScoutActivityMap().getSelectedActivityCell()));
+//        popupWorker.setLightWeightPopup(false);
+//        popupWorker.enqueue();
+//      }
+//    };
+//    getSwingEnvironment().invokeScoutLater(t, 5678);
+//    // end notify
   }
 }

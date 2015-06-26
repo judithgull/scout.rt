@@ -170,7 +170,11 @@ public class RwtScoutDialog extends AbstractRwtScoutPart {
       }
 
       @Override
-      public void shellActivated(ShellEvent e) {
+      public void shellActivated(final ShellEvent e) {
+        final Shell shell = (Shell) e.widget;
+        if (!shell.isDisposed() && shell.getMinimized()) {
+          shell.setMinimized(false);
+        }
         getUiEnvironment().invokeScoutLater(new Runnable() {
           @Override
           public void run() {
@@ -345,6 +349,7 @@ public class RwtScoutDialog extends AbstractRwtScoutPart {
   protected void setTitleFromScout() {
     IForm f = getScoutObject();
     //
+    @SuppressWarnings("deprecation")
     String s = f.getBasicTitle();
     m_uiDialog.getShell().setText(StringUtility.removeNewLines(s != null ? s : ""));
     //

@@ -19,7 +19,6 @@ import org.eclipse.jface.action.IToolBarManager;
 import org.eclipse.jface.dialogs.Dialog;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.exception.ProcessingException;
-import org.eclipse.scout.commons.internal.runtime.CompatibilityUtility;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.action.ActionUtility;
@@ -49,10 +48,9 @@ import org.eclipse.ui.forms.widgets.Form;
 
 /**
  * <h3>SwtScoutDialog</h3> ...
- * 
+ *
  * @since 1.0.9 18.07.2008
  */
-@SuppressWarnings("restriction")
 public class SwtScoutDialog extends Dialog implements ISwtScoutPart {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(SwtScoutDialog.class);
 
@@ -167,8 +165,8 @@ public class SwtScoutDialog extends Dialog implements ISwtScoutPart {
   }
 
   /**
-  *
-  */
+   *
+   */
   protected void updateToolbarActionsFromScout() {
     List<IToolButton> toolbuttons = ActionUtility.visibleNormalizedActions(getForm().getToolButtons());
     if (!toolbuttons.isEmpty()) {
@@ -201,6 +199,7 @@ public class SwtScoutDialog extends Dialog implements ISwtScoutPart {
   protected void setTitleFromScout(String title) {
     IForm f = getForm();
     //
+    @SuppressWarnings("deprecation")
     String s = f.getBasicTitle();
     getShell().setText(StringUtility.removeNewLines(s != null ? s : ""));
     //
@@ -234,10 +233,6 @@ public class SwtScoutDialog extends Dialog implements ISwtScoutPart {
   }
 
   protected void setSaveNeededFromScout(boolean modified) {
-    if (CompatibilityUtility.isEclipseVersionLessThan35()) {
-      return;
-    }
-
     try {
       //Call getShell().setModified(modified);
       Method setModified = Shell.class.getMethod("setModified", boolean.class);

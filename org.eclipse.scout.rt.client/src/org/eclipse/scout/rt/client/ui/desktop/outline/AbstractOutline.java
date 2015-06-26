@@ -12,7 +12,6 @@ package org.eclipse.scout.rt.client.ui.desktop.outline;
 
 import java.security.Permission;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 
@@ -22,12 +21,16 @@ import org.eclipse.scout.commons.OptimisticLock;
 import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
+import org.eclipse.scout.commons.annotations.IOrdered;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.dnd.TransferObject;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.holders.Holder;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.extension.ui.basic.tree.ITreeExtension;
+import org.eclipse.scout.rt.client.extension.ui.desktop.outline.IOutlineExtension;
+import org.eclipse.scout.rt.client.extension.ui.desktop.outline.OutlineChains.OutlineCreateChildPagesChain;
 import org.eclipse.scout.rt.client.ui.action.ActionUtility;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 import org.eclipse.scout.rt.client.ui.action.menu.MenuSeparator;
@@ -63,7 +66,7 @@ public abstract class AbstractOutline extends AbstractTree implements IOutline {
   private OptimisticLock m_contextPageOptimisticLock;
   private OutlineMediator m_outlineMediator;
 
-//  // internal usage of menus temporarily added to the tree.
+  // internal usage of menus temporarily added to the tree.
   private List<IMenu> m_inheritedMenusOfPage;
 
   public AbstractOutline() {
@@ -82,7 +85,7 @@ public abstract class AbstractOutline extends AbstractTree implements IOutline {
    * Configures whether this outline is enabled.
    * <p>
    * Subclasses can override this method. Default is {@code true}.
-   * 
+   *
    * @return {@code true} if this outline is enabled, {@code false} otherwise
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
@@ -95,7 +98,7 @@ public abstract class AbstractOutline extends AbstractTree implements IOutline {
    * Configures the visibility of this outline.
    * <p>
    * Subclasses can override this method. Default is {@code true}.
-   * 
+   *
    * @return {@code true} if this outline is visible, {@code false} otherwise
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
@@ -105,18 +108,18 @@ public abstract class AbstractOutline extends AbstractTree implements IOutline {
   }
 
   /**
-   * Provides a documentation text or description of this outline. The text is intended to be included in external
-   * documentation. This method is typically processed by a documentation generation tool or similar.
+   * Configures the view order of this outline. The view order determines the order in which the outline appears.<br>
+   * The view order of outlines with no view order configured ({@code < 0}) is initialized based on the {@link Order}
+   * annotation of the class.
    * <p>
-   * Subclasses can override this method. Default is {@code null}.
-   * 
-   * @deprecated: Use a {@link ClassId} annotation as key for Doc-Text. Will be removed in the 5.0 Release.
-   * @return a documentation text, suitable to be included in external documents
+   * Subclasses can override this method. The default is {@link IOrdered#DEFAULT_ORDER}.
+   *
+   * @return View order of this outline.
    */
-  @Deprecated
-  @Order(110)
-  protected String getConfiguredDoc() {
-    return null;
+  @ConfigProperty(ConfigProperty.DOUBLE)
+  @Order(120)
+  protected double getConfiguredViewOrder() {
+    return IOrdered.DEFAULT_ORDER;
   }
 
   /**
@@ -124,18 +127,18 @@ public abstract class AbstractOutline extends AbstractTree implements IOutline {
    * roots of the visible tree.
    * <p>
    * Subclasses can override this method. The default does nothing.
-   * 
+   *
    * @param pageList
    *          live collection to add pages to the outline tree
    * @throws ProcessingException
    */
   @ConfigOperation
   @Order(90)
-  protected void execCreateChildPages(Collection<IPage> pageList) throws ProcessingException {
+  protected void execCreateChildPages(List<IPage> pageList) throws ProcessingException {
   }
 
-  protected void createChildPagesInternal(Collection<IPage> pageList) throws ProcessingException {
-    execCreateChildPages(pageList);
+  protected void createChildPagesInternal(List<IPage> pageList) throws ProcessingException {
+    interceptCreateChildPages(pageList);
   }
 
   /**
@@ -166,6 +169,7 @@ public abstract class AbstractOutline extends AbstractTree implements IOutline {
     setRootNode(rootPage);
     setEnabled(getConfiguredEnabled());
     setVisible(getConfiguredVisible());
+    setOrder(calculateViewOrder());
   }
 
   /*
@@ -175,6 +179,27 @@ public abstract class AbstractOutline extends AbstractTree implements IOutline {
   @Override
   public IPage getActivePage() {
     return (IPage) getSelectedNode();
+  }
+
+  /**
+   * Calculates the actions's view order, e.g. if the @Order annotation is set to 30.0, the method will
+   * return 30.0. If no {@link Order} annotation is set, the method checks its super classes for an @Order annotation.
+   *
+   * @since 4.0.1
+   */
+  protected double calculateViewOrder() {
+    double viewOrder = getConfiguredViewOrder();
+    if (viewOrder == IOrdered.DEFAULT_ORDER) {
+      Class<?> cls = getClass();
+      while (cls != null && IOutline.class.isAssignableFrom(cls)) {
+        if (cls.isAnnotationPresent(Order.class)) {
+          Order order = (Order) cls.getAnnotation(Order.class);
+          return order.value();
+        }
+        cls = cls.getSuperclass();
+      }
+    }
+    return viewOrder;
   }
 
   @Override
@@ -360,6 +385,16 @@ public abstract class AbstractOutline extends AbstractTree implements IOutline {
   }
 
   @Override
+  public double getOrder() {
+    return propertySupport.getPropertyDouble(PROP_VIEW_ORDER);
+  }
+
+  @Override
+  public void setOrder(double order) {
+    propertySupport.setPropertyDouble(PROP_VIEW_ORDER, order);
+  }
+
+  @Override
   public IPage getRootPage() {
     return (IPage) getRootNode();
   }
@@ -414,25 +449,39 @@ public abstract class AbstractOutline extends AbstractTree implements IOutline {
     IPage activePage = getActivePage();
     if (activePage != null && m_contextPage != activePage) {
       m_contextPage = activePage;
-      activePage.pageActivatedNotify();
       addMenusOfActivePageToContextMenu(activePage);
+      activePage.pageActivatedNotify();
     }
   }
 
-  protected void addMenusOfActivePageToContextMenu(IPage activePage) {
-    List<IMenu> wrappedMenus = new ArrayList<IMenu>();
+  @Override
+  public List<IMenu> getMenusForPage(IPage page) {
+    List<IMenu> result = new ArrayList<IMenu>();
+    for (IMenu m : getContextMenu().getChildActions()) {
+      if (!m_inheritedMenusOfPage.contains(m)) {
+        result.add(m);
+      }
+    }
+    result.addAll(computeInheritedMenusOfPage(page));
+    return result;
+  }
 
+  /**
+   * @see IOutline#getMenusForPage(IPage)
+   */
+  protected List<IMenu> computeInheritedMenusOfPage(IPage activePage) {
+    List<IMenu> menus = new ArrayList<IMenu>();
     if (activePage instanceof IPageWithTable<?>) {
       // in case of a page with table the empty space actions of the table will be added to the context menu of the tree.
       IPageWithTable<?> pageWithTable = (IPageWithTable<?>) activePage;
       if (pageWithTable.isShowEmptySpaceMenus()) {
         ITable table = pageWithTable.getTable();
         List<IMenu> emptySpaceMenus = ActionUtility.getActions(table.getMenus(),
-            ActionUtility.createMenuFilterMenuTypes(TableMenuType.EmptySpace));
+            ActionUtility.createMenuFilterMenuTypes(CollectionUtility.hashSet(TableMenuType.EmptySpace), false));
         if (emptySpaceMenus.size() > 0) {
-          wrappedMenus.add(new MenuSeparator());
+          menus.add(new MenuSeparator());
           for (IMenu menu : emptySpaceMenus) {
-            wrappedMenus.add(new TablePageTreeMenuWrapper(menu, TreeMenuType.SingleSelection));
+            menus.add(menu);
           }
         }
       }
@@ -446,13 +495,26 @@ public abstract class AbstractOutline extends AbstractTree implements IOutline {
       ITable table = pageWithTable.getTable();
       if (row != null) {
         table.getUIFacade().setSelectedRowsFromUI(CollectionUtility.arrayList(row));
-        List<IMenu> menus = ActionUtility.getActions(table.getContextMenu().getChildActions(), ActionUtility.createMenuFilterMenuTypes(TableMenuType.SingleSelection));
-        if (menus.size() > 0) {
-          wrappedMenus.add(new MenuSeparator());
-          for (IMenu menu : menus) {
-            wrappedMenus.add(new TablePageTreeMenuWrapper(menu, TreeMenuType.SingleSelection));
+        List<IMenu> parentTableMenus = ActionUtility.getActions(table.getContextMenu().getChildActions(), ActionUtility.createMenuFilterMenuTypes(CollectionUtility.hashSet(TableMenuType.SingleSelection), false));
+        if (parentTableMenus.size() > 0) {
+          menus.add(new MenuSeparator());
+          for (IMenu menu : parentTableMenus) {
+            menus.add(menu);
           }
         }
+      }
+    }
+    return menus;
+  }
+
+  protected void addMenusOfActivePageToContextMenu(IPage activePage) {
+    List<IMenu> wrappedMenus = new ArrayList<IMenu>();
+    for (IMenu m : computeInheritedMenusOfPage(activePage)) {
+      if (m.isSeparator()) {
+        wrappedMenus.add(m);
+      }
+      else {
+        wrappedMenus.add(new TablePageTreeMenuWrapper(m, TreeMenuType.SingleSelection));
       }
     }
     m_inheritedMenusOfPage = wrappedMenus;
@@ -609,9 +671,32 @@ public abstract class AbstractOutline extends AbstractTree implements IOutline {
 
   private class InvisibleRootPage extends AbstractPageWithNodes {
     @Override
-    protected void execCreateChildPages(Collection<IPage> pageList) throws ProcessingException {
+    protected void execCreateChildPages(List<IPage> pageList) throws ProcessingException {
       AbstractOutline.this.createChildPagesInternal(pageList);
     }
+  }
+
+  protected final void interceptCreateChildPages(List<IPage> pageList) throws ProcessingException {
+    List<? extends ITreeExtension<? extends AbstractTree>> extensions = getAllExtensions();
+    OutlineCreateChildPagesChain chain = new OutlineCreateChildPagesChain(extensions);
+    chain.execCreateChildPages(pageList);
+  }
+
+  protected static class LocalOutlineExtension<OWNER extends AbstractOutline> extends LocalTreeExtension<OWNER> implements IOutlineExtension<OWNER> {
+
+    public LocalOutlineExtension(OWNER owner) {
+      super(owner);
+    }
+
+    @Override
+    public void execCreateChildPages(OutlineCreateChildPagesChain chain, List<IPage> pageList) throws ProcessingException {
+      getOwner().execCreateChildPages(pageList);
+    }
+  }
+
+  @Override
+  protected IOutlineExtension<? extends AbstractOutline> createLocalExtension() {
+    return new LocalOutlineExtension<AbstractOutline>(this);
   }
 
 }

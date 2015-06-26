@@ -4,7 +4,7 @@
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- * 
+ *
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
@@ -41,6 +41,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.event.EventListenerList;
 import javax.swing.event.MouseInputListener;
 
+import org.eclipse.scout.rt.client.ui.basic.activitymap.IActivityMap;
 import org.eclipse.scout.rt.ui.swing.ext.MouseClickedBugFix;
 
 /**
@@ -61,6 +62,10 @@ public class JActivityMap extends JComponent implements Scrollable {
   // mouse state
   private boolean m_pressedInsideMap;
   private int m_selectorResizeType = 0;
+  private IActivityMap<?, ?> m_scoutActivityMap;
+
+  private int m_rowStartedDrag;
+  private int m_currentRowDrag;
 
   public JActivityMap() {
     m_header = new JActivityMapHeader(this);
@@ -78,15 +83,19 @@ public class JActivityMap extends JComponent implements Scrollable {
             fix = new MouseClickedBugFix(e);
             Component parent = getParentAt(e.getComponent(), e.getPoint());
             e = SwingUtilities.convertMouseEvent(e.getComponent(), e, parent);
-            parent.dispatchEvent(e);
+            if (parent != null) {
+              parent.dispatchEvent(e);
+            }
           }
 
           @Override
           public void mouseReleased(MouseEvent e) {
             Component parent = getParentAt(e.getComponent(), e.getPoint());
-            parent.dispatchEvent(SwingUtilities.convertMouseEvent(e.getComponent(), e, parent));
-            if(fix!=null) {
-              fix.mouseReleased(this, e);
+            if (parent != null) {
+              parent.dispatchEvent(SwingUtilities.convertMouseEvent(e.getComponent(), e, parent));
+              if (fix != null) {
+                fix.mouseReleased(this, e);
+              }
             }
           }
 
@@ -96,7 +105,9 @@ public class JActivityMap extends JComponent implements Scrollable {
               return;
             }
             Component parent = getParentAt(e.getComponent(), e.getPoint());
-            parent.dispatchEvent(SwingUtilities.convertMouseEvent(e.getComponent(), e, parent));
+            if (parent != null) {
+              parent.dispatchEvent(SwingUtilities.convertMouseEvent(e.getComponent(), e, parent));
+            }
           }
         }
         );
@@ -107,9 +118,10 @@ public class JActivityMap extends JComponent implements Scrollable {
           @Override
           public void mouseDragged(MouseEvent e) {
             Component parent = getParentAt(e.getComponent(), e.getPoint());
-            parent.dispatchEvent(SwingUtilities.convertMouseEvent(e.getComponent(), e, parent));
+            if (parent != null) {
+              parent.dispatchEvent(SwingUtilities.convertMouseEvent(e.getComponent(), e, parent));
+            }
           }
-
         }
         );
     setLayout(new ActivityMapLayout());
@@ -124,6 +136,7 @@ public class JActivityMap extends JComponent implements Scrollable {
               m_pressedInsideMap = true;
               ActivityMapSelection s = new ActivityMapSelection(m_selection);
               int row = pixToRow(e.getY());
+              m_rowStartedDrag = row;
               double[] mouseRange = pixToRange(e.getX());
               if (m_selection.getRange() != null && m_selector.getCursor().getType() == Cursor.E_RESIZE_CURSOR) {
                 m_selectorResizeType = m_selector.getCursor().getType();
@@ -218,6 +231,7 @@ public class JActivityMap extends JComponent implements Scrollable {
             if (isButton1(e) && m_pressedInsideMap) {
               ActivityMapSelection s = new ActivityMapSelection(m_selection);
               int row = pixToRow(e.getY());
+              m_currentRowDrag = row;
               double[] mouseRange = pixToRange(e.getX());
               if (m_selectorResizeType == Cursor.E_RESIZE_CURSOR) {
                 s.setRange(new double[]{m_selection.getRange()[0], mouseRange[1]});
@@ -226,7 +240,13 @@ public class JActivityMap extends JComponent implements Scrollable {
                 s.setRange(new double[]{mouseRange[0], m_selection.getRange()[1]});
               }
               else {
+                s.setRange(new double[]{mouseRange[0], mouseRange[1]});
                 s.setLead(row, mouseRange);
+
+                int[] selectedRows = new int[2];
+                selectedRows[0] = m_rowStartedDrag;
+                selectedRows[1] = m_currentRowDrag;
+                s.setRows(selectedRows);
               }
               setSelectionInternal(s);
             }
@@ -277,7 +297,7 @@ public class JActivityMap extends JComponent implements Scrollable {
         if (isButton1(e)) {
           dispatchEvent(SwingUtilities.convertMouseEvent(e.getComponent(), e, JActivityMap.this));
         }
-        if(fix!=null) {
+        if (fix != null) {
           fix.mouseReleased(this, e);
         }
       }
@@ -840,4 +860,11 @@ public class JActivityMap extends JComponent implements Scrollable {
     return parent;
   }
 
+  public void setActivityMap(IActivityMap<?, ?> scoutObject) {
+    m_scoutActivityMap = scoutObject;
+  }
+
+  public IActivityMap<?, ?> getActivityMap() {
+    return m_scoutActivityMap;
+  }
 }

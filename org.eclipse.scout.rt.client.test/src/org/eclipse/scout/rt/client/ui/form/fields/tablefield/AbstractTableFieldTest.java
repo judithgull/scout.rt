@@ -27,22 +27,23 @@ import org.eclipse.scout.rt.client.ui.basic.table.columns.AbstractStringColumn;
 import org.junit.Before;
 import org.junit.Test;
 
+@SuppressWarnings("deprecation")
 public class AbstractTableFieldTest extends AbstractTableField<AbstractTableFieldTest.Table> {
   private static final String[] LOREM_IPSUM = new String[]{
-      "Lorem ipsum dolor sit amet,",
-      "consetetur sadipscing elitr,",
-      "sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat,",
-      "sed diam voluptua.",
-      "At vero eos et accusam et justo duo dolores et ea rebum.",
-      "Stet clita kasd gubergren,",
-      "no sea takimata sanctus est Lorem ipsum dolor sit amet.",
-      "Lorem ipsum dolor sit amet,",
-      "consetetur sadipscing elitr,",
-      "sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat,",
-      "sed diam voluptua.",
-      "At vero eos et accusam et justo duo dolores et ea rebum.",
-      "Stet clita kasd gubergren,",
-      "no sea takimata sanctus est Lorem ipsum dolor sit amet."
+    "Lorem ipsum dolor sit amet,",
+    "consetetur sadipscing elitr,",
+    "sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat,",
+    "sed diam voluptua.",
+    "At vero eos et accusam et justo duo dolores et ea rebum.",
+    "Stet clita kasd gubergren,",
+    "no sea takimata sanctus est Lorem ipsum dolor sit amet.",
+    "Lorem ipsum dolor sit amet,",
+    "consetetur sadipscing elitr,",
+    "sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat,",
+    "sed diam voluptua.",
+    "At vero eos et accusam et justo duo dolores et ea rebum.",
+    "Stet clita kasd gubergren,",
+    "no sea takimata sanctus est Lorem ipsum dolor sit amet."
   };
 
   private static final BigDecimal FAR_BELOW_ZERO = new BigDecimal("-999999999999999999999999999999999999999999999999999999999999");
@@ -71,8 +72,8 @@ public class AbstractTableFieldTest extends AbstractTableField<AbstractTableFiel
     assertTrue("TableStatus does not contain sum of Integer-column as expected. (tableStatus [" + tableStatus + "])", tableStatus.contains("Integer: " + getTable().getIntegerColumn().getFormat().format(45)));
     assertTrue("TableStatus does not contain sum of Long-column as expected. (tableStatus [" + tableStatus + "])", tableStatus.contains("Long: " + getTable().getLongColumn().getFormat().format(90)));
     assertTrue("TableStatus does not contain sum of Double-column as expected. (tableStatus [" + tableStatus + "])", tableStatus.contains("Double: " + getTable().getDoubleColumn().getFormat().format(49.95d)));
-    String formattedBigDecimalSum = "BigDecimal: " + getTable().getBigDecimalColumn().getFormat().format(FAR_BELOW_ZERO.multiply(BigDecimal.TEN).add(BigDecimal.valueOf(49.95d)));
     // XXX[aho]
+//    String formattedBigDecimalSum = "BigDecimal: " + getTable().getBigDecimalColumn().getFormat().format(FAR_BELOW_ZERO.multiply(BigDecimal.TEN).add(BigDecimal.valueOf(49.95d)));
 //    assertTrue("TableStatus does not contain sum of BigDecimal-column as expected. (expected [" + formattedBigDecimalSum + "] in tableStatus [" + tableStatus + "])", tableStatus.contains(formattedBigDecimalSum));
   }
 

@@ -4,12 +4,17 @@
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- * 
+ *
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
 package org.eclipse.scout.rt.server.services.common.jdbc.dict;
 
+/**
+ * @deprecated will be removed in the Neptune release.
+ */
+@Deprecated
+@SuppressWarnings("deprecation")
 public class OracleCongruencyFilter extends CongruencyFilter {
   protected int m_minVersion;
   protected int m_majVersion;
@@ -30,35 +35,35 @@ public class OracleCongruencyFilter extends CongruencyFilter {
   public String getCanonicalColumnType(ColumnDesc cd) {
     String type = cd.getTypeName().toUpperCase();
     // bugs in oracle are corrected first
-    if (type.equals("DOUBLE")) {
+    if ("DOUBLE".equals(type)) {
       type = "DOUBLE PRECISION";
     }
     // map column type names to canonical names
-    if (type.equals("DATE") || type.equals("TIME") || type.equals("TIMESTAMP")) {
+    if ("DATE".equals(type) || "TIME".equals(type) || "TIMESTAMP".equals(type)) {
       type = "DATE";
     }
-    else if (type.equals("INT") || type.equals("INTEGER")) {
+    else if ("INT".equals(type) || "INTEGER".equals(type)) {
       type = "INT";
     }
     // do not use m_size even though oracle reports one for the following types
-    if (type.equals("BIT") ||
-        type.equals("BLOB") ||
-        type.equals("CLOB") ||
-        type.equals("DATE") ||
-        type.equals("DOUBLE PRECISION") ||
-        type.equals("LONG") ||
-        type.equals("LONG RAW") ||
-        type.equals("REAL") ||
-        type.equals("ROWID") ||
-        type.equals("INT") ||
-        type.equals("BIGINT") ||
-        type.equals("SMALLINT") ||
-        type.equals("TINYINT")) {
+    if ("BIT".equals(type) ||
+        "BLOB".equals(type) ||
+        "CLOB".equals(type) ||
+        "DATE".equals(type) ||
+        "DOUBLE PRECISION".equals(type) ||
+        "LONG".equals(type) ||
+        "LONG RAW".equals(type) ||
+        "REAL".equals(type) ||
+        "ROWID".equals(type) ||
+        "INT".equals(type) ||
+        "BIGINT".equals(type) ||
+        "SMALLINT".equals(type) ||
+        "TINYINT".equals(type)) {
       return type;
     }
     // for DECIMAL and NUMBER use only presicion and decimalDigits
-    if (type.equals("NUMBER") ||
-        type.equals("DECIMAL")) {
+    if ("NUMBER".equals(type) ||
+        "DECIMAL".equals(type)) {
       long prec = (cd.getPrecision() > 0) ? cd.getPrecision() : 38;
       if (cd.getDecimalDigits() > 0) {
         return type + "(" + prec + "," + cd.getDecimalDigits() + ")";

@@ -28,13 +28,29 @@ import org.eclipse.scout.commons.EventListenerList;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
 import org.eclipse.scout.commons.annotations.Order;
+import org.eclipse.scout.commons.annotations.OrderedCollection;
 import org.eclipse.scout.commons.beans.AbstractPropertyObserver;
 import org.eclipse.scout.commons.dnd.TransferObject;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.holders.Holder;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.extension.ui.action.tree.MoveActionNodesHandler;
+import org.eclipse.scout.rt.client.extension.ui.basic.tree.ITreeExtension;
+import org.eclipse.scout.rt.client.extension.ui.basic.tree.TreeChains.TreeDecorateCellChain;
+import org.eclipse.scout.rt.client.extension.ui.basic.tree.TreeChains.TreeDisposeTreeChain;
+import org.eclipse.scout.rt.client.extension.ui.basic.tree.TreeChains.TreeDragNodeChain;
+import org.eclipse.scout.rt.client.extension.ui.basic.tree.TreeChains.TreeDragNodesChain;
+import org.eclipse.scout.rt.client.extension.ui.basic.tree.TreeChains.TreeDropChain;
+import org.eclipse.scout.rt.client.extension.ui.basic.tree.TreeChains.TreeDropTargetChangedChain;
+import org.eclipse.scout.rt.client.extension.ui.basic.tree.TreeChains.TreeHyperlinkActionChain;
+import org.eclipse.scout.rt.client.extension.ui.basic.tree.TreeChains.TreeInitTreeChain;
+import org.eclipse.scout.rt.client.extension.ui.basic.tree.TreeChains.TreeNodeActionChain;
+import org.eclipse.scout.rt.client.extension.ui.basic.tree.TreeChains.TreeNodeClickChain;
+import org.eclipse.scout.rt.client.extension.ui.basic.tree.TreeChains.TreeNodesSelectedChain;
+import org.eclipse.scout.rt.client.ui.IDNDSupport;
 import org.eclipse.scout.rt.client.ui.IEventHistory;
+import org.eclipse.scout.rt.client.ui.MouseButton;
 import org.eclipse.scout.rt.client.ui.action.ActionFinder;
 import org.eclipse.scout.rt.client.ui.action.ActionUtility;
 import org.eclipse.scout.rt.client.ui.action.IAction;
@@ -50,11 +66,17 @@ import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
 import org.eclipse.scout.rt.client.ui.profiler.DesktopProfiler;
 import org.eclipse.scout.rt.shared.data.form.fields.treefield.AbstractTreeFieldData;
 import org.eclipse.scout.rt.shared.data.form.fields.treefield.TreeNodeData;
+import org.eclipse.scout.rt.shared.extension.AbstractExtension;
+import org.eclipse.scout.rt.shared.extension.ContributionComposite;
+import org.eclipse.scout.rt.shared.extension.IContributionOwner;
+import org.eclipse.scout.rt.shared.extension.IExtensibleObject;
+import org.eclipse.scout.rt.shared.extension.IExtension;
+import org.eclipse.scout.rt.shared.extension.ObjectExtensions;
 import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.rt.shared.services.common.security.IAccessControlService;
 import org.eclipse.scout.service.SERVICES;
 
-public abstract class AbstractTree extends AbstractPropertyObserver implements ITree {
+public abstract class AbstractTree extends AbstractPropertyObserver implements ITree, IContributionOwner, IExtensibleObject {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractTree.class);
 
   private final EventListenerList m_listenerList = new EventListenerList();
@@ -82,7 +104,8 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   private boolean m_actionRunning;
   private boolean m_saveAndRestoreScrollbars;
   private ITreeNode m_lastSeenDropNode;
-
+  private IContributionOwner m_contributionHolder;
+  private final ObjectExtensions<AbstractTree, ITreeExtension<? extends AbstractTree>> m_objectExtensions;
   private List<IMenu> m_currentNodeMenus;
 
   public AbstractTree() {
@@ -96,6 +119,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
     m_deletedNodes = new HashMap<Object, ITreeNode>();
     m_nodeFilters = new ArrayList<ITreeNodeFilter>(1);
     m_actionRunning = false;
+    m_objectExtensions = new ObjectExtensions<AbstractTree, ITreeExtension<? extends AbstractTree>>(this);
     if (callInitialzier) {
       callInitializer();
     }
@@ -103,9 +127,24 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
 
   protected void callInitializer() {
     if (!m_initialized) {
-      initConfig();
+      interceptInitConfig();
       m_initialized = true;
     }
+  }
+
+  @Override
+  public final List<Object> getAllContributions() {
+    return m_contributionHolder.getAllContributions();
+  }
+
+  @Override
+  public final <T> List<T> getContributionsByClass(Class<T> type) {
+    return m_contributionHolder.getContributionsByClass(type);
+  }
+
+  @Override
+  public final <T> T getContribution(Class<T> contribution) {
+    return m_contributionHolder.getContribution(contribution);
   }
 
   /*
@@ -159,12 +198,30 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
     return false;
   }
 
+  /**
+   * Configures the drag support of this tree.
+   * <p>
+   * Subclasses can override this method. Default is {@code 0} (no drag support).
+   *
+   * @return {@code 0} for no support or one or more of {@link IDNDSupport#TYPE_FILE_TRANSFER},
+   *         {@link IDNDSupport#TYPE_IMAGE_TRANSFER}, {@link IDNDSupport#TYPE_JAVA_ELEMENT_TRANSFER} or
+   *         {@link IDNDSupport#TYPE_TEXT_TRANSFER} (e.g. {@code TYPE_TEXT_TRANSFER | TYPE_FILE_TRANSFER}).
+   */
   @ConfigProperty(ConfigProperty.DRAG_AND_DROP_TYPE)
   @Order(51)
   protected int getConfiguredDragType() {
     return 0;
   }
 
+  /**
+   * Configures the drop support of this tree.
+   * <p>
+   * Subclasses can override this method. Default is {@code 0} (no drop support).
+   *
+   * @return {@code 0} for no support or one or more of {@link IDNDSupport#TYPE_FILE_TRANSFER},
+   *         {@link IDNDSupport#TYPE_IMAGE_TRANSFER}, {@link IDNDSupport#TYPE_JAVA_ELEMENT_TRANSFER} or
+   *         {@link IDNDSupport#TYPE_TEXT_TRANSFER} (e.g. {@code TYPE_TEXT_TRANSFER | TYPE_FILE_TRANSFER}).
+   */
   @ConfigProperty(ConfigProperty.DRAG_AND_DROP_TYPE)
   @Order(52)
   protected int getConfiguredDropType() {
@@ -198,7 +255,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
    * Advices the ui to automatically scroll to the selection
    * <p>
    * If not used permanent, this feature can also used dynamically at individual occasions using
-   * 
+   *
    * <pre>
    * {@link #scrollToSelection()}
    * </pre>
@@ -217,7 +274,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
    * component is attached to Scout.
    * <p>
    * Subclasses can override this method. Default is {@code false}.
-   * 
+   *
    * @return {@code true} if this tree should save and restore its scrollbars coordinates, {@code false} otherwise
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
@@ -235,8 +292,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   protected List<Class<? extends IMenu>> getDeclaredMenus() {
     Class<?>[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
     List<Class<IMenu>> filtered = ConfigurationUtility.filterClasses(dca, IMenu.class);
-    List<Class<? extends IMenu>> foca = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(filtered, IMenu.class);
-    return ConfigurationUtility.removeReplacedClasses(foca);
+    return ConfigurationUtility.removeReplacedClasses(filtered);
   }
 
   @ConfigOperation
@@ -251,7 +307,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
 
   /**
    * The hyperlink's tree node is the selected node {@link #getSelectedNode()}
-   * 
+   *
    * @param url
    * @param path
    *          {@link URL#getPath()}
@@ -265,9 +321,10 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   }
 
   /**
-   * this method should not be implemented if you support {@link AbstractTree#execDrag(ITreeNode[])} (drag of mulitple
+   * this method should not be implemented if you support {@link AbstractTree#interceptDrag(ITreeNode[])} (drag of
+   * mulitple
    * nodes), as it takes precedence
-   * 
+   *
    * @return a transferable object representing the given row
    */
   @ConfigOperation
@@ -278,8 +335,8 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
 
   /**
    * Drag of multiple nodes. If this method is implemented, also single drags will be handled by Scout,
-   * the method {@link AbstractTree#execDrag(ITreeNode)} must not be implemented then.
-   * 
+   * the method {@link AbstractTree#interceptDrag(ITreeNode)} must not be implemented then.
+   *
    * @return a transferable object representing the given rows
    */
   @ConfigOperation
@@ -299,7 +356,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   /**
    * This method gets called when the drop node is changed, e.g. the dragged object
    * is moved over a new drop target.
-   * 
+   *
    * @since 4.0-M7
    */
   @ConfigOperation
@@ -326,11 +383,21 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   protected void execNodesSelected(TreeEvent e) throws ProcessingException {
   }
 
-  @ConfigOperation
-  @Order(70)
+  /**
+   * @deprecated use {@link #interceptNodeClick(ITreeNode, MouseButton)} instead. This method will be removed with V5.0
+   */
+  @Deprecated
   protected void execNodeClick(ITreeNode node) throws ProcessingException {
     TreeEvent e = new TreeEvent(this, TreeEvent.TYPE_NODE_CLICK, node);
     fireTreeEventInternal(e);
+  }
+
+  @ConfigOperation
+  @Order(70)
+  protected void execNodeClick(ITreeNode node, MouseButton mouseButton) throws ProcessingException {
+    TreeEvent e = new TreeEvent(this, TreeEvent.TYPE_NODE_CLICK, node);
+    fireTreeEventInternal(e);
+    execNodeClick(node);
   }
 
   @ConfigOperation
@@ -340,10 +407,20 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
     fireTreeEventInternal(e);
   }
 
+  protected final void interceptInitConfig() {
+    m_objectExtensions.initConfig(createLocalExtension(), new Runnable() {
+      @Override
+      public void run() {
+        initConfig();
+      }
+    });
+  }
+
   protected void initConfig() {
     m_enabledGranted = true;
     m_eventHistory = createEventHistory();
     m_uiFacade = new P_UIFacade();
+    m_contributionHolder = new ContributionComposite(this);
     setTitle(getConfiguredTitle());
     setIconId(getConfiguredIconId());
     setAutoTitle(getConfiguredAutoTitle());
@@ -377,9 +454,9 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
             m_lastSeenDropNode = null;
             if (e.getDragObject() == null) {
               try {
-                TransferObject transferObject = execDrag(e.getNode());
+                TransferObject transferObject = interceptDrag(e.getNode());
                 if (transferObject == null) {
-                  transferObject = execDrag(e.getNodes());
+                  transferObject = interceptDrag(e.getNodes());
                 }
                 e.setDragObject(transferObject);
               }
@@ -393,7 +470,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
             m_lastSeenDropNode = null;
             if (e.getDropObject() != null) {
               try {
-                execDrop(e.getNode(), e.getDropObject());
+                interceptDrop(e.getNode(), e.getDropObject());
               }
               catch (Throwable t) {
                 LOG.error("Drop", t);
@@ -409,7 +486,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
             try {
               if (m_lastSeenDropNode == null || m_lastSeenDropNode != e.getNode()) {
                 m_lastSeenDropNode = e.getNode();
-                execDropTargetChanged(e.getNode());
+                interceptDropTargetChanged(e.getNode());
               }
             }
             catch (Throwable t) {
@@ -424,8 +501,9 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
       }
     });
     // key shortcuts
-    List<IKeyStroke> ksList = new ArrayList<IKeyStroke>();
-    for (Class<? extends IKeyStroke> keystrokeClazz : getConfiguredKeyStrokes()) {
+    List<Class<? extends IKeyStroke>> configuredKeyStrokes = getConfiguredKeyStrokes();
+    List<IKeyStroke> ksList = new ArrayList<IKeyStroke>(configuredKeyStrokes.size());
+    for (Class<? extends IKeyStroke> keystrokeClazz : configuredKeyStrokes) {
       try {
         ksList.add(ConfigurationUtility.newInnerInstance(this, keystrokeClazz));
       }
@@ -442,28 +520,38 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
         }
       });
     }
+
+    List<IKeyStroke> contributedKeyStrokes = m_contributionHolder.getContributionsByClass(IKeyStroke.class);
+    contributedKeyStrokes.addAll(contributedKeyStrokes);
+
     m_baseKeyStrokes = ksList;
     setKeyStrokesInternal(m_baseKeyStrokes);
+
     // menus
-    List<IMenu> menuList = new ArrayList<IMenu>();
-    for (Class<? extends IMenu> menuClazz : getDeclaredMenus()) {
+    List<Class<? extends IMenu>> declaredMenus = getDeclaredMenus();
+    List<IMenu> contributedMenus = m_contributionHolder.getContributionsByClass(IMenu.class);
+
+    OrderedCollection<IMenu> menus = new OrderedCollection<IMenu>();
+    for (Class<? extends IMenu> menuClazz : declaredMenus) {
       try {
         IMenu menu = ConfigurationUtility.newInnerInstance(this, menuClazz);
-        menuList.add(menu);
+        menus.addOrdered(menu);
       }
       catch (Exception e) {
         SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + menuClazz.getName() + "'.", e));
       }
     }
     try {
-      injectMenusInternal(menuList);
+      injectMenusInternal(menus);
     }
     catch (Exception e) {
       LOG.error("Error occured while dynamically contributing menus.", e);
     }
-    TreeContextMenu contextMenu = new TreeContextMenu(this, menuList);
-    setContextMenuInternal(contextMenu);
 
+    menus.addAllOrdered(contributedMenus);
+    new MoveActionNodesHandler<IMenu>(menus).moveModelObjects();
+    TreeContextMenu contextMenu = new TreeContextMenu(this, menus.getOrderedList());
+    setContextMenuInternal(contextMenu);
   }
 
   /*
@@ -473,7 +561,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   public final void initTree() throws ProcessingException {
     initTreeInternal();
     ActionUtility.initActions(getMenus());
-    execInitTree();
+    interceptInitTree();
   }
 
   protected void initTreeInternal() throws ProcessingException {
@@ -483,7 +571,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   public final void disposeTree() {
     disposeTreeInternal();
     try {
-      execDisposeTree();
+      interceptDisposeTree();
     }
     catch (Throwable t) {
       LOG.warn(getClass().getName(), t);
@@ -493,14 +581,29 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   protected void disposeTreeInternal() {
   }
 
+  @Override
+  public final List<? extends ITreeExtension<? extends AbstractTree>> getAllExtensions() {
+    return m_objectExtensions.getAllExtensions();
+  }
+
+  protected ITreeExtension<? extends AbstractTree> createLocalExtension() {
+    return new LocalTreeExtension<AbstractTree>(this);
+  }
+
+  @Override
+  public <T extends IExtension<?>> T getExtension(Class<T> c) {
+    return m_objectExtensions.getExtension(c);
+  }
+
   /**
    * Override this internal method only in order to make use of dynamic menus<br/>
-   * Used to manage menu list and add/remove menus
-   * 
-   * @param menuList
-   *          live and mutable list of configured menus
+   * Used to manage menu list and add/remove menus.<br>
+   * To change the order or specify the insert position use {@link IMenu#setOrder(double)}.
+   *
+   * @param menus
+   *          live and mutable collection of configured menus
    */
-  protected void injectMenusInternal(List<IMenu> menuList) {
+  protected void injectMenusInternal(OrderedCollection<IMenu> menus) {
   }
 
   @Override
@@ -776,7 +879,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   private void rebuildKeyStrokesInternal() {
 
     final List<IMenu> menus = new ArrayList<IMenu>();
-    final IActionFilter activeFilter = getContextMenu().getActiveFilter();
+    final IActionFilter activeFilter = ActionUtility.createMenuFilterMenuTypes(getContextMenu().getCurrentMenuTypes(), true);
     getContextMenu().acceptVisitor(new IActionVisitor() {
       @Override
       public int visit(IAction action) {
@@ -1029,13 +1132,9 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   public void setNodeVisiblePermission(ITreeNode node, Permission p) {
     node = resolveNode(node);
     if (node != null) {
-      boolean oldValue = node.isVisible();
       node.setVisiblePermissionInternal(p);
-      boolean newValue = node.isVisible();
-      if (oldValue != newValue) {
-        // dont fire observers since visibility change only has an effect when
-        // used in init method
-      }
+      // dont fire observers since visibility change only has an effect when
+      // used in init method
     }
   }
 
@@ -1063,13 +1162,9 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   public void setNodeVisible(ITreeNode node, boolean b) {
     node = resolveNode(node);
     if (node != null) {
-      boolean oldValue = node.isVisible();
       node.setVisibleInternal(b);
-      boolean newValue = node.isVisible();
-      if (oldValue != newValue) {
-        // dont fire observers since visibility change only has an effect when
-        // used in init method
-      }
+      // dont fire observers since visibility change only has an effect when
+      // used in init method
     }
   }
 
@@ -1077,13 +1172,9 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   public void setNodeVisibleGranted(ITreeNode node, boolean b) {
     node = resolveNode(node);
     if (node != null) {
-      boolean oldValue = node.isVisible();
       node.setVisibleGrantedInternal(b);
-      boolean newValue = node.isVisible();
-      if (oldValue != newValue) {
-        // dont fire observers since visibility change only has an effect when
-        // used in init method
-      }
+      // dont fire observers since visibility change only has an effect when
+      // used in init method
     }
   }
 
@@ -1929,7 +2020,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
 
   /**
    * keeps order of input
-   * 
+   *
    * @param nodes
    * @return
    */
@@ -2034,7 +2125,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
     updateNodeMenus(newSelection);
     //single observer
     try {
-      execNodesSelected(e);
+      interceptNodesSelected(e);
     }
     catch (ProcessingException ex) {
       SERVICES.getService(IExceptionHandlerService.class).handleException(ex);
@@ -2075,11 +2166,11 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
     }
   }
 
-  private void fireNodeClick(ITreeNode node) {
+  private void fireNodeClick(ITreeNode node, MouseButton mouseButton) {
     if (node != null) {
       try {
         interceptNodeClickSingleObserver(node);
-        execNodeClick(node);
+        interceptNodeClick(node, mouseButton);
       }
       catch (ProcessingException ex) {
         SERVICES.getService(IExceptionHandlerService.class).handleException(ex);
@@ -2103,7 +2194,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
         if (node != null) {
           if (node.isLeaf()) {
             try {
-              execNodeAction(node);
+              interceptNodeAction(node);
             }
             catch (ProcessingException ex) {
               SERVICES.getService(IExceptionHandlerService.class).handleException(ex);
@@ -2145,7 +2236,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   /**
    * This method gets called when the drop node is changed, e.g. the dragged object
    * is moved over a new drop target.
-   * 
+   *
    * @since 4.0-M7
    */
   public void fireNodeDropTargetChanged(ITreeNode node) {
@@ -2155,7 +2246,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
 
   /**
    * This method gets called after the drag action has been finished.
-   * 
+   *
    * @since 4.0-M7
    */
   public void fireDragFinished() {
@@ -2267,7 +2358,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
           ITreeNode node = it.next();
           if (node.getTree() != null) {
             try {
-              execDecorateCell(node, node.getCellForUpdate());
+              interceptDecorateCell(node, node.getCellForUpdate());
             }
             catch (Throwable t) {
               LOG.warn("node " + node.getClass() + " " + node.getCell().getText(), t);
@@ -2354,7 +2445,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
         m_actionRunning = true;
         if (node != null) {
           selectNode(node);
-          execHyperlinkAction(url, url.getPath(), url != null && url.getHost().equals("local"));
+          interceptHyperlinkAction(url, url.getPath(), url != null && "local".equals(url.getHost()));
         }
       }
       finally {
@@ -2369,7 +2460,7 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
   }
 
   private void exportTreeNodeDataRec(List<ITreeNode> nodes, AbstractTreeFieldData treeData, TreeNodeData parentNodeData) throws ProcessingException {
-    ArrayList<TreeNodeData> nodeDataList = new ArrayList<TreeNodeData>();
+    ArrayList<TreeNodeData> nodeDataList = new ArrayList<TreeNodeData>(nodes.size());
     for (ITreeNode node : nodes) {
       TreeNodeData nodeData = exportTreeNodeData(node, treeData);
       if (nodeData != null) {
@@ -2593,13 +2684,13 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
     }
 
     @Override
-    public void fireNodeClickFromUI(ITreeNode node) {
+    public void fireNodeClickFromUI(ITreeNode node, MouseButton mouseButton) {
       try {
         pushUIProcessor();
         node = resolveNode(node);
         node = resolveVirtualNode(node);
         if (node != null) {
-          fireNodeClick(node);
+          fireNodeClick(node, mouseButton);
         }
       }
       catch (ProcessingException e) {
@@ -2627,12 +2718,6 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
       finally {
         popUIProcessor();
       }
-    }
-
-    @SuppressWarnings("deprecation")
-    @Override
-    public boolean getNodesDragEnabledFromUI() {
-      return isDragEnabled();
     }
 
     @Override
@@ -2722,4 +2807,136 @@ public abstract class AbstractTree extends AbstractPropertyObserver implements I
 
   }// end private class
 
+  /**
+   * The extension delegating to the local methods. This Extension is always at the end of the chain and will not call
+   * any further chain elements.
+   */
+  protected static class LocalTreeExtension<OWNER extends AbstractTree> extends AbstractExtension<OWNER> implements ITreeExtension<OWNER> {
+
+    public LocalTreeExtension(OWNER owner) {
+      super(owner);
+    }
+
+    @Override
+    public void execDrop(TreeDropChain chain, ITreeNode node, TransferObject t) throws ProcessingException {
+      getOwner().execDrop(node, t);
+    }
+
+    @Override
+    public void execInitTree(TreeInitTreeChain chain) throws ProcessingException {
+      getOwner().execInitTree();
+    }
+
+    @Override
+    public void execDropTargetChanged(TreeDropTargetChangedChain chain, ITreeNode node) throws ProcessingException {
+      getOwner().execDropTargetChanged(node);
+    }
+
+    @Override
+    public TransferObject execDrag(TreeDragNodesChain chain, Collection<ITreeNode> nodes) throws ProcessingException {
+      return getOwner().execDrag(nodes);
+    }
+
+    @Override
+    public void execNodeAction(TreeNodeActionChain chain, ITreeNode node) throws ProcessingException {
+      getOwner().execNodeAction(node);
+    }
+
+    @Override
+    public void execNodeClick(TreeNodeClickChain chain, ITreeNode node, MouseButton mouseButton) throws ProcessingException {
+      getOwner().execNodeClick(node, mouseButton);
+    }
+
+    @Override
+    public void execHyperlinkAction(TreeHyperlinkActionChain chain, URL url, String path, boolean local) throws ProcessingException {
+      getOwner().execHyperlinkAction(url, path, local);
+    }
+
+    @Override
+    public void execNodesSelected(TreeNodesSelectedChain chain, TreeEvent e) throws ProcessingException {
+      getOwner().execNodesSelected(e);
+    }
+
+    @Override
+    public void execDisposeTree(TreeDisposeTreeChain chain) throws ProcessingException {
+      getOwner().execDisposeTree();
+    }
+
+    @Override
+    public void execDecorateCell(TreeDecorateCellChain chain, ITreeNode node, Cell cell) throws ProcessingException {
+      getOwner().execDecorateCell(node, cell);
+    }
+
+    @Override
+    public TransferObject execDrag(TreeDragNodeChain chain, ITreeNode node) throws ProcessingException {
+      return getOwner().execDrag(node);
+    }
+
+  }
+
+  protected final void interceptDrop(ITreeNode node, TransferObject t) throws ProcessingException {
+    List<? extends ITreeExtension<? extends AbstractTree>> extensions = getAllExtensions();
+    TreeDropChain chain = new TreeDropChain(extensions);
+    chain.execDrop(node, t);
+  }
+
+  protected final void interceptInitTree() throws ProcessingException {
+    List<? extends ITreeExtension<? extends AbstractTree>> extensions = getAllExtensions();
+    TreeInitTreeChain chain = new TreeInitTreeChain(extensions);
+    chain.execInitTree();
+  }
+
+  protected final void interceptDropTargetChanged(ITreeNode node) throws ProcessingException {
+    List<? extends ITreeExtension<? extends AbstractTree>> extensions = getAllExtensions();
+    TreeDropTargetChangedChain chain = new TreeDropTargetChangedChain(extensions);
+    chain.execDropTargetChanged(node);
+  }
+
+  protected final TransferObject interceptDrag(Collection<ITreeNode> nodes) throws ProcessingException {
+    List<? extends ITreeExtension<? extends AbstractTree>> extensions = getAllExtensions();
+    TreeDragNodesChain chain = new TreeDragNodesChain(extensions);
+    return chain.execDrag(nodes);
+  }
+
+  protected final void interceptNodeAction(ITreeNode node) throws ProcessingException {
+    List<? extends ITreeExtension<? extends AbstractTree>> extensions = getAllExtensions();
+    TreeNodeActionChain chain = new TreeNodeActionChain(extensions);
+    chain.execNodeAction(node);
+  }
+
+  protected final void interceptNodeClick(ITreeNode node, MouseButton mouseButton) throws ProcessingException {
+    List<? extends ITreeExtension<? extends AbstractTree>> extensions = getAllExtensions();
+    TreeNodeClickChain chain = new TreeNodeClickChain(extensions);
+    chain.execNodeClick(node, mouseButton);
+  }
+
+  protected final void interceptHyperlinkAction(URL url, String path, boolean local) throws ProcessingException {
+    List<? extends ITreeExtension<? extends AbstractTree>> extensions = getAllExtensions();
+    TreeHyperlinkActionChain chain = new TreeHyperlinkActionChain(extensions);
+    chain.execHyperlinkAction(url, path, local);
+  }
+
+  protected final void interceptNodesSelected(TreeEvent e) throws ProcessingException {
+    List<? extends ITreeExtension<? extends AbstractTree>> extensions = getAllExtensions();
+    TreeNodesSelectedChain chain = new TreeNodesSelectedChain(extensions);
+    chain.execNodesSelected(e);
+  }
+
+  protected final void interceptDisposeTree() throws ProcessingException {
+    List<? extends ITreeExtension<? extends AbstractTree>> extensions = getAllExtensions();
+    TreeDisposeTreeChain chain = new TreeDisposeTreeChain(extensions);
+    chain.execDisposeTree();
+  }
+
+  protected final void interceptDecorateCell(ITreeNode node, Cell cell) throws ProcessingException {
+    List<? extends ITreeExtension<? extends AbstractTree>> extensions = getAllExtensions();
+    TreeDecorateCellChain chain = new TreeDecorateCellChain(extensions);
+    chain.execDecorateCell(node, cell);
+  }
+
+  protected final TransferObject interceptDrag(ITreeNode node) throws ProcessingException {
+    List<? extends ITreeExtension<? extends AbstractTree>> extensions = getAllExtensions();
+    TreeDragNodeChain chain = new TreeDragNodeChain(extensions);
+    return chain.execDrag(node);
+  }
 }

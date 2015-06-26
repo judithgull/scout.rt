@@ -13,6 +13,7 @@ package org.eclipse.scout.rt.client.mobile.ui.desktop;
 import java.util.Collection;
 
 import org.eclipse.scout.commons.annotations.Order;
+import org.eclipse.scout.commons.annotations.OrderedCollection;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.holders.IHolder;
 import org.eclipse.scout.rt.client.mobile.navigation.AbstractMobileBackAction;
@@ -82,18 +83,16 @@ public class DeviceTransformationDesktopExtension extends AbstractDesktopExtensi
     }
 
     getDeviceTransformer().adaptDesktopActions(actions);
-
     super.contributeActions(actions);
   }
 
   @Override
-  public void contributeOutlines(Collection<IOutline> outlines) {
+  public void contributeOutlines(OrderedCollection<IOutline> outlines) {
     if (!isActive()) {
       return;
     }
 
     getDeviceTransformer().adaptDesktopOutlines(outlines);
-
     super.contributeOutlines(outlines);
   }
 

@@ -264,7 +264,35 @@ public final class BookmarkUtility {
     }
   }
 
+  /**
+   * Load a {@link Bookmark} on the specified {@link IDesktop} model.
+   * <p />
+   * First the specific {@link Bookmark#getOutlineClassName()} is evaluated and selected, afterwards every page from the
+   * {@link Bookmark#getPath()} will be selected (respecting the {@link AbstractPageState}).
+   * <p />
+   * Finally the path will be expanded. Possible exceptions might occur if no outline is set in the {@link Bookmark} or
+   * the outline is not available.
+   *
+   * @param forceReload
+   *          parameter without any function
+   * @deprecated use {@link #activateBookmark(IDesktop, Bookmark)}, parameter forceReload is without any
+   *             function. Will be removed in the N-Release
+   */
+  @Deprecated
   public static void activateBookmark(IDesktop desktop, Bookmark bm, boolean forceReload) throws ProcessingException {
+    activateBookmark(desktop, bm);
+  }
+
+  /**
+   * Load a {@link Bookmark} on the specified {@link IDesktop} model.
+   * <p />
+   * First the specific {@link Bookmark#getOutlineClassName()} is evaluated and selected, afterwards every page from the
+   * {@link Bookmark#getPath()} will be selected (respecting the {@link AbstractPageState}).
+   * <p />
+   * Finally the path will be expanded. Possible exceptions might occur if no outline is set in the {@link Bookmark} or
+   * the outline is not available.
+   */
+  public static void activateBookmark(IDesktop desktop, Bookmark bm) throws ProcessingException {
     if (bm.getOutlineClassName() == null) {
       return;
     }
@@ -349,7 +377,7 @@ public final class BookmarkUtility {
   /**
    * Constructs a list of {@link TableColumnState} objects which
    * describe the set of columns of the given {@link ITable}.
-   * 
+   *
    * @param table
    *          The table with the columns to back-up.
    * @return A {@link List} of {@link TableColumnState} objects that
@@ -385,7 +413,7 @@ public final class BookmarkUtility {
 
   /**
    * Restores a tables columns from the given list of {@link TableColumnState} objects.
-   * 
+   *
    * @param table
    *          The table to be restored.
    * @param oldColumns
@@ -606,18 +634,7 @@ public final class BookmarkUtility {
     // setup table
     try {
       table.setTableChanging(true);
-      //legacy support
-      List<TableColumnState> allColumns = new ArrayList<TableColumnState>();
-      for (TableColumnState tcs : tablePageState.getAvailableColumns()) {
-        if (tcs.getVisible()) {
-          allColumns.add(tcs);
-        }
-      }
-
-      if (allColumns == null || allColumns.size() == 0) {
-        allColumns = tablePageState.getAvailableColumns();
-      }
-      restoreTableColumns(tablePage.getTable(), allColumns);
+      restoreTableColumns(tablePage.getTable(), tablePageState.getAvailableColumns());
     }
     finally {
       table.setTableChanging(false);
@@ -736,7 +753,7 @@ public final class BookmarkUtility {
       nodePage.ensureChildrenLoaded();
       IPage p = BookmarkUtility.resolvePage(nodePage.getChildPages(), childState.getPageClassName(), childState.getBookmarkIdentifier());
       if (p != null) {
-        ITable table = nodePage.getInternalTable();
+        ITable table = nodePage.getTable();
         // reset table column filter if requested
         if (resetViewAndWarnOnFail && !p.isFilterAccepted() && table.getColumnFilterManager() != null && table.getColumnFilterManager().isEnabled()) {
           table.getColumnFilterManager().reset();

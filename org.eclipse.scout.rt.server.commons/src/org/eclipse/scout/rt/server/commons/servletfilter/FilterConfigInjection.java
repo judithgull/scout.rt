@@ -144,13 +144,13 @@ public class FilterConfigInjection {
 
     /**
      * Convenience for parameter "active"
-     * 
+     *
      * @return true if there is no init parameter "active" or the init parameter
      *         "active" has the value "true"
      */
     public boolean isActive() {
       String activeText = getInitParameter("active");
-      return activeText == null || activeText.equals("true");
+      return activeText == null || "true".equals(activeText);
     }
 
     @Override
@@ -174,6 +174,7 @@ public class FilterConfigInjection {
       }
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public Enumeration getInitParameterNames() {
       TreeSet<String> names = new TreeSet<String>(m_injectedMap.keySet());

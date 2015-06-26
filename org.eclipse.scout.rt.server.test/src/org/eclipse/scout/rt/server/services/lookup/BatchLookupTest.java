@@ -33,7 +33,10 @@ import org.junit.Test;
 import org.osgi.framework.ServiceRegistration;
 
 /**
- * Test {@link IBatchLookupService} and caching with {@link BatchLookupResultCache}
+ * Test {@link IBatchLookupService} and caching with {@link BatchLookupResultCache}.
+ * Test for the deprecated {@link BatchLookupService} (server).
+ * This test has been copied to the shared test fragment (for the BatchLookupService in the shared).
+ * Will be removed with the N-Release (when the BatchLookupService in the server is removed)
  */
 public class BatchLookupTest {
   private List<ServiceRegistration> m_reg;
@@ -111,6 +114,7 @@ public class BatchLookupTest {
     testInternal(SubclassedLocalFlowerLookupCallWithMembersWithEqualsOverride.class, 100, 0);
   }
 
+  @SuppressWarnings("deprecation")
   private void testInternal(Class<? extends IFlowerLookupCall> callClazz, long expectedLocalInvocations, long expectedServerInvocations) throws Exception {
     m_localInvocations = 0;
     m_serverInvocations = 0;
@@ -363,7 +367,7 @@ public class BatchLookupTest {
     private static final long serialVersionUID = 1L;
   }
 
-  public static interface IFlowerLookupCall {
+  public interface IFlowerLookupCall {
     void setKey(Object key);
 
     void setLatinId(Long id);
@@ -371,7 +375,7 @@ public class BatchLookupTest {
     Long getLatinId();
   }
 
-  public static interface IFlowerLookupService extends ILookupService {
+  public interface IFlowerLookupService extends ILookupService {
   }
 
   public static class FlowerLookupService extends AbstractLookupService implements IFlowerLookupService {

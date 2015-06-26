@@ -18,9 +18,12 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -74,7 +77,7 @@ public final class HTMLUtility {
    * as {@link DocumentParser} does not allow to specify the charset in HTML text. Due to failsafe, all other
    * &lt;meta&gt; tags are removed as well as just informative anyway.
    * </p>
-   * 
+   *
    * @param htmlText
    * @return
    */
@@ -152,7 +155,7 @@ public final class HTMLUtility {
    * <p>
    * Applies some intelligence to the HTML document to ensure a valid HTML document.
    * </p>
-   * 
+   *
    * @param rawHtml
    *          the raw HTML document
    * @param ensureContentType
@@ -193,7 +196,7 @@ public final class HTMLUtility {
       // 1b) ensure </HTML> tag
       Matcher matcherHtmlEndTag = createMatcherForTag(rawHtml, "html", true);
       if (!matcherHtmlEndTag.find()) {
-        rawHtml = rawHtml += "</html>";
+        rawHtml += "</html>";
       }
 
       // 2a) ensure <HEAD> tag
@@ -262,7 +265,7 @@ public final class HTMLUtility {
    * called.
    * <p>
    * If none of the conditions hold, the HTML source is not changed.
-   * 
+   *
    * @return the adjusted HTML source according to the description above.
    */
   private static String adjustCssIfNeeded(String rawHtml, boolean cleanupCss, DefaultFont defaultFont, Color defaultHyperlinkColor) {
@@ -379,6 +382,7 @@ public final class HTMLUtility {
       }
     }
     // clean font tags if any styles are present
+    final Map<MutableAttributeSet, List<Object>> attributesToRemove = new HashMap<MutableAttributeSet, List<Object>>();
     doc.writeLockEx();
     visitDocument(doc, new IDocumentVisitor() {
       @Override
@@ -390,11 +394,25 @@ public final class HTMLUtility {
       public void visitAttribute(Element elem, AttributeSet atts, Object nm, Object value) {
         if (nm == HTML.Attribute.FACE || nm == HTML.Attribute.SIZE || nm == CSS.Attribute.FONT_FAMILY || nm == CSS.Attribute.FONT_SIZE) {
           if (atts instanceof MutableAttributeSet) {
-            ((MutableAttributeSet) atts).removeAttribute(nm);
+            MutableAttributeSet mutableAttributeSet = (MutableAttributeSet) atts;
+            List<Object> attributes = attributesToRemove.get(mutableAttributeSet);
+            if (attributes == null) {
+              attributes = new ArrayList<Object>();
+              attributesToRemove.put(mutableAttributeSet, attributes);
+            }
+            attributes.add(nm);
           }
         }
       }
     });
+
+    for (Entry<MutableAttributeSet, List<Object>> entry : attributesToRemove.entrySet()) {
+      MutableAttributeSet mutableAttributeSet = entry.getKey();
+      for (Object nm : entry.getValue()) {
+        mutableAttributeSet.removeAttribute(nm);
+      }
+    }
+
     doc.writeUnlockEx();
     return htmlDoc;
   }
@@ -420,7 +438,7 @@ public final class HTMLUtility {
         Object attKey = en2.nextElement();
         CSS.Attribute cssAtt = cssMap.get("" + attKey);
         String value = "" + style.getAttribute(attKey);
-        if (cssAtt != null && (!value.equals("null")) && value.length() > 0) {
+        if (cssAtt != null && (!"null".equals(value)) && value.length() > 0) {
           Matcher m = cidPattern.matcher(value);
           if (m.matches()) {
             String cid = m.group(1);
@@ -524,12 +542,12 @@ public final class HTMLUtility {
    * @return simple and quick conversion of html text to plain text without parsing and building of a html model
    *         <p>
    *         Rule based conversion:
-   * 
+   *
    *         <pre>
    * <xmp>
    * <br>|<br/>
    * |
-   * 
+   *
    *         </p>
    *         |
    *         <p/>
@@ -564,13 +582,16 @@ public final class HTMLUtility {
    * <li>p tags in table cells will be ignored</li>
    * <li>table columns are rendered with a pipe character (|)</li>
    * </ul>
-   * 
+   *
    * @param html
    *          input HTML code as string.
    * @return plain text as string
    */
   public static String toPlainTextWithTable(String html) {
     String s = html;
+    if (s == null || s.length() == 0) {
+      return s;
+    }
     //escape comments:
     s = Pattern.compile("<!\\-\\-(.*?)\\-\\->", Pattern.DOTALL).matcher(s).replaceAll("");
 
@@ -681,7 +702,7 @@ public final class HTMLUtility {
    * <p>
    * Precondition: &lt;head&gt; section must be contained in the given HTML text
    * </p>
-   * 
+   *
    * @param httpEquiv
    *          the content type
    * @param content
@@ -714,7 +735,7 @@ public final class HTMLUtility {
    * <p>
    * This is important as document cannot be loaded by @{DocumentParser} otherwise.
    * </p>
-   * 
+   *
    * @param rawHtml
    * @param singleStyleQuote
    *          the quote character for the style attribte
@@ -756,7 +777,7 @@ public final class HTMLUtility {
   /**
    * Create a {@link Matcher} for the given tag. Please note that the tag is not considered to be an empty tag, e.g.
    * <code>&lt;br/&gt;</code>
-   * 
+   *
    * @param rawHtml
    * @param tag
    *          the tag the matcher should be created for
@@ -771,7 +792,7 @@ public final class HTMLUtility {
 
   /**
    * Eliminates the vertical scrollbar by setting overflow:auto in body style attribute.
-   * 
+   *
    * @param rawHtml
    * @return
    */
@@ -823,7 +844,7 @@ public final class HTMLUtility {
 
   /**
    * To ensure default font settings set in CSS body style
-   * 
+   *
    * @param rawHtml
    * @param defaultFont
    * @return
@@ -958,7 +979,7 @@ public final class HTMLUtility {
     }
   }
 
-  private static interface IDocumentVisitor {
+  private interface IDocumentVisitor {
     void visitElement(Element elem);
 
     void visitAttribute(Element elem, AttributeSet atts, Object nm, Object value);

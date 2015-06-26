@@ -10,11 +10,11 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.extension.client.ui.desktop.outline.pages;
 
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeMap;
 
 import org.eclipse.scout.commons.CompositeObject;
@@ -38,11 +38,11 @@ import org.eclipse.scout.rt.extension.client.ui.desktop.outline.pages.internal.P
  * {@link AbstractExtensiblePageWithNodes} and {@link AbstractExtensiblePageWithTable} should be used in general for
  * providing extensible outlines. This utility class is intended to be used in cases in which it is not possible to
  * modify the given class hierarchy.
- * 
+ *
  * @since 3.9.0
  */
 public final class PageExtensionUtility {
-  private final static IScoutLogger LOG = ScoutLogManager.getLogger(PageExtensionUtility.class);
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(PageExtensionUtility.class);
 
   private PageExtensionUtility() {
     // utility class
@@ -51,13 +51,13 @@ public final class PageExtensionUtility {
   /**
    * Adapts the given {@link IPageWithNodes} by adding new pages to the given page list and by removing or modifying
    * existing pages.
-   * 
+   *
    * @param nodePage
    * @param pageList
    * @throws ProcessingException
    * @see {@link AbstractExtensiblePageWithNodes}
    */
-  public static void adaptPageWithNodes(IPageWithNodes nodePage, Collection<IPage> pageList) throws ProcessingException {
+  public static void adaptPageWithNodes(IPageWithNodes nodePage, List<IPage> pageList) throws ProcessingException {
     if (nodePage == null) {
       throw new ProcessingException("nodePage must not be null");
     }
@@ -74,13 +74,13 @@ public final class PageExtensionUtility {
   /**
    * Adapts the given {@link IOutline} by adding new pages to the given page list and by removing or modifying
    * existing pages.
-   * 
+   *
    * @param outline
    * @param pageList
    * @throws ProcessingException
    * @see {@link AbstractExtensibleOutline}
    */
-  public static void adaptOutline(IOutline outline, Collection<IPage> pageList) throws ProcessingException {
+  public static void adaptOutline(IOutline outline, List<IPage> pageList) throws ProcessingException {
     if (outline == null) {
       throw new ProcessingException("outline must not be null");
     }
@@ -95,7 +95,7 @@ public final class PageExtensionUtility {
 
   /**
    * Adapts the given page by applying page modifications contributed by extensions.
-   * 
+   *
    * @param outline
    * @param parentPage
    * @param page
@@ -116,7 +116,7 @@ public final class PageExtensionUtility {
     modifyPages(outline, parentPage, extensionManager.getPageModificationExtensions(), Collections.singletonList(page));
   }
 
-  static void contributePages(IOutline outline, IPageWithNodes parentPage, List<PageContributionExtension> extensions, Collection<IPage> pageList) throws ProcessingException {
+  static void contributePages(IOutline outline, IPageWithNodes parentPage, List<PageContributionExtension> extensions, List<IPage> pageList) throws ProcessingException {
     if (extensions == null || extensions.isEmpty()) {
       return;
     }
@@ -133,7 +133,7 @@ public final class PageExtensionUtility {
       return;
     }
 
-    TreeMap<CompositeObject, IPage> orderedPages = new TreeMap<CompositeObject, IPage>();
+    Map<CompositeObject,IPage> orderedPages = new TreeMap<CompositeObject, IPage>();
     // assign synthetic order to existing pages
     int counter = 0;
     for (IPage p : pageList) {
@@ -157,7 +157,7 @@ public final class PageExtensionUtility {
     pageList.addAll(orderedPages.values());
   }
 
-  static void removePages(IOutline outline, IPage parentPage, List<PageRemoveExtension> extensions, Collection<IPage> pageList) {
+  static void removePages(IOutline outline, IPage parentPage, List<PageRemoveExtension> extensions, List<IPage> pageList) {
     if (extensions == null || extensions.isEmpty()) {
       return;
     }
@@ -173,7 +173,7 @@ public final class PageExtensionUtility {
     }
   }
 
-  static void modifyPages(IOutline outline, IPage parentPage, List<PageModificationExtension> extensions, Collection<IPage> pageList) {
+  static void modifyPages(IOutline outline, IPage parentPage, List<PageModificationExtension> extensions, List<IPage> pageList) {
     if (extensions == null || extensions.isEmpty()) {
       return;
     }

@@ -495,8 +495,24 @@ public class SwtMock extends AbstractGuiMock {
   }
 
   @Override
+  public org.eclipse.scout.testing.client.menu.MenuItem getContextMenuItem(String label) {
+    final MenuItem uiMenuItem = getMenuItem(label);
+    return syncExec(new WaitCondition<org.eclipse.scout.testing.client.menu.MenuItem>() {
+      @Override
+      public org.eclipse.scout.testing.client.menu.MenuItem run() throws Throwable {
+        if (uiMenuItem != null) {
+          return new org.eclipse.scout.testing.client.menu.MenuItem(uiMenuItem.getText(), uiMenuItem.isEnabled(), true);
+        }
+        else {
+          return null;
+        }
+      }
+    });
+  }
+
+  @Override
   public void contextMenu(final String... names) {
-    final ArrayList<Integer> indexOfList = new ArrayList<Integer>();
+    final List<Integer> indexOfList = new ArrayList<Integer>();
     final MenuItem mi = waitForMenuItem(names[0]);
     syncExec(new WaitCondition<Boolean>() {
       @Override
@@ -1082,52 +1098,55 @@ public class SwtMock extends AbstractGuiMock {
     return waitUntil(new WaitCondition<MenuItem>() {
       @Override
       public MenuItem run() {
-        return syncExec(new WaitCondition<MenuItem>() {
-          @Override
-          public MenuItem run() throws Throwable {
-            String label = cleanButtonLabel(name);
-            //focus control
-            Control focusControl = getDisplay().getFocusControl();
-            if (focusControl != null) {
-              Menu m = focusControl.getMenu();
-              if (m != null) {
-                for (MenuItem item : m.getItems()) {
-                  if (label.equals(cleanButtonLabel(item.getText()))) {
-                    return item;
-                  }
-                }
-              }
-            }
-            //other controls
-            for (Composite parent : enumerateParentContainers()) {
-              for (Control c : SwtUtility.findChildComponents(parent, Control.class)) {
-                Menu m = c.getMenu();
-                if (m != null) {
-                  for (MenuItem item : m.getItems()) {
-                    if (label.equals(cleanButtonLabel(item.getText()))) {
-                      return item;
-                    }
-                  }
-                }
-              }
-            }
-            //main menu
-            for (Shell shell : getDisplay().getShells()) {
-              Menu m = shell.getMenuBar();
-              if (m != null) {
-                for (MenuItem item : m.getItems()) {
-                  if (label.equals(cleanButtonLabel(item.getText()))) {
-                    return item;
-                  }
-                }
-              }
-            }
-            return null;
-          }
-        });
+        return getMenuItem(name);
       }
     });
+  }
 
+  protected MenuItem getMenuItem(final String name) {
+    return syncExec(new WaitCondition<MenuItem>() {
+      @Override
+      public MenuItem run() throws Throwable {
+        String label = cleanButtonLabel(name);
+        //focus control
+        Control focusControl = getDisplay().getFocusControl();
+        if (focusControl != null) {
+          Menu m = focusControl.getMenu();
+          if (m != null) {
+            for (MenuItem item : m.getItems()) {
+              if (label.equals(cleanButtonLabel(item.getText()))) {
+                return item;
+              }
+            }
+          }
+        }
+        //other controls
+        for (Composite parent : enumerateParentContainers()) {
+          for (Control c : SwtUtility.findChildComponents(parent, Control.class)) {
+            Menu m = c.getMenu();
+            if (m != null) {
+              for (MenuItem item : m.getItems()) {
+                if (label.equals(cleanButtonLabel(item.getText()))) {
+                  return item;
+                }
+              }
+            }
+          }
+        }
+        //main menu
+        for (Shell shell : getDisplay().getShells()) {
+          Menu m = shell.getMenuBar();
+          if (m != null) {
+            for (MenuItem item : m.getItems()) {
+              if (label.equals(cleanButtonLabel(item.getText()))) {
+                return item;
+              }
+            }
+          }
+        }
+        return null;
+      }
+    });
   }
 
   protected <T> T syncExec(final WaitCondition<T> r) {

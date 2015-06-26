@@ -22,20 +22,19 @@ import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.job.JobEx;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
-import org.eclipse.scout.commons.osgi.BundleInspector;
-import org.eclipse.scout.commons.serialization.SerializationUtility;
 import org.eclipse.scout.rt.servicetunnel.AbstractServiceTunnel;
 import org.eclipse.scout.rt.shared.ISession;
 import org.eclipse.scout.rt.shared.ScoutTexts;
 import org.eclipse.scout.rt.shared.services.common.processing.IServerProcessingCancelService;
 import org.eclipse.scout.rt.shared.servicetunnel.DefaultServiceTunnelContentHandler;
 import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelContentHandler;
-import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelRequest;
+import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelRequest;
+import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelResponse;
 import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelResponse;
 
 /**
  * Abstract non-public implementation of a tunnel used to invoke a service through HTTP.
- * 
+ *
  * @author awe (refactoring)
  */
 public abstract class AbstractInternalHttpServiceTunnel<T extends ISession> extends AbstractServiceTunnel<T> {
@@ -74,7 +73,7 @@ public abstract class AbstractInternalHttpServiceTunnel<T extends ISession> exte
    *           override this method to customize the creation of the {@link URLConnection} see
    *           {@link #addCustomHeaders(URLConnection, String)}
    */
-  protected URLConnection createURLConnection(ServiceTunnelRequest call, byte[] callData) throws IOException {
+  protected URLConnection createURLConnection(IServiceTunnelRequest call, byte[] callData) throws IOException {
     // fast check of dummy URL's
     if (getServerURL().getProtocol().startsWith("file")) {
       throw new IOException("File connection is not supporting HTTP: " + getServerURL());
@@ -126,20 +125,19 @@ public abstract class AbstractInternalHttpServiceTunnel<T extends ISession> exte
   public Object invokeService(Class serviceInterfaceClass, Method operation, Object[] callerArgs) throws ProcessingException {
     if (m_contentHandler == null) {
       m_contentHandler = new DefaultServiceTunnelContentHandler();
-      String[] bundleOrderPrefixes = SerializationUtility.getBundleOrderPrefixes();
-      m_contentHandler.initialize(BundleInspector.getOrderedBundleList(bundleOrderPrefixes), getSession().getClass().getClassLoader());
+      m_contentHandler.initialize();
     }
     return super.invokeService(serviceInterfaceClass, operation, callerArgs);
   }
 
   @Override
-  protected ServiceTunnelResponse tunnel(final ServiceTunnelRequest req) {
+  protected IServiceTunnelResponse tunnel(final IServiceTunnelRequest req) {
     final Object backgroundLock = new Object();
     IHttpBackgroundExecutor executor = createHttpBackgroundExecutor("ServerCallProcessing", req, backgroundLock);
     JobEx httpJob = executor.getJob();
     decorateBackgroundJob(req, httpJob);
     // wait until done
-    ServiceTunnelResponse res = null;
+    IServiceTunnelResponse res = null;
     boolean cancelled = false;
     boolean sentCancelRequest = false;
     synchronized (backgroundLock) {
@@ -182,31 +180,29 @@ public abstract class AbstractInternalHttpServiceTunnel<T extends ISession> exte
   /**
    * Override this method to decide when background jobs to the backend should be presented to the user or not (for
    * cancelling). The default implementation does nothing.
-   * 
+   *
    * @param call
    * @param backgroundJob
    */
-  protected void decorateBackgroundJob(ServiceTunnelRequest call, Job backgroundJob) {
+  protected void decorateBackgroundJob(IServiceTunnelRequest call, Job backgroundJob) {
   }
 
   /**
    * Signals the server to cancel processing jobs for the current session.
-   * 
+   *
    * @return true if cancel was successful and transaction was in fact cancelled, false otherwise
    */
   protected boolean sendCancelRequest(long requestSequence) {
     try {
-      ServiceTunnelRequest cancelCall = new ServiceTunnelRequest(getVersion(), IServerProcessingCancelService.class, IServerProcessingCancelService.class.getMethod("cancel", long.class), new Object[]{requestSequence});
-      cancelCall.setClientSubject(getSession().getSubject());
-      cancelCall.setVirtualSessionId(getSession().getVirtualSessionId());
-      cancelCall.setUserAgent(getSession().getUserAgent().createIdentifier());
+      IServiceTunnelRequest cancelCall = createServiceTunnelRequest(getVersion(), IServerProcessingCancelService.class, IServerProcessingCancelService.class.getMethod("cancel", long.class), new Object[]{requestSequence});
+
       IHttpBackgroundExecutor executor = createHttpBackgroundExecutor("ServerCallCancelProcessing", cancelCall, new Object());
       JobEx cancelHttpJob = executor.getJob();
       cancelHttpJob.setSystem(true);
       cancelHttpJob.schedule();
       try {
         cancelHttpJob.join(10000L);
-        ServiceTunnelResponse cancelResult = executor.getResponse();
+        IServiceTunnelResponse cancelResult = executor.getResponse();
         if (cancelResult == null) {
           return false;
         }
@@ -227,7 +223,7 @@ public abstract class AbstractInternalHttpServiceTunnel<T extends ISession> exte
     }
   }
 
-  private IHttpBackgroundExecutor createHttpBackgroundExecutor(String name, ServiceTunnelRequest request, Object lock) {
+  private IHttpBackgroundExecutor createHttpBackgroundExecutor(String name, IServiceTunnelRequest request, Object lock) {
     HttpBackgroundExecutable executable = new HttpBackgroundExecutable(request, lock, this);
     JobEx job = createHttpBackgroundJob(ScoutTexts.get(name), executable);
     return new HttpBackgroundExecutor(job, executable);
@@ -239,10 +235,10 @@ public abstract class AbstractInternalHttpServiceTunnel<T extends ISession> exte
    * This method is called just after the http response is received but before
    * the http response is processed by scout. This might be used to read and
    * interpret custom http headers.
-   * 
+   *
    * @since 06.07.2009
    */
-  protected void preprocessHttpRepsonse(URLConnection urlConn, ServiceTunnelRequest call, int httpCode) {
+  protected void preprocessHttpRepsonse(URLConnection urlConn, IServiceTunnelRequest call, int httpCode) {
   }
 
 }

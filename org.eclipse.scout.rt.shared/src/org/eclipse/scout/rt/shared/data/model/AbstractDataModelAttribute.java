@@ -24,11 +24,19 @@ import org.eclipse.scout.commons.LocaleThreadLocal;
 import org.eclipse.scout.commons.TypeCastUtility;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
+import org.eclipse.scout.commons.annotations.IOrdered;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.beans.AbstractPropertyObserver;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.shared.extension.AbstractSerializableExtension;
+import org.eclipse.scout.rt.shared.extension.IExtensibleObject;
+import org.eclipse.scout.rt.shared.extension.IExtension;
+import org.eclipse.scout.rt.shared.extension.ObjectExtensions;
+import org.eclipse.scout.rt.shared.extension.data.model.DataModelAttributeChains.DataModelAttributeInitAttributeChain;
+import org.eclipse.scout.rt.shared.extension.data.model.DataModelAttributeChains.DataModelAttributePrepareLookupChain;
+import org.eclipse.scout.rt.shared.extension.data.model.IDataModelAttributeExtension;
 import org.eclipse.scout.rt.shared.services.common.code.ICodeType;
 import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.rt.shared.services.common.security.IAccessControlService;
@@ -38,14 +46,14 @@ import org.eclipse.scout.rt.shared.services.lookup.ILookupRow;
 import org.eclipse.scout.rt.shared.services.lookup.LookupCall;
 import org.eclipse.scout.service.SERVICES;
 
-@SuppressWarnings("deprecation")
-public abstract class AbstractDataModelAttribute extends AbstractPropertyObserver implements IDataModelAttribute, DataModelConstants, Serializable {
+public abstract class AbstractDataModelAttribute extends AbstractPropertyObserver implements IDataModelAttribute, DataModelConstants, Serializable, IExtensibleObject {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractDataModelAttribute.class);
   private static final long serialVersionUID = 1L;
 
   private String m_id;
   private String m_text;
   private int m_type;
+  private double m_order;
   private List<? extends IDataModelAttributeOp> m_operators;
   private int[] m_aggregationTypes;
   private String m_iconId;
@@ -60,6 +68,7 @@ public abstract class AbstractDataModelAttribute extends AbstractPropertyObserve
   private boolean m_visible;
   private boolean m_activeFilterEnabled;
   private IDataModelEntity m_parentEntity;
+  private final ObjectExtensions<AbstractDataModelAttribute, IDataModelAttributeExtension<? extends AbstractDataModelAttribute>> m_objectExtensions;
 
   public AbstractDataModelAttribute() {
     this(true);
@@ -67,17 +76,39 @@ public abstract class AbstractDataModelAttribute extends AbstractPropertyObserve
 
   /**
    * @param callInitConfig
-   *          true if {@link #callInitConfig()} should automcatically be invoked, false if the subclass invokes
-   *          {@link #callInitConfig()} itself
+   *          true if {@link #callInitializer()} should automatically be invoked, false if the subclass invokes
+   *          {@link #callInitializer()} itself
    */
   public AbstractDataModelAttribute(boolean callInitConfig) {
+    m_objectExtensions = new ObjectExtensions<AbstractDataModelAttribute, IDataModelAttributeExtension<? extends AbstractDataModelAttribute>>(this);
     if (callInitConfig) {
-      callInitConfig();
+      callInitializer();
     }
   }
 
-  protected void callInitConfig() {
-    initConfig();
+  protected final void callInitializer() {
+    interceptInitConfig();
+  }
+
+  /**
+   * Calculates the column's view order, e.g. if the @Order annotation is set to 30.0, the method will
+   * return 30.0. If no {@link Order} annotation is set, the method checks its super classes for an @Order annotation.
+   *
+   * @since 3.10.0-M4
+   */
+  protected double calculateViewOrder() {
+    double viewOrder = getConfiguredViewOrder();
+    Class<?> cls = getClass();
+    if (viewOrder == IOrdered.DEFAULT_ORDER) {
+      while (cls != null && IDataModelAttribute.class.isAssignableFrom(cls)) {
+        if (cls.isAnnotationPresent(Order.class)) {
+          Order order = (Order) cls.getAnnotation(Order.class);
+          return order.value();
+        }
+        cls = cls.getSuperclass();
+      }
+    }
+    return viewOrder;
   }
 
   /*
@@ -144,6 +175,21 @@ public abstract class AbstractDataModelAttribute extends AbstractPropertyObserve
     return false;
   }
 
+  /**
+   * Configures the view order of this data model attribute. The view order determines the order in which the attributes
+   * appear. The order of attributes with no view order configured ({@code < 0}) is initialized based on the
+   * {@link Order} annotation of the attribute class.
+   * <p>
+   * Subclasses can override this method. The default is {@link IOrdered#DEFAULT_ORDER}.
+   *
+   * @return View order of this attribute.
+   */
+  @ConfigProperty(ConfigProperty.DOUBLE)
+  @Order(130)
+  protected double getConfiguredViewOrder() {
+    return IOrdered.DEFAULT_ORDER;
+  }
+
   @ConfigOperation
   @Order(10)
   protected void execInitAttribute() throws ProcessingException {
@@ -160,6 +206,15 @@ public abstract class AbstractDataModelAttribute extends AbstractPropertyObserve
     return null;
   }
 
+  protected final void interceptInitConfig() {
+    m_objectExtensions.initConfig(createLocalExtension(), new Runnable() {
+      @Override
+      public void run() {
+        initConfig();
+      }
+    });
+  }
+
   protected void initConfig() {
     m_visibleGranted = true;
     setNotOperatorEnabled(getConfiguredNotOperatorEnabled());
@@ -170,6 +225,7 @@ public abstract class AbstractDataModelAttribute extends AbstractPropertyObserve
     setType(getConfiguredType());
     setVisible(getConfiguredVisible());
     setActiveFilterEnabled(getConfiguredActiveFilterEnabled());
+    setOrder(calculateViewOrder());
 
     // code type
     if (getConfiguredCodeType() != null) {
@@ -191,6 +247,20 @@ public abstract class AbstractDataModelAttribute extends AbstractPropertyObserve
     injectAggregationTypes();
   }
 
+  @Override
+  public final List<? extends IDataModelAttributeExtension<? extends AbstractDataModelAttribute>> getAllExtensions() {
+    return m_objectExtensions.getAllExtensions();
+  }
+
+  protected IDataModelAttributeExtension<? extends AbstractDataModelAttribute> createLocalExtension() {
+    return new LocalDataModelAttributeExtension<AbstractDataModelAttribute>(this);
+  }
+
+  @Override
+  public <T extends IExtension<?>> T getExtension(Class<T> c) {
+    return m_objectExtensions.getExtension(c);
+  }
+
   /*
    * Runtime
    */
@@ -205,12 +275,22 @@ public abstract class AbstractDataModelAttribute extends AbstractPropertyObserve
 
   @Override
   public final void initAttribute() throws ProcessingException {
-    execInitAttribute();
+    interceptInitAttribute();
   }
 
   @Override
   public void prepareLookup(ILookupCall<?> call) throws ProcessingException {
-    execPrepareLookup(call);
+    interceptPrepareLookup(call);
+  }
+
+  @Override
+  public double getOrder() {
+    return m_order;
+  }
+
+  @Override
+  public void setOrder(double order) {
+    m_order = order;
   }
 
   @Override
@@ -404,7 +484,6 @@ public abstract class AbstractDataModelAttribute extends AbstractPropertyObserve
     return m_parentEntity;
   }
 
-  @Override
   public void setParentEntity(IDataModelEntity parent) {
     m_parentEntity = parent;
   }
@@ -423,11 +502,11 @@ public abstract class AbstractDataModelAttribute extends AbstractPropertyObserve
       case DataModelConstants.TYPE_CODE_LIST:
       case DataModelConstants.TYPE_CODE_TREE:
       case DataModelConstants.TYPE_NUMBER_LIST:
-      case DataModelConstants.TYPE_NUMBER_TREE: {
+      case DataModelConstants.TYPE_NUMBER_TREE:
         return true;
-      }
+      default:
+        return false;
     }
-    return false;
   }
 
   @Override
@@ -474,7 +553,7 @@ public abstract class AbstractDataModelAttribute extends AbstractPropertyObserve
   /**
    * Method is called in case the raw value is null.
    * This method may be overridden by subclass in order to provide a different formatted value for null values.
-   * 
+   *
    * @return null
    */
   protected String formatNullValue() {
@@ -488,7 +567,7 @@ public abstract class AbstractDataModelAttribute extends AbstractPropertyObserve
    * <li>{@link DataModelConstants#TYPE_DATE_TIME}</li>
    * <li>{@link DataModelConstants#TYPE_TIME}</li>
    * </ul>
-   * 
+   *
    * @param rawValue
    *          Raw value to format
    * @param hasDate
@@ -522,7 +601,7 @@ public abstract class AbstractDataModelAttribute extends AbstractPropertyObserve
    * <li>{@link DataModelConstants#TYPE_PLAIN_DOUBLE}</li>
    * <li>{@link DataModelConstants#TYPE_PERCENT}</li>
    * </ul>
-   * 
+   *
    * @param rawValue
    *          Raw value to format
    * @param groupingUsed
@@ -559,7 +638,7 @@ public abstract class AbstractDataModelAttribute extends AbstractPropertyObserve
    * <li>{@link DataModelConstants#TYPE_INTEGER}</li>
    * <li>{@link DataModelConstants#TYPE_PLAIN_INTEGER}</li>
    * </ul>
-   * 
+   *
    * @param rawValue
    *          Raw value to format
    * @param groupingUsed
@@ -582,7 +661,7 @@ public abstract class AbstractDataModelAttribute extends AbstractPropertyObserve
    * <li>{@link DataModelConstants#TYPE_LONG}</li>
    * <li>{@link DataModelConstants#TYPE_PLAIN_LONG}</li>
    * </ul>
-   * 
+   *
    * @param rawValue
    *          Raw value to format
    * @param groupingUsed
@@ -610,7 +689,7 @@ public abstract class AbstractDataModelAttribute extends AbstractPropertyObserve
    * </ul>
    * If whether code type class nor lookup call is set, the return value will be null.
    * The method does not throw an exception. In case of failure, the return value is the empty string.
-   * 
+   *
    * @param rawValue
    *          Raw value to format
    * @param codeTypeClass
@@ -669,7 +748,7 @@ public abstract class AbstractDataModelAttribute extends AbstractPropertyObserve
    * <li>{@link DataModelConstants#TYPE_STRING}</li>
    * <li>{@link DataModelConstants#TYPE_FULL_TEXT}</li>
    * </ul>
-   * 
+   *
    * @param rawValue
    *          Raw value to format
    * @return Formatted value: raw value is casted to String
@@ -680,12 +759,47 @@ public abstract class AbstractDataModelAttribute extends AbstractPropertyObserve
 
   /**
    * Formats the raw value for unknown attribute types
-   * 
+   *
    * @param rawValue
    *          Raw value to format
    * @return Formatted value: raw value is casted to String
    */
   protected String formatObject(Object rawValue) {
     return rawValue.toString();
+  }
+
+  /**
+   * The extension delegating to the local methods. This Extension is always at the end of the chain and will not call
+   * any further chain elements.
+   */
+  protected static class LocalDataModelAttributeExtension<OWNER extends AbstractDataModelAttribute> extends AbstractSerializableExtension<OWNER> implements IDataModelAttributeExtension<OWNER> {
+    private static final long serialVersionUID = 1L;
+
+    public LocalDataModelAttributeExtension(OWNER owner) {
+      super(owner);
+    }
+
+    @Override
+    public void execInitAttribute(DataModelAttributeInitAttributeChain chain) throws ProcessingException {
+      getOwner().execInitAttribute();
+    }
+
+    @Override
+    public void execPrepareLookup(DataModelAttributePrepareLookupChain chain, ILookupCall<?> call) throws ProcessingException {
+      getOwner().execPrepareLookup(call);
+    }
+
+  }
+
+  protected final void interceptInitAttribute() throws ProcessingException {
+    List<? extends IDataModelAttributeExtension<? extends AbstractDataModelAttribute>> extensions = getAllExtensions();
+    DataModelAttributeInitAttributeChain chain = new DataModelAttributeInitAttributeChain(extensions);
+    chain.execInitAttribute();
+  }
+
+  protected final void interceptPrepareLookup(ILookupCall<?> call) throws ProcessingException {
+    List<? extends IDataModelAttributeExtension<? extends AbstractDataModelAttribute>> extensions = getAllExtensions();
+    DataModelAttributePrepareLookupChain chain = new DataModelAttributePrepareLookupChain(extensions);
+    chain.execPrepareLookup(call);
   }
 }

@@ -20,19 +20,24 @@ import org.eclipse.swt.widgets.Text;
 
 /**
  * Common code for RWT fields corresponding to {@link IBasicField}.
- * 
+ *
  * @since 3.10.0-M3
  */
 public abstract class RwtScoutBasicFieldComposite<T extends IBasicField<?>> extends RwtScoutValueFieldComposite<T> {
 
   private boolean m_validateOnAnyKey;
   private P_RwtValidateOnAnyKeyModifyListener m_validateOnAnyKeyModifyListener;
+  private P_RwtUpdateDisplayTextOnModifyModifyListener m_updateDisplayTextOnModifyListener = new P_RwtUpdateDisplayTextOnModifyModifyListener();
+  protected boolean m_updateDisplayTextOnModify;
+  protected boolean m_updateDisplayTextOnModifyWasTrueSinceLastWriteDown;
 
+  @SuppressWarnings("deprecation")
   @Override
   protected void attachScout() {
     super.attachScout();
     IBasicField f = getScoutObject();
     setValidateOnAnyKeyFromScout(f.isValidateOnAnyKey());
+    setUpdateDisplayTextOnModifyFromScout(f.isUpdateDisplayTextOnModify());
   }
 
   @Override
@@ -53,8 +58,14 @@ public abstract class RwtScoutBasicFieldComposite<T extends IBasicField<?>> exte
     if (oldText.equals(newText)) {
       return;
     }
+    updateTextKeepCurserPosition(newText);
+  }
+
+  protected void updateTextKeepCurserPosition(String newText) {
     try {
       getUpdateUiFromScoutLock().acquire();
+      Text field = getUiField();
+      String oldText = field.getText();
       int startIndex = field.getSelection().x;
       int endIndex = field.getSelection().y;
       if (startIndex == endIndex && newText.length() != oldText.length()) {
@@ -93,6 +104,25 @@ public abstract class RwtScoutBasicFieldComposite<T extends IBasicField<?>> exte
     }
   }
 
+  protected void setUpdateDisplayTextOnModifyFromScout(boolean b) {
+    m_updateDisplayTextOnModify = b;
+    if (b) {
+      m_updateDisplayTextOnModifyWasTrueSinceLastWriteDown = true;
+      addUpdateDisplayTextOnModifyListener();
+    }
+    else {
+      removeUpdateDisplayTextOnModifyListener();
+    }
+  }
+
+  private void addUpdateDisplayTextOnModifyListener() {
+    getUiField().addModifyListener(m_updateDisplayTextOnModifyListener);
+  }
+
+  private void removeUpdateDisplayTextOnModifyListener() {
+    getUiField().removeModifyListener(m_updateDisplayTextOnModifyListener);
+  }
+
   protected void addValidateOnAnyKeyModifyListener() {
     if (m_validateOnAnyKeyModifyListener == null) {
       m_validateOnAnyKeyModifyListener = new P_RwtValidateOnAnyKeyModifyListener();
@@ -110,11 +140,15 @@ public abstract class RwtScoutBasicFieldComposite<T extends IBasicField<?>> exte
   /**
    * scout property handler override
    */
+  @SuppressWarnings("deprecation")
   @Override
   protected void handleScoutPropertyChange(String name, Object newValue) {
     super.handleScoutPropertyChange(name, newValue);
     if (name.equals(IBasicField.PROP_VALIDATE_ON_ANY_KEY)) {
       setValidateOnAnyKeyFromScout(((Boolean) newValue).booleanValue());
+    }
+    if (name.equals(IBasicField.PROP_UPDATE_DISPLAY_TEXT_ON_MODIFY)) {
+      setUpdateDisplayTextOnModifyFromScout(((Boolean) newValue).booleanValue());
     }
   }
 
@@ -125,7 +159,7 @@ public abstract class RwtScoutBasicFieldComposite<T extends IBasicField<?>> exte
     }
     final String text = getUiField().getText();
     // only handle if text has changed
-    if (CompareUtility.equals(text, getScoutObject().getDisplayText()) && getScoutObject().getErrorStatus() == null) {
+    if (!m_updateDisplayTextOnModifyWasTrueSinceLastWriteDown && CompareUtility.equals(text, getScoutObject().getDisplayText()) && getScoutObject().getErrorStatus() == null) {
       return;
     }
     final Holder<Boolean> result = new Holder<Boolean>(Boolean.class, false);
@@ -146,6 +180,9 @@ public abstract class RwtScoutBasicFieldComposite<T extends IBasicField<?>> exte
     }
     doit = result.getValue();
     getUiEnvironment().dispatchImmediateUiJobs();
+    if (m_updateDisplayTextOnModifyWasTrueSinceLastWriteDown && !m_updateDisplayTextOnModify) {
+      m_updateDisplayTextOnModifyWasTrueSinceLastWriteDown = false;
+    }
   }
 
   @Override
@@ -190,5 +227,24 @@ public abstract class RwtScoutBasicFieldComposite<T extends IBasicField<?>> exte
       getUiEnvironment().invokeScoutLater(t, 0);
     }
   } // end class P_RwtValidateOnAnyKeyModifyListener
+
+  private class P_RwtUpdateDisplayTextOnModifyModifyListener implements ModifyListener {
+    private static final long serialVersionUID = 1L;
+
+    @Override
+    public void modifyText(ModifyEvent event) {
+      if (m_updateDisplayTextOnModify && getUpdateUiFromScoutLock().isReleased()) {
+        final String text = getUiField().getText();
+        // notify Scout
+        Runnable t = new Runnable() {
+          @Override
+          public void run() {
+            getScoutObject().getUIFacade().setDisplayTextFromUI(text);
+          }
+        };
+        getUiEnvironment().invokeScoutLater(t, 0);
+      }
+    }
+  }
 
 }

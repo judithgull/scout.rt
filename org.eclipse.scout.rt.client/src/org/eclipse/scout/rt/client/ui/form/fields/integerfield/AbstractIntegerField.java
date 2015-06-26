@@ -18,6 +18,7 @@ import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.integerfield.IIntegerFieldExtension;
 import org.eclipse.scout.rt.client.ui.form.fields.numberfield.AbstractNumberField;
 import org.eclipse.scout.rt.shared.data.form.ValidationRule;
 
@@ -36,25 +37,6 @@ public abstract class AbstractIntegerField extends AbstractNumberField<Integer> 
   /*
    * Configuration
    */
-  /**
-   * @deprecated Will be removed with scout 5.0, use {@link #getConfiguredMinValue()}.<br>
-   *             As long as this deprecated version is overridden in subclasses. This setting wins over
-   *             {@link #getConfiguredMinValue()} in {@link #initConfig()}.
-   */
-  @Deprecated
-  protected Integer getConfiguredMinimumValue() {
-    return getConfiguredMinValue();
-  }
-
-  /**
-   * @deprecated Will be removed with scout 5.0, use {@link #getConfiguredMaxValue()}.<br>
-   *             As long as this deprecated version is overridden in subclasses. This setting wins over
-   *             {@link #getConfiguredMaxValue()} in {@link #initConfig()}.
-   */
-  @Deprecated
-  protected Integer getConfiguredMaximumValue() {
-    return getConfiguredMaxValue();
-  }
 
   @Override
   @ConfigProperty(ConfigProperty.INTEGER)
@@ -80,26 +62,13 @@ public abstract class AbstractIntegerField extends AbstractNumberField<Integer> 
   }
 
   @Override
-  protected void initConfig() {
-    super.initConfig();
-    setMinValue(getConfiguredMinimumValue());
-    setMaxValue(getConfiguredMaximumValue());
+  protected Integer getMinPossibleValue() {
+    return Integer.MIN_VALUE;
   }
 
-  /**
-   * Set the minimum value for this field. If value is <code>null</code>, it is replaced by Integer.MIN_VALUE.
-   */
   @Override
-  public void setMinValue(Integer value) {
-    super.setMinValue(value == null ? Integer.MIN_VALUE : value);
-  }
-
-  /**
-   * Set the maximum value for this field. If value is <code>null</code>, it is replaced by Integer.MAX_VALUE.
-   */
-  @Override
-  public void setMaxValue(Integer value) {
-    super.setMaxValue(value == null ? Integer.MAX_VALUE : value);
+  protected Integer getMaxPossibleValue() {
+    return Integer.MAX_VALUE;
   }
 
   /**
@@ -113,6 +82,18 @@ public abstract class AbstractIntegerField extends AbstractNumberField<Integer> 
       retVal = Integer.valueOf(parsedVal.intValueExact());
     }
     return retVal;
+  }
+
+  protected static class LocalIntegerFieldExtension<OWNER extends AbstractIntegerField> extends LocalNumberFieldExtension<Integer, OWNER> implements IIntegerFieldExtension<OWNER> {
+
+    public LocalIntegerFieldExtension(OWNER owner) {
+      super(owner);
+    }
+  }
+
+  @Override
+  protected IIntegerFieldExtension<? extends AbstractIntegerField> createLocalExtension() {
+    return new LocalIntegerFieldExtension<AbstractIntegerField>(this);
   }
 
 }

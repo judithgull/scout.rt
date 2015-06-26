@@ -13,6 +13,7 @@ package org.eclipse.scout.svg.client.svgfield;
 import java.io.ByteArrayOutputStream;
 import java.net.URL;
 import java.util.EventListener;
+import java.util.List;
 
 import org.eclipse.scout.commons.EventListenerList;
 import org.eclipse.scout.commons.annotations.ClassId;
@@ -21,10 +22,14 @@ import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.IFormFieldExtension;
 import org.eclipse.scout.rt.client.ui.form.fields.AbstractFormField;
 import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.service.SERVICES;
 import org.eclipse.scout.svg.client.SVGUtility;
+import org.eclipse.scout.svg.client.extension.svgfield.ISvgFieldExtension;
+import org.eclipse.scout.svg.client.extension.svgfield.SvgFieldChains.SvgFieldClickedChain;
+import org.eclipse.scout.svg.client.extension.svgfield.SvgFieldChains.SvgFieldHyperlinkChain;
 import org.w3c.dom.svg.SVGDocument;
 import org.w3c.dom.svg.SVGPoint;
 
@@ -135,7 +140,7 @@ public abstract class AbstractSvgField extends AbstractFormField implements ISvg
         SvgFieldEvent e = new SvgFieldEvent(this, SvgFieldEvent.TYPE_HYPERLINK, null, url);
         // single observer
         try {
-          execHyperlink(e);
+          interceptHyperlink(e);
         }
         catch (ProcessingException pe) {
           SERVICES.getService(IExceptionHandlerService.class).handleException(pe);
@@ -158,7 +163,7 @@ public abstract class AbstractSvgField extends AbstractFormField implements ISvg
         SvgFieldEvent e = new SvgFieldEvent(this, SvgFieldEvent.TYPE_CLICKED, getSelection(), null);
         // single observer
         try {
-          execClicked(e);
+          interceptClicked(e);
         }
         catch (ProcessingException pe) {
           SERVICES.getService(IExceptionHandlerService.class).handleException(pe);
@@ -200,5 +205,39 @@ public abstract class AbstractSvgField extends AbstractFormField implements ISvg
       }
       fireClick();
     }
+  }
+
+  protected final void interceptClicked(SvgFieldEvent e) throws ProcessingException {
+    List<? extends IFormFieldExtension<? extends AbstractFormField>> extensions = getAllExtensions();
+    SvgFieldClickedChain chain = new SvgFieldClickedChain(extensions);
+    chain.execClicked(e);
+  }
+
+  protected final void interceptHyperlink(SvgFieldEvent e) throws ProcessingException {
+    List<? extends IFormFieldExtension<? extends AbstractFormField>> extensions = getAllExtensions();
+    SvgFieldHyperlinkChain chain = new SvgFieldHyperlinkChain(extensions);
+    chain.execHyperlink(e);
+  }
+
+  protected static class LocalSvgFieldExtension<OWNER extends AbstractSvgField> extends LocalFormFieldExtension<OWNER> implements ISvgFieldExtension<OWNER> {
+
+    public LocalSvgFieldExtension(OWNER owner) {
+      super(owner);
+    }
+
+    @Override
+    public void execClicked(SvgFieldClickedChain chain, SvgFieldEvent e) throws ProcessingException {
+      getOwner().execClicked(e);
+    }
+
+    @Override
+    public void execHyperlink(SvgFieldHyperlinkChain chain, SvgFieldEvent e) throws ProcessingException {
+      getOwner().execHyperlink(e);
+    }
+  }
+
+  @Override
+  protected ISvgFieldExtension<? extends AbstractSvgField> createLocalExtension() {
+    return new LocalSvgFieldExtension<AbstractSvgField>(this);
   }
 }

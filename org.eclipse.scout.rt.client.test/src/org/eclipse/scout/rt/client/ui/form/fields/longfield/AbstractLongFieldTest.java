@@ -11,33 +11,35 @@
 package org.eclipse.scout.rt.client.ui.form.fields.longfield;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Locale;
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
 
-import org.eclipse.scout.commons.LocaleThreadLocal;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.ui.form.fields.numberfield.AbstractNumberFieldTest;
-import org.junit.AfterClass;
+import org.eclipse.scout.rt.shared.ScoutTexts;
+import org.eclipse.scout.testing.client.runner.ScoutClientTestRunner;
 import org.junit.Assert;
-import org.junit.BeforeClass;
+import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 
+@RunWith(ScoutClientTestRunner.class)
 public class AbstractLongFieldTest extends AbstractLongField {
 
-  private static Locale ORIGINAL_LOCALE;
+  private NumberFormat m_formatter;
+  private char m_decimalSeparator;
 
-  @BeforeClass
-  public static void setupBeforeClass() {
-    ORIGINAL_LOCALE = LocaleThreadLocal.get();
-    LocaleThreadLocal.set(new Locale("de", "CH"));
-  }
-
-  @AfterClass
-  public static void tearDownAfterClass() {
-    LocaleThreadLocal.set(ORIGINAL_LOCALE);
+  @Before
+  public void setUp() {
+    m_formatter = DecimalFormat.getInstance();
+    DecimalFormat df = (DecimalFormat) DecimalFormat.getNumberInstance();
+    m_decimalSeparator = df.getDecimalFormatSymbols().getDecimalSeparator();
   }
 
   @Test
@@ -60,8 +62,8 @@ public class AbstractLongFieldTest extends AbstractLongField {
     assertEquals("expect default for maxValue=Long.MAX_VALUE", Long.valueOf(Long.MAX_VALUE), getMaxValue());
     assertEquals("expect default for minValue=Long.MIN_VALUE", Long.valueOf(Long.MIN_VALUE), getMinValue());
 
-    setMaxValue(99l);
-    setMinValue(-99l);
+    setMaxValue(99L);
+    setMinValue(-99L);
     assertEquals("maxValue not as set above", Long.valueOf(99), getMaxValue());
     assertEquals("minValue not as set above", Long.valueOf(-99), getMinValue());
 
@@ -79,8 +81,8 @@ public class AbstractLongFieldTest extends AbstractLongField {
     assertEquals("parsing failed", Long.valueOf(Long.MAX_VALUE), parseValueInternal(BigDecimal.valueOf(Long.MAX_VALUE).toPlainString()));
     assertEquals("parsing failed", Long.valueOf(Long.MIN_VALUE), parseValueInternal(BigDecimal.valueOf(Long.MIN_VALUE).toPlainString()));
 
-    setMaxValue(99l);
-    setMinValue(-99l);
+    setMaxValue(99L);
+    setMinValue(-99L);
     AbstractNumberFieldTest.assertParseToBigDecimalInternalThrowsProcessingException("Expected an exception when parsing a string representing a too big number.", this, "100");
     AbstractNumberFieldTest.assertParseToBigDecimalInternalThrowsProcessingException("Expected an exception when parsing a string representing a too small number.", this, "-100");
     assertEquals("parsing failed", Long.valueOf(99), parseValueInternal("99"));
@@ -104,23 +106,76 @@ public class AbstractLongFieldTest extends AbstractLongField {
     // expecting RoundingMode.UNNECESSARY as default
     boolean exceptionOccured = false;
     try {
-      parseValueInternal("12.7");
+      parseValueInternal(formatWithFractionDigits(12.7, 1));
     }
     catch (ProcessingException e) {
       exceptionOccured = true;
     }
     assertTrue("Expected an exception when parsing a string representing a decimal value.", exceptionOccured);
-    Assert.assertEquals("parsing failed", Long.valueOf(12), parseValueInternal("12.0"));
+    Assert.assertEquals("parsing failed", Long.valueOf(12), parseValueInternal(formatWithFractionDigits(12.0, 1)));
 
     setRoundingMode(RoundingMode.HALF_UP);
-    Assert.assertEquals("parsing failed", Long.valueOf(12), parseValueInternal("12.0"));
-    Assert.assertEquals("parsing failed", Long.valueOf(12), parseValueInternal("12.1"));
-    Assert.assertEquals("parsing failed", Long.valueOf(13), parseValueInternal("12.5"));
+    Assert.assertEquals("parsing failed", Long.valueOf(12), parseValueInternal(formatWithFractionDigits(12.0, 1)));
+    Assert.assertEquals("parsing failed", Long.valueOf(12), parseValueInternal(formatWithFractionDigits(12.1, 1)));
+    Assert.assertEquals("parsing failed", Long.valueOf(13), parseValueInternal(formatWithFractionDigits(12.5, 1)));
 
-    Assert.assertEquals("parsing failed", Long.valueOf(Long.MAX_VALUE), parseValueInternal("9223372036854775807.40007"));
-    Assert.assertEquals("parsing failed", Long.valueOf(Long.MAX_VALUE), parseValueInternal("9223372036854775806.5"));
+    Assert.assertEquals("parsing failed", Long.valueOf(Long.MAX_VALUE), parseValueInternal("9223372036854775807" + m_decimalSeparator + "40007"));
+    Assert.assertEquals("parsing failed", Long.valueOf(Long.MAX_VALUE), parseValueInternal("9223372036854775806" + m_decimalSeparator + "5"));
 
     setRoundingMode(RoundingMode.HALF_EVEN);
-    Assert.assertEquals("parsing failed", Long.valueOf(12), parseValueInternal("12.5"));
+    Assert.assertEquals("parsing failed", Long.valueOf(12), parseValueInternal(formatWithFractionDigits(12.5, 1)));
+  }
+
+  @Test
+  public void testNoErrorMessage() {
+    setValue(Long.valueOf(5));
+    assertNull(getErrorStatus());
+    setValue(getMinPossibleValue());
+    assertNull(getErrorStatus());
+    setValue(getMaxPossibleValue());
+    assertNull(getErrorStatus());
+  }
+
+  @Test
+  public void testErrorMessageValueTooLarge() {
+    setMaxValue(Long.valueOf(100));
+
+    setValue(Long.valueOf(100));
+    assertNull(getErrorStatus());
+    setValue(Long.valueOf(101));
+    assertNotNull(getErrorStatus());
+
+    assertEquals(ScoutTexts.get("NumberTooLargeMessageX", formatValueInternal(getMaxValue())), getErrorStatus().getMessage());
+
+    setMinValue(Long.valueOf(10));
+
+    setValue(Long.valueOf(20));
+    assertNull(getErrorStatus());
+    setValue(Long.valueOf(101));
+    assertEquals(ScoutTexts.get("NumberTooLargeMessageXY", formatValueInternal(getMinValue()), formatValueInternal(getMaxValue())), getErrorStatus().getMessage());
+  }
+
+  @Test
+  public void testErrorMessageValueTooSmall() {
+    setMinValue(Long.valueOf(100));
+
+    setValue(Long.valueOf(100));
+    assertNull(getErrorStatus());
+    setValue(Long.valueOf(99));
+    assertNotNull(getErrorStatus());
+    assertEquals(ScoutTexts.get("NumberTooSmallMessageX", formatValueInternal(getMinValue())), getErrorStatus().getMessage());
+
+    setMaxValue(Long.valueOf(200));
+
+    setValue(Long.valueOf(150));
+    assertNull(getErrorStatus());
+    setValue(Long.valueOf(50));
+    assertEquals(ScoutTexts.get("NumberTooSmallMessageXY", formatValueInternal(getMinValue()), formatValueInternal(getMaxValue())), getErrorStatus().getMessage());
+  }
+
+  private String formatWithFractionDigits(Number number, int fractionDigits) {
+    m_formatter.setMinimumFractionDigits(fractionDigits);
+    m_formatter.setMaximumFractionDigits(fractionDigits);
+    return m_formatter.format(number);
   }
 }

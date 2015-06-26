@@ -14,7 +14,7 @@ import org.eclipse.swt.widgets.Widget;
 
 /**
  * Common code for SWT fields corresponding to {@link IBasicField}.
- * 
+ *
  * @since 3.10.0-M3
  */
 public abstract class SwtScoutBasicFieldComposite<T extends IBasicField<?>> extends SwtScoutValueFieldComposite<T> {
@@ -22,17 +22,21 @@ public abstract class SwtScoutBasicFieldComposite<T extends IBasicField<?>> exte
   private Point m_backupSelection = null;
   private TextFieldEditableSupport m_editableSupport;
   private boolean m_validateOnAnyKey;
+  protected boolean m_updateDisplayTextOnModify;
+  protected boolean m_updateDisplayTextOnModifyWasTrueSinceLastWriteDown;
 
   protected void addModifyListenerForBasicField(Widget inputField) {
     TypedListener typedListener = new TypedListener(new P_SwtTextModifyListener());
     inputField.addListener(SWT.Modify, typedListener);
   }
 
+  @SuppressWarnings("deprecation")
   @Override
   protected void attachScout() {
     super.attachScout();
     IBasicField f = getScoutObject();
     setValidateOnAnyKeyFromScout(f.isValidateOnAnyKey());
+    setUpdateDisplayTextOnModifyFromScout(f.isUpdateDisplayTextOnModify());
   }
 
   @Override
@@ -47,9 +51,13 @@ public abstract class SwtScoutBasicFieldComposite<T extends IBasicField<?>> exte
     if (oldText.equals(newText)) {
       return;
     }
-    //
+    updateTextKeepCurserPosition(newText);
+  }
+
+  protected void updateTextKeepCurserPosition(String newText) {
     try {
       getUpdateSwtFromScoutLock().acquire();
+      String oldText = getText();
       int startIndex = getSelection().x;
       int endIndex = getSelection().y;
       int caretPosition = getCaretOffset();
@@ -173,7 +181,7 @@ public abstract class SwtScoutBasicFieldComposite<T extends IBasicField<?>> exte
   protected boolean handleSwtInputVerifier() {
     final String text = getText();
     // only handle if text has changed
-    if (CompareUtility.equals(text, getScoutObject().getDisplayText()) && getScoutObject().getErrorStatus() == null) {
+    if (!m_updateDisplayTextOnModifyWasTrueSinceLastWriteDown && CompareUtility.equals(text, getScoutObject().getDisplayText()) && getScoutObject().getErrorStatus() == null) {
       return true;
     }
     // notify Scout
@@ -192,22 +200,36 @@ public abstract class SwtScoutBasicFieldComposite<T extends IBasicField<?>> exte
     }
     getEnvironment().dispatchImmediateSwtJobs();
     // end notify
+    if (m_updateDisplayTextOnModifyWasTrueSinceLastWriteDown && !m_updateDisplayTextOnModify) {
+      m_updateDisplayTextOnModifyWasTrueSinceLastWriteDown = false;
+    }
     return true; // continue always
   }
 
   /**
    * scout property handler override
    */
+  @SuppressWarnings("deprecation")
   @Override
   protected void handleScoutPropertyChange(String name, Object newValue) {
     super.handleScoutPropertyChange(name, newValue);
     if (name.equals(IBasicField.PROP_VALIDATE_ON_ANY_KEY)) {
       setValidateOnAnyKeyFromScout(((Boolean) newValue).booleanValue());
     }
+    if (name.equals(IBasicField.PROP_UPDATE_DISPLAY_TEXT_ON_MODIFY)) {
+      setUpdateDisplayTextOnModifyFromScout(((Boolean) newValue).booleanValue());
+    }
   }
 
   private void setValidateOnAnyKeyFromScout(boolean b) {
     m_validateOnAnyKey = b;
+  }
+
+  protected void setUpdateDisplayTextOnModifyFromScout(boolean b) {
+    m_updateDisplayTextOnModify = b;
+    if (b) {
+      m_updateDisplayTextOnModifyWasTrueSinceLastWriteDown = true;
+    }
   }
 
   protected class P_SwtTextModifyListener implements ModifyListener {
@@ -217,10 +239,25 @@ public abstract class SwtScoutBasicFieldComposite<T extends IBasicField<?>> exte
      */
     @Override
     public void modifyText(ModifyEvent e) {
+      setDisplayTextInScout();
       if (m_validateOnAnyKey) {
         if (getUpdateSwtFromScoutLock().isReleased()) {
           sendVerifyToScoutAndIgnoreResponses();
         }
+      }
+    }
+
+    private void setDisplayTextInScout() {
+      if (m_updateDisplayTextOnModify && getUpdateSwtFromScoutLock().isReleased()) {
+        final String text = getText();
+        // notify Scout
+        Runnable t = new Runnable() {
+          @Override
+          public void run() {
+            getScoutObject().getUIFacade().setDisplayTextFromUI(text);
+          }
+        };
+        getEnvironment().invokeScoutLater(t, 0);
       }
     }
 

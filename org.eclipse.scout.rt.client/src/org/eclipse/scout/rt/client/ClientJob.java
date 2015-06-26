@@ -160,9 +160,9 @@ public class ClientJob extends JobEx implements IClientSessionProvider {
   }
 
   private IStatus runTransactionWrapper(IProgressMonitor monitor) {
-    Locale oldLocale = LocaleThreadLocal.get();
-    ScoutTexts oldTexts = TextsThreadLocal.get();
     IClientSession oldSession = ClientSessionThreadLocal.get();
+    Locale oldLocale = LocaleThreadLocal.get(false);
+    ScoutTexts oldTexts = TextsThreadLocal.get();
     ClientJobContext oldContext = ClientJobContextThreadLocal.get();
     try {
       ClientSessionThreadLocal.set(getClientSession());
@@ -181,7 +181,7 @@ public class ClientJob extends JobEx implements IClientSessionProvider {
 
   /**
    * Executes this job. The session's locale is accessible through {@link LocaleThreadLocal}.
-   * 
+   *
    * @see #run(IProgressMonitor)
    */
   protected IStatus runStatus(IProgressMonitor monitor) {
@@ -227,7 +227,7 @@ public class ClientJob extends JobEx implements IClientSessionProvider {
     // continue work
   }
 
-  void releaseWaitFor() throws InterruptedException {
+  void releaseWaitFor() {
     final ClientRule rule = (getRule() instanceof ClientRule ? (ClientRule) getRule() : null);
     if (rule != null) {
       ClientSyncJob proxyJob = new ClientSyncJob("release waitFor lock on \"" + this + "\"", m_session) {
@@ -320,6 +320,14 @@ public class ClientJob extends JobEx implements IClientSessionProvider {
 
     @Override
     public IStatus getResult() {
+      return null;
+    }
+
+    /**
+     * implements org.eclipse.core.runtime.jobs.IJobChangeEvent.getJobGroupResult() which was introduced with eclipse
+     * mars. (@Override-Annotation is missing for backward-compatibility.)
+     */
+    public IStatus getJobGroupResult() {
       return null;
     }
   }

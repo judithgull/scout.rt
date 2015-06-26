@@ -19,7 +19,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.TreeSet;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
@@ -92,13 +91,14 @@ import org.eclipse.swt.widgets.TableColumn;
 import org.eclipse.swt.widgets.TableItem;
 
 /**
- * knownIssues - multi column sorting is not supported, unable to get any key
- * mask in the selection event.
+ * knownIssues:
+ * <p>
+ * - unable to get any key mask in the selection event.
  * <p>
  * - multi line support in headers is not supported by rwt.
  * <p>
  * - multi line support in row texts is not supported so far. Might probably be done by customized table rows.
- * 
+ *
  * @since 3.8.0
  */
 @SuppressWarnings("restriction")
@@ -120,11 +120,12 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
 
   private RwtScoutColumnModel m_columnModel = null;
 
-  private String m_variant = "";
+  private final String m_variant;
 
   private AbstractTableKeyboardNavigationSupport m_keyboardNavigationSupport;
 
   public RwtScoutTable() {
+    m_variant = "";
   }
 
   public RwtScoutTable(String variant) {
@@ -161,13 +162,6 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
     m_uiCellEditorComposite = new RwtScoutTableCellEditor(this);
 
     table.addMenuDetectListener(new P_RwtHeaderMenuDetectListener());
-
-    //columns
-    initializeUiColumns();
-
-    RwtScoutTableModel tableModel = createUiTableModel();
-    viewer.setContentProvider(tableModel);
-    viewer.setInput(tableModel);
 
     // ui listeners
     viewer.addSelectionChangedListener(new P_RwtSelectionChangedListener());
@@ -260,21 +254,22 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
         }
         rwtCol.setMoveable(true);
         rwtCol.setToolTipText(cell.getTooltipText());
-        updateHeaderText(rwtCol, scoutColumn);
         rwtCol.setWidth(scoutColumn.getWidth());
         if (scoutColumn.isFixedWidth()) {
           rwtCol.setResizable(false);
         }
-        if (cell.isSortActive()) {
-          getUiField().setSortColumn(rwtCol);
-          getUiField().setSortDirection(cell.isSortAscending() ? SWT.UP : SWT.DOWN);
-        }
+
         if (sortEnabled) {
           rwtCol.addSelectionListener(m_columnSortListener);
         }
         rwtCol.addListener(SWT.Move, m_columnListener);
         rwtCol.addListener(SWT.Resize, m_columnListener);
       }
+
+      // no sort indicator. is done in decorateHeaderTexts()
+      getUiField().setSortColumn(null);
+      decorateHeaderTexts();
+
       //multiline header settings
       if (multilineHeaders) {
         getUiField().setData("multiLineHeader", Boolean.TRUE);
@@ -298,6 +293,13 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
       m_scoutTableListener = new P_ScoutTableListener();
       getScoutObject().addUITableListener(m_scoutTableListener);
     }
+    //columns
+    initializeUiColumns();
+
+    RwtScoutTableModel tableModel = createUiTableModel();
+    getUiTableViewer().setContentProvider(tableModel);
+    getUiTableViewer().setInput(tableModel);
+
     setHeaderVisibleFromScout(getScoutObject().isHeaderVisible());
     setSelectionFromScout(getScoutObject().getSelectedRows());
     setKeyStrokeFormScout();
@@ -585,49 +587,48 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
     switch (e.getType()) {
       case TableEvent.TYPE_ROW_FILTER_CHANGED:
         // Update column title if filter changed (mark column as filtered)
-        for (TableColumn swtCol : getUiField().getColumns()) {
-          updateHeaderText(swtCol);
-        }
+        decorateHeaderTexts();
         setSelectionFromScout(e.getTable().getSelectedRows());
         break;
     }
   }
 
-  private void updateHeaderText(TableColumn swtCol) {
-    if (swtCol == null) {
-      return;
-    }
-    Object data = swtCol.getData(KEY_SCOUT_COLUMN);
-    if (data instanceof IColumn<?>) {
-      updateHeaderText(swtCol, (IColumn<?>) data);
-    }
-  }
-
-  private void updateHeaderText(TableColumn swtCol, IColumn<?> scoutCol) {
-    updateHeaderText(swtCol, scoutCol, false);
-  }
-
-  private void updateHeaderText(TableColumn swtCol, IColumn<?> scoutCol, boolean indicateSortOrder) {
-    IHeaderCell cell = scoutCol.getHeaderCell();
-    String text = cell.getText();
-    if (text == null) {
-      text = "";
-    }
-    if (scoutCol instanceof ICustomColumn) {
-      text = "[+] " + text;
-    }
-    if (scoutCol.isColumnFilterActive()) {
-      text = "(*) " + text;
-    }
-    if (indicateSortOrder) {
-      if (scoutCol.isSortAscending()) {
-        text = "[a-z] " + text;
-      }
-      else {
-        text = "[z-a] " + text;
+  private void decorateHeaderTexts() {
+    List<IColumn<?>> sortColumns = getScoutObject().getColumnSet().getSortColumns();
+    // strip invisible columns
+    Iterator<IColumn<?>> it = sortColumns.iterator();
+    while (it.hasNext()) {
+      IColumn<?> next = it.next();
+      if (!next.isVisible() || !next.isSortExplicit()) {
+        it.remove();
       }
     }
-    swtCol.setText(text);
+
+    for (TableColumn uiColumn : getUiField().getColumns()) {
+      IColumn<?> scoutColumn = (IColumn<?>) uiColumn.getData(KEY_SCOUT_COLUMN);
+      if (scoutColumn != null) {
+        IHeaderCell cell = scoutColumn.getHeaderCell();
+        StringBuilder textBuilder = new StringBuilder();
+        if (cell.getText() != null) {
+          textBuilder.append(cell.getText());
+        }
+        if (scoutColumn instanceof ICustomColumn) {
+          textBuilder.insert(0, "[+] ");
+        }
+        if (scoutColumn.isColumnFilterActive()) {
+          textBuilder.insert(0, "(*) ");
+        }
+        if (sortColumns.contains(scoutColumn)) {
+          if (scoutColumn.isSortAscending()) {
+            textBuilder.append(" \u25b4");
+          }
+          else {
+            textBuilder.append(" \u25be");
+          }
+        }
+        uiColumn.setText(textBuilder.toString());
+      }
+    }
   }
 
   protected void setHeaderVisibleFromScout(boolean headerVisible) {
@@ -764,50 +765,17 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
   }
 
   protected void headerUpdateFromScout() {
-    // Because SWT can only indicate one sort column, we will use the first (i.e. the column
-    // with the lowest sort index) user sort column that is visible for that purpose. Further
-    // sort columns will be indicated by a special header text (see updateHeaderText() method).
-    int minSortIndex = -1;
-    TableColumn minUiSortColumn = null;
-    IColumn<?> minScoutSortColumn = null;
-    for (TableColumn col : getUiField().getColumns()) {
-      Object data = col.getData(KEY_SCOUT_COLUMN);
-      if (data instanceof IColumn<?>) {
-        IColumn<?> cell = (IColumn<?>) data;
-        if (cell.isSortExplicit() && (minSortIndex == -1 || cell.getSortIndex() < minSortIndex)) {
-          minSortIndex = cell.getSortIndex();
-          minUiSortColumn = col;
-          minScoutSortColumn = cell;
-        }
-        updateHeaderText(col);
-      }
-    }
-
-    if (minUiSortColumn != null && minScoutSortColumn != null) {
-      getUiField().setSortColumn(minUiSortColumn);
-      getUiField().setSortDirection(minScoutSortColumn.isSortAscending() ? SWT.UP : SWT.DOWN);
-    }
-    else {
-      getUiField().setSortColumn(null);
-    }
-    for (TableColumn col : getUiField().getColumns()) {
-      Object data = col.getData(KEY_SCOUT_COLUMN);
-      if (data instanceof IColumn<?>) {
-        IColumn<?> cell = (IColumn<?>) data;
-        boolean indicateSortOrder = (cell.isSortExplicit() && cell != minScoutSortColumn);
-        updateHeaderText(col, cell, indicateSortOrder);
-      }
-    }
+    decorateHeaderTexts();
   }
 
-  protected void handleUiRowClick(final ITableRow row) {
+  protected void handleUiRowClick(final ITableRow row, final int rwtMouseButton) {
     if (getScoutObject() != null) {
       if (row != null) {
         // notify Scout
         Runnable t = new Runnable() {
           @Override
           public void run() {
-            getScoutObject().getUIFacade().fireRowClickFromUI(row);
+            getScoutObject().getUIFacade().fireRowClickFromUI(row, RwtUtility.rwtToScoutMouseButton(rwtMouseButton));
           }
         };
         getUiEnvironment().invokeScoutLater(t, 0);
@@ -870,7 +838,7 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
     if (getUiField().getVerticalBar() != null && getUiField().getVerticalBar().getVisible()) {
       totalWidth -= getUiField().getVerticalBar().getSize().x;
     }
-    */
+     */
     if (totalWidth < 32) {
       //either not showing or not yet layouted
       return;
@@ -1024,7 +992,7 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
           case ' ':
             List<ITableRow> selectedRows = RwtUtility.getItemsOfSelection(ITableRow.class, (StructuredSelection) getUiTableViewer().getSelection());
             if (CollectionUtility.hasElements(selectedRows)) {
-              handleUiRowClick(CollectionUtility.firstElement(selectedRows));
+              handleUiRowClick(CollectionUtility.firstElement(selectedRows), e.button);
             }
             e.doit = false;
             break;
@@ -1143,7 +1111,7 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
         case SWT.MouseUp: {
           StructuredSelection selection = (StructuredSelection) uiTableViewer.getSelection();
           if (selection != null && selection.size() == 1) {
-            handleUiRowClick((ITableRow) selection.getFirstElement());
+            handleUiRowClick((ITableRow) selection.getFirstElement(), event.button);
           }
           break;
         }
@@ -1325,16 +1293,19 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
     @Override
     public void menuShown(MenuEvent e) {
       super.menuShown(e);
-      final AtomicReference<IContextMenu> scoutMenusRef = new AtomicReference<IContextMenu>();
+
+      final IActionFilter aboutToShowFilter;
+      if (m_header) {
+        aboutToShowFilter = ActionUtility.createMenuFilterMenuTypes(CollectionUtility.hashSet(TableMenuType.EmptySpace, TableMenuType.Header), false);
+      }
+      else {
+        aboutToShowFilter = ActionUtility.createMenuFilterMenuTypes(getScoutObject().getContextMenu().getCurrentMenuTypes(), false);
+      }
       Runnable t = new Runnable() {
-        @SuppressWarnings("deprecation")
         @Override
         public void run() {
           IContextMenu contextMenu = getScoutObject().getContextMenu();
-          // manually call about to show
-          contextMenu.aboutToShow();
-          contextMenu.prepareAction();
-          scoutMenusRef.set(contextMenu);
+          contextMenu.callAboutToShow(aboutToShowFilter);
         }
       };
       JobEx job = getUiEnvironment().invokeScoutLater(t, 1200);
@@ -1344,17 +1315,15 @@ public class RwtScoutTable extends RwtScoutComposite<ITable> implements IRwtScou
       catch (InterruptedException ex) {
         //nop
       }
-      IContextMenu contextMenu = scoutMenusRef.get();
-      if (contextMenu != null) {
-        IActionFilter filter = null;
-        if (m_header) {
-          filter = ActionUtility.createMenuFilterVisibleAndMenuTypes(TableMenuType.EmptySpace, TableMenuType.Header);
-        }
-        else {
-          filter = contextMenu.getActiveFilter();
-        }
-        RwtMenuUtility.fillMenu((Menu) e.getSource(), contextMenu.getChildActions(), filter, getUiEnvironment());
+
+      final IActionFilter displayFilter;
+      if (m_header) {
+        displayFilter = ActionUtility.createMenuFilterMenuTypes(CollectionUtility.hashSet(TableMenuType.EmptySpace, TableMenuType.Header), true);
       }
+      else {
+        displayFilter = ActionUtility.createMenuFilterMenuTypes(getScoutObject().getContextMenu().getCurrentMenuTypes(), true);
+      }
+      RwtMenuUtility.fillMenu((Menu) e.getSource(), getScoutObject().getContextMenu().getChildActions(), displayFilter, getUiEnvironment());
     }
   }
 

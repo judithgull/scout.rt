@@ -14,8 +14,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
 
-import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
@@ -41,13 +41,23 @@ import org.junit.runner.RunWith;
 @RunWith(ScoutClientTestRunner.class)
 public class PageWithTableAndPageBeanTest {
 
-  private static final String SECOND_COL_CONTENT = "second col";
   private static final String FIRST_COL_CONTENT = "first col";
+  private static final String SECOND_COL_CONTENT = "second col";
+
+  private static final String FIRST_COL_CONTENT2 = "first col 2";
+  private static final String SECOND_COL_CONTENT2 = "second col 2";
+
+  private static final String FIRST_COL_CONTENT3 = "first col 3";
+  private static final String SECOND_COL_CONTENT3 = "second col 3";
 
   @Test
   public void testExecLoadDataInvokesExecLoadTableData() throws Exception {
     PageWithTable p = prepareTest(true);
-    assertEquals(0, p.getTable().getRowCount());
+    assertEquals(2, p.getTable().getRowCount());
+    assertEquals(FIRST_COL_CONTENT2, p.getTable().getFirstColumn().getValue(0));
+    assertEquals(SECOND_COL_CONTENT2, p.getTable().getSecondColumn().getValue(0));
+    assertEquals(FIRST_COL_CONTENT3, p.getTable().getFirstColumn().getValue(1));
+    assertEquals(SECOND_COL_CONTENT3, p.getTable().getSecondColumn().getValue(1));
   }
 
   @Test
@@ -97,7 +107,7 @@ public class PageWithTableAndPageBeanTest {
     }
 
     @Override
-    protected void execCreateChildPages(Collection<IPage> pageList) throws ProcessingException {
+    protected void execCreateChildPages(List<IPage> pageList) throws ProcessingException {
       pageList.add(new PageWithTable(m_invokeSuperExecLoadData));
     }
   }
@@ -126,11 +136,15 @@ public class PageWithTableAndPageBeanTest {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     protected Object[][] execLoadTableData(SearchFilter filter) throws ProcessingException {
       if (!m_invokeSuperExecLoadData) {
         Assert.fail("execLoadTableData must not be called!");
       }
-      return new Object[0][];
+      return new Object[][]{
+          new Object[]{FIRST_COL_CONTENT2, SECOND_COL_CONTENT2},
+          new Object[]{FIRST_COL_CONTENT3, SECOND_COL_CONTENT3}
+      };
     }
 
     @Override

@@ -27,6 +27,13 @@ import org.eclipse.scout.rt.ui.rap.form.fields.IRwtScoutFormField;
 import org.eclipse.swt.widgets.Composite;
 import org.osgi.framework.Bundle;
 
+/**
+ * Generic {@link IFormFieldFactory} for creating {@link IFormField}s by using the extension point
+ * org.eclipse.scout.rt.ui.rap.formfields. <br>
+ * With this extension point it is possible to define how a UI object is created for a specific model class: <br>
+ * Either map a specific UI class to the model class and use the default factory to create it or specify a specific
+ * factory.
+ */
 public class FormFieldFactory implements IFormFieldFactory {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(FormFieldFactory.class);
 
@@ -47,7 +54,7 @@ public class FormFieldFactory implements IFormFieldFactory {
           loaderBundle = requesterBundle;
         }
         else {
-          loaderBundle = Platform.getBundle(extension.getContibuterBundleId());
+          loaderBundle = Platform.getBundle(extension.getContributorBundleId());
         }
         if (loaderBundle != null) {
           Class<?> modelClazz;
@@ -58,14 +65,14 @@ public class FormFieldFactory implements IFormFieldFactory {
             if (!StringUtility.isNullOrEmpty(extension.getUiClassName())) {
               uiClazz = (Class<? extends IRwtScoutFormField>) loaderBundle.loadClass(extension.getUiClassName());
               if (!IRwtScoutFormField.class.isAssignableFrom(uiClazz)) {
-                LOG.warn("extension '" + extension.getName() + "' contributed by '" + extension.getContibuterBundleId() + "' has an ui class not instanceof " + IRwtScoutFormField.class.getName() + ".");
+                LOG.warn("extension '" + extension.getName() + "' contributed by '" + extension.getContributorBundleId() + "' has an ui class not instanceof " + IRwtScoutFormField.class.getName() + ".");
                 uiClazz = null;
               }
             }
             else if (!StringUtility.isNullOrEmpty(extension.getFactoryClassName())) {
               factoryClazz = (Class<? extends IFormFieldFactory>) loaderBundle.loadClass(extension.getFactoryClassName());
               if (!IFormFieldFactory.class.isAssignableFrom(factoryClazz)) {
-                LOG.warn("extension '" + extension.getName() + "' contributed by '" + extension.getContibuterBundleId() + "' has a facotry class not instanceof " + IFormFieldFactory.class.getName() + ".");
+                LOG.warn("extension '" + extension.getName() + "' contributed by '" + extension.getContributorBundleId() + "' has a facotry class not instanceof " + IFormFieldFactory.class.getName() + ".");
                 factoryClazz = null;
               }
             }
@@ -82,7 +89,7 @@ public class FormFieldFactory implements IFormFieldFactory {
               }
             }
             else {
-              LOG.debug("extension '" + extension.getName() + "' contributed by '" + extension.getContibuterBundleId() + "' has neither an UiClass nor a factory defined! Skipping extension.");
+              LOG.debug("extension '" + extension.getName() + "' contributed by '" + extension.getContributorBundleId() + "' has neither an UiClass nor a factory defined! Skipping extension.");
               continue;
             }
             int distance = -distanceToIFormField(modelClazz, 0);
@@ -91,7 +98,7 @@ public class FormFieldFactory implements IFormFieldFactory {
               P_FormFieldExtension existingExt = sortedMap.get(key);
               // check scope
               if (existingExt.getFormFieldExtension().getScope() == extension.getScope()) {
-                LOG.warn("The bundles '" + extension.getContibuterBundleId() + "' and '" + existingExt.getFormFieldExtension().getContibuterBundleId() + "' are both providing " + "an form field extension to '" + extension.getModelClassName() + "' with the same scope.");
+                LOG.warn("The bundles '" + extension.getContributorBundleId() + "' and '" + existingExt.getFormFieldExtension().getContributorBundleId() + "' are both providing " + "an form field extension to '" + extension.getModelClassName() + "' with the same scope.");
               }
               else if (existingExt.getFormFieldExtension().getScope() < extension.getScope()) {
                 // replace
@@ -103,7 +110,7 @@ public class FormFieldFactory implements IFormFieldFactory {
             }
           }
           catch (ClassNotFoundException e) {
-            LOG.debug("local extension '" + extension.getName() + "' contributed by '" + extension.getContibuterBundleId() + "' is not visible from bundle: '" + loaderBundle.getSymbolicName() + "'.");
+            LOG.debug("local extension '" + extension.getName() + "' contributed by '" + extension.getContributorBundleId() + "' is not visible from bundle: '" + loaderBundle.getSymbolicName() + "'.");
           }
         }
 

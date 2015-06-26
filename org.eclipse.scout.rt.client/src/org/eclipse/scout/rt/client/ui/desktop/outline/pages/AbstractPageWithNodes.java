@@ -11,7 +11,6 @@
 package org.eclipse.scout.rt.client.ui.desktop.outline.pages;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 
@@ -23,6 +22,9 @@ import org.eclipse.scout.commons.exception.IProcessingStatus;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.extension.ui.basic.tree.ITreeNodeExtension;
+import org.eclipse.scout.rt.client.extension.ui.desktop.outline.pages.IPageWithNodesExtension;
+import org.eclipse.scout.rt.client.extension.ui.desktop.outline.pages.PageWithNodesChains.PageWithNodesCreateChildPagesChain;
 import org.eclipse.scout.rt.client.ui.action.ActionUtility;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 import org.eclipse.scout.rt.client.ui.action.menu.TableMenuType;
@@ -37,6 +39,7 @@ import org.eclipse.scout.rt.client.ui.basic.table.TableEvent;
 import org.eclipse.scout.rt.client.ui.basic.table.TableRow;
 import org.eclipse.scout.rt.client.ui.basic.table.columns.AbstractStringColumn;
 import org.eclipse.scout.rt.client.ui.basic.table.internal.TablePageTreeMenuWrapper;
+import org.eclipse.scout.rt.client.ui.basic.tree.AbstractTreeNode;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITree;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
 import org.eclipse.scout.rt.client.ui.desktop.outline.OutlineMediator;
@@ -65,7 +68,7 @@ public abstract class AbstractPageWithNodes extends AbstractPage implements IPag
   }
 
   /**
-   * @deprecated Will be removed in the 6.0 Release.
+   * @deprecated Will be removed with the N-Release.
    *             Use {@link #AbstractPageWithNodes()} in combination with getter and setter on the page
    *             instead.
    */
@@ -84,7 +87,7 @@ public abstract class AbstractPageWithNodes extends AbstractPage implements IPag
   }
 
   /**
-   * @deprecated Will be removed in the 6.0 Release.
+   * @deprecated Will be removed with the N-Release.
    *             Use {@link #AbstractPageWithNodes(boolean, String)} in combination with getter and setter on the page
    *             instead.
    */
@@ -102,18 +105,18 @@ public abstract class AbstractPageWithNodes extends AbstractPage implements IPag
    * Called by {@link #loadChildren()} to load data for this page. Allows to add multiple child pages to this page.
    * <p>
    * Subclasses can override this method. The default does nothing.
-   * 
+   *
    * @param pageList
    *          live collection to add child pages to this page
    * @throws ProcessingException
    */
   @ConfigOperation
   @Order(90)
-  protected void execCreateChildPages(Collection<IPage> pageList) throws ProcessingException {
+  protected void execCreateChildPages(List<IPage> pageList) throws ProcessingException {
   }
 
-  protected void createChildPagesInternal(Collection<IPage> pageList) throws ProcessingException {
-    execCreateChildPages(pageList);
+  protected void createChildPagesInternal(List<IPage> pageList) throws ProcessingException {
+    interceptCreateChildPages(pageList);
   }
 
   @Override
@@ -143,7 +146,7 @@ public abstract class AbstractPageWithNodes extends AbstractPage implements IPag
    * If the cell has changed (e.g. the text) we inform our parent as well.
    * If the parent page is a {@link IPageWithNodes}, update its table accordingly.
    * Since the table {@link P_Table} has only one column, we update the first column.
-   * 
+   *
    * @since 3.10.0-M5
    */
   protected void updateParentTableRow(ICell cell) {
@@ -161,14 +164,20 @@ public abstract class AbstractPageWithNodes extends AbstractPage implements IPag
    */
 
   @Override
+  @SuppressWarnings("deprecation")
   public ITable getInternalTable() {
+    return getTable();
+  }
+
+  @Override
+  public ITable getTable() {
     return m_table;
   }
 
   @Override
   public void setPagePopulateStatus(IProcessingStatus status) {
     super.setPagePopulateStatus(status);
-    getInternalTable().tablePopulated();
+    getTable().tablePopulated();
   }
 
   /**
@@ -177,15 +186,15 @@ public abstract class AbstractPageWithNodes extends AbstractPage implements IPag
    * Subclasses can override this method.<br/>
    * This implementation sets the title of the internal table used by this page to the path from the root node to this
    * page.
-   * 
+   *
    * @throws ProcessingException
    */
   @Override
   protected void execPageActivated() throws ProcessingException {
     super.execPageActivated();
     // set title of table
-    if (getInternalTable() != null && getTree() != null) {
-      getInternalTable().setTitle(getTree().getPathText(AbstractPageWithNodes.this));
+    if (getTable() != null && getTree() != null) {
+      getTable().setTitle(getTree().getPathText(AbstractPageWithNodes.this));
     }
   }
 
@@ -194,7 +203,7 @@ public abstract class AbstractPageWithNodes extends AbstractPage implements IPag
    */
   @Override
   public void loadChildren() throws ProcessingException {
-    ArrayList<IPage> pageList = new ArrayList<IPage>();
+    List<IPage> pageList = new ArrayList<IPage>();
     createChildPagesInternal(pageList);
     // load tree
     ITree tree = getTree();
@@ -259,12 +268,12 @@ public abstract class AbstractPageWithNodes extends AbstractPage implements IPag
     }
     // copy to table
     try {
-      getInternalTable().setTableChanging(true);
+      getTable().setTableChanging(true);
       rebuildTableInternal();
       setPagePopulateStatus(null);
     }
     finally {
-      getInternalTable().setTableChanging(false);
+      getTable().setTableChanging(false);
     }
     super.loadChildren();
   }
@@ -273,19 +282,19 @@ public abstract class AbstractPageWithNodes extends AbstractPage implements IPag
   public void rebuildTableInternal() throws ProcessingException {
     List<ITreeNode> childNodes = getChildNodes();
     try {
-      getInternalTable().setTableChanging(true);
+      getTable().setTableChanging(true);
       //
       unlinkAllTableRowWithPage();
-      getInternalTable().discardAllRows();
+      getTable().discardAllRows();
       for (ITreeNode childNode : childNodes) {
-        ITableRow row = new TableRow(getInternalTable().getColumnSet());
+        ITableRow row = new TableRow(getTable().getColumnSet());
         row.setCell(0, childNode.getCell());
-        ITableRow insertedRow = getInternalTable().addRow(row);
+        ITableRow insertedRow = getTable().addRow(row);
         linkTableRowWithPage(insertedRow, (IPage) childNode);
       }
     }
     finally {
-      getInternalTable().setTableChanging(false);
+      getTable().setTableChanging(false);
     }
   }
 
@@ -327,30 +336,30 @@ public abstract class AbstractPageWithNodes extends AbstractPage implements IPag
   protected void updateContextMenusForSelection() {
     // remove old
     if (m_pageMenusOfSelection != null) {
-      getInternalTable().getContextMenu().removeChildActions(m_pageMenusOfSelection);
+      getTable().getContextMenu().removeChildActions(m_pageMenusOfSelection);
       m_pageMenusOfSelection = null;
     }
 
     List<IMenu> pageMenus = new ArrayList<IMenu>();
-    List<ITableRow> selectedRows = getInternalTable().getSelectedRows();
+    List<ITableRow> selectedRows = getTable().getSelectedRows();
     if (CollectionUtility.size(selectedRows) == 1) {
       ITreeNode node = getTreeNodeFor(CollectionUtility.firstElement(selectedRows));
       if (node instanceof IPageWithTable<?>) {
         IPageWithTable<?> tablePage = (IPageWithTable<?>) node;
-        List<IMenu> menus = ActionUtility.getActions(tablePage.getTable().getContextMenu().getChildActions(), ActionUtility.createMenuFilterMenuTypes(TableMenuType.EmptySpace));
+        List<IMenu> menus = ActionUtility.getActions(tablePage.getTable().getContextMenu().getChildActions(), ActionUtility.createMenuFilterMenuTypes(CollectionUtility.hashSet(TableMenuType.EmptySpace), false));
         for (IMenu m : menus) {
           pageMenus.add(new TablePageTreeMenuWrapper(m, TableMenuType.SingleSelection));
         }
       }
       else if (node instanceof IPageWithNodes) {
         IPageWithNodes pageWithNodes = (IPageWithNodes) node;
-        List<IMenu> menus = ActionUtility.getActions(pageWithNodes.getMenus(), ActionUtility.createMenuFilterMenuTypes(TreeMenuType.SingleSelection));
+        List<IMenu> menus = ActionUtility.getActions(pageWithNodes.getMenus(), ActionUtility.createMenuFilterMenuTypes(CollectionUtility.hashSet(TreeMenuType.SingleSelection), false));
         for (IMenu m : menus) {
           pageMenus.add(new TablePageTreeMenuWrapper(m, TableMenuType.SingleSelection));
         }
       }
     }
-    getInternalTable().getContextMenu().addChildActions(pageMenus);
+    getTable().getContextMenu().addChildActions(pageMenus);
     m_pageMenusOfSelection = pageMenus;
 
   }
@@ -446,6 +455,29 @@ public abstract class AbstractPageWithNodes extends AbstractPage implements IPag
       }
 
     }
+  }
+
+  protected final void interceptCreateChildPages(List<IPage> pageList) throws ProcessingException {
+    List<? extends ITreeNodeExtension<? extends AbstractTreeNode>> extensions = getAllExtensions();
+    PageWithNodesCreateChildPagesChain chain = new PageWithNodesCreateChildPagesChain(extensions);
+    chain.execCreateChildPages(pageList);
+  }
+
+  protected static class LocalPageWithNodesExtension<OWNER extends AbstractPageWithNodes> extends LocalPageExtension<OWNER> implements IPageWithNodesExtension<OWNER> {
+
+    public LocalPageWithNodesExtension(OWNER owner) {
+      super(owner);
+    }
+
+    @Override
+    public void execCreateChildPages(PageWithNodesCreateChildPagesChain chain, List<IPage> pageList) throws ProcessingException {
+      getOwner().execCreateChildPages(pageList);
+    }
+  }
+
+  @Override
+  protected IPageWithNodesExtension<? extends AbstractPageWithNodes> createLocalExtension() {
+    return new LocalPageWithNodesExtension<AbstractPageWithNodes>(this);
   }
 
 }

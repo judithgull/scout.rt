@@ -27,6 +27,7 @@ import org.eclipse.scout.rt.ui.swt.DefaultValidateRoot;
 import org.eclipse.scout.rt.ui.swt.ISwtEnvironment;
 import org.eclipse.scout.rt.ui.swt.IValidateRoot;
 import org.eclipse.scout.rt.ui.swt.LogicalGridLayout;
+import org.eclipse.scout.rt.ui.swt.action.menu.MenuPositionCorrectionListener;
 import org.eclipse.scout.rt.ui.swt.action.menu.SwtContextMenuMarkerComposite;
 import org.eclipse.scout.rt.ui.swt.action.menu.SwtScoutContextMenu;
 import org.eclipse.scout.rt.ui.swt.ext.ImageViewer;
@@ -51,7 +52,7 @@ import org.eclipse.swt.widgets.Control;
 
 /**
  * <h3>SwtScoutImageBox</h3> ...
- * 
+ *
  * @since 1.0.9 16.07.2008
  */
 public class SwtScoutImageField extends SwtScoutFieldComposite<IImageField> implements ISwtScoutImageBox {
@@ -61,6 +62,7 @@ public class SwtScoutImageField extends SwtScoutFieldComposite<IImageField> impl
   private ScrolledFormEx m_scrolledForm;
   private SwtContextMenuMarkerComposite m_menuMarkerComposite;
   private SwtScoutContextMenu m_contextMenu;
+  private PropertyChangeListener m_contextMenuVisibilityListener;
 
   @Override
   protected void initializeSwt(Composite parent) {
@@ -119,14 +121,11 @@ public class SwtScoutImageField extends SwtScoutFieldComposite<IImageField> impl
     body.setLayout(new FillLayout());
   }
 
-  @Override
   protected void installContextMenu() {
     m_menuMarkerComposite.setMarkerVisible(getScoutObject().getContextMenu().isVisible());
-    getScoutObject().getContextMenu().addPropertyChangeListener(new PropertyChangeListener() {
-
+    m_contextMenuVisibilityListener = new PropertyChangeListener() {
       @Override
       public void propertyChange(PropertyChangeEvent evt) {
-
         if (IMenu.PROP_VISIBLE.equals(evt.getPropertyName())) {
           final boolean markerVisible = getScoutObject().getContextMenu().isVisible();
           getEnvironment().invokeSwtLater(new Runnable() {
@@ -137,10 +136,46 @@ public class SwtScoutImageField extends SwtScoutFieldComposite<IImageField> impl
           });
         }
       }
-    });
+    };
+    getScoutObject().getContextMenu().addPropertyChangeListener(m_contextMenuVisibilityListener);
 
     m_contextMenu = new SwtScoutContextMenu(getImageViewer().getShell(), getScoutObject().getContextMenu(), getEnvironment());
     getImageViewer().setMenu(m_contextMenu.getSwtMenu());
+
+    // correction of menu position
+    int hAlign;
+    switch (getImageViewer().getAlignmentX()) {
+      case SWT.LEFT:
+        hAlign = MenuPositionCorrectionListener.HORIZONTAL_LEFT;
+        break;
+      case SWT.RIGHT:
+        hAlign = MenuPositionCorrectionListener.HORIZONTAL_RIGHT;
+        break;
+      default:
+        hAlign = MenuPositionCorrectionListener.HORIZONTAL_CENTER;
+        break;
+    }
+
+    int vAlign;
+    switch (getImageViewer().getAlignmentY()) {
+      case SWT.TOP:
+        vAlign = MenuPositionCorrectionListener.VERTICAL_TOP;
+        break;
+      case SWT.BOTTOM:
+        vAlign = MenuPositionCorrectionListener.VERTICAL_BOTTOM;
+        break;
+      default:
+        vAlign = MenuPositionCorrectionListener.VERTICAL_CENTER;
+        break;
+    }
+    getImageViewer().addListener(SWT.MenuDetect, new MenuPositionCorrectionListener(getImageViewer(), hAlign | vAlign));
+  }
+
+  protected void uninstallContextMenu() {
+    if (m_contextMenuVisibilityListener != null) {
+      getScoutObject().getContextMenu().removePropertyChangeListener(m_contextMenuVisibilityListener);
+      m_contextMenuVisibilityListener = null;
+    }
   }
 
   public ImageViewer getImageViewer() {
@@ -165,6 +200,13 @@ public class SwtScoutImageField extends SwtScoutFieldComposite<IImageField> impl
     updateAutoFitFromScout();
     updateImageFromScout();
     new P_DndSupport(getScoutObject(), getScoutObject(), getSwtField(), getEnvironment());
+    installContextMenu();
+  }
+
+  @Override
+  protected void detachScout() {
+    uninstallContextMenu();
+    super.detachScout();
   }
 
   protected void updateImageFromScout() {

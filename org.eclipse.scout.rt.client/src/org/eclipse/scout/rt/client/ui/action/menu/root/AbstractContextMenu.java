@@ -12,19 +12,23 @@ package org.eclipse.scout.rt.client.ui.action.menu.root;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 import org.eclipse.scout.commons.EventListenerList;
 import org.eclipse.scout.commons.beans.IPropertyObserver;
 import org.eclipse.scout.commons.holders.BooleanHolder;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.extension.ui.action.menu.root.IContextMenuExtension;
 import org.eclipse.scout.rt.client.ui.action.ActionUtility;
 import org.eclipse.scout.rt.client.ui.action.IAction;
 import org.eclipse.scout.rt.client.ui.action.IActionFilter;
 import org.eclipse.scout.rt.client.ui.action.IActionVisitor;
 import org.eclipse.scout.rt.client.ui.action.menu.AbstractMenu;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.IMenuType;
 
 /**
  *
@@ -53,7 +57,6 @@ public abstract class AbstractContextMenu extends AbstractMenu implements IConte
   @Override
   protected void initConfig() {
     super.initConfig();
-    setActiveFilter(ActionUtility.createVisibleFilter());
     calculateLocalVisibility();
   }
 
@@ -62,13 +65,14 @@ public abstract class AbstractContextMenu extends AbstractMenu implements IConte
     return m_owner;
   }
 
+  @SuppressWarnings("unchecked")
   @Override
-  public IActionFilter getActiveFilter() {
-    return (IActionFilter) propertySupport.getProperty(PROP_ACTIVE_FILTER);
+  public Set<? extends IMenuType> getCurrentMenuTypes() {
+    return (Set<? extends IMenuType>) propertySupport.getProperty(PROP_CURRENT_MENU_TYPES);
   }
 
-  public void setActiveFilter(IActionFilter filter) {
-    propertySupport.setProperty(PROP_ACTIVE_FILTER, filter);
+  protected void setCurrentMenuTypes(Set<? extends IMenuType> menuTypes) {
+    propertySupport.setProperty(PROP_CURRENT_MENU_TYPES, menuTypes);
   }
 
   @Override
@@ -93,12 +97,12 @@ public abstract class AbstractContextMenu extends AbstractMenu implements IConte
   }
 
   @Override
-  public void addChildActions(List<? extends IMenu> actionList) {
+  public void addChildActions(Collection<? extends IMenu> actionList) {
     super.addChildActions(actionList);
   }
 
   @Override
-  protected void afterChildMenusAdd(List<? extends IMenu> newChildMenus) {
+  protected void afterChildMenusAdd(Collection<? extends IMenu> newChildMenus) {
     super.afterChildMenusAdd(newChildMenus);
     addScoutMenuVisibilityListenerRec(newChildMenus);
     calculateLocalVisibility();
@@ -106,7 +110,7 @@ public abstract class AbstractContextMenu extends AbstractMenu implements IConte
   }
 
   @Override
-  protected void afterChildMenusRemove(List<? extends IMenu> childMenusToRemove) {
+  protected void afterChildMenusRemove(Collection<? extends IMenu> childMenusToRemove) {
     super.afterChildMenusRemove(childMenusToRemove);
     removeScoutMenuVisibilityListenerRec(childMenusToRemove);
     calculateLocalVisibility();
@@ -123,7 +127,7 @@ public abstract class AbstractContextMenu extends AbstractMenu implements IConte
     fireContextMenuEvent(new ContextMenuEvent(this, ContextMenuEvent.TYPE_STRUCTURE_CHANGED));
   }
 
-  protected void addScoutMenuVisibilityListenerRec(List<? extends IMenu> menus) {
+  protected void addScoutMenuVisibilityListenerRec(Collection<? extends IMenu> menus) {
     if (menus != null) {
       for (IMenu m : menus) {
         m.addPropertyChangeListener(IMenu.PROP_CHILD_ACTIONS, m_menuVisibilityListener);
@@ -133,7 +137,7 @@ public abstract class AbstractContextMenu extends AbstractMenu implements IConte
     }
   }
 
-  protected void removeScoutMenuVisibilityListenerRec(List<? extends IMenu> menus) {
+  protected void removeScoutMenuVisibilityListenerRec(Collection<? extends IMenu> menus) {
     if (menus != null) {
       for (IMenu m : menus) {
         m.removePropertyChangeListener(IMenu.PROP_CHILD_ACTIONS, m_menuVisibilityListener);
@@ -143,9 +147,25 @@ public abstract class AbstractContextMenu extends AbstractMenu implements IConte
     }
   }
 
+  @Override
+  public void callAboutToShow(final IActionFilter filter) {
+    acceptVisitor(new IActionVisitor() {
+      @SuppressWarnings("deprecation")
+      @Override
+      public int visit(IAction action) {
+        if (action instanceof IMenu && (filter == null || filter.accept(action))) {
+          IMenu menu = (IMenu) action;
+          menu.aboutToShow();
+          menu.prepareAction();
+        }
+        return CONTINUE;
+      }
+    });
+  }
+
   protected void calculateLocalVisibility() {
 
-    final IActionFilter activeFilter = getActiveFilter();
+    final IActionFilter activeFilter = ActionUtility.createMenuFilterMenuTypes(getCurrentMenuTypes(), true);
     if (activeFilter != null) {
       final BooleanHolder visibleHolder = new BooleanHolder(false);
       acceptVisitor(new IActionVisitor() {
@@ -177,6 +197,18 @@ public abstract class AbstractContextMenu extends AbstractMenu implements IConte
       }
       calculateLocalVisibility();
     }
+  }
+
+  protected static class LocalContextMenuExtension<OWNER extends AbstractContextMenu> extends LocalMenuExtension<OWNER> implements IContextMenuExtension<OWNER> {
+
+    public LocalContextMenuExtension(OWNER owner) {
+      super(owner);
+    }
+  }
+
+  @Override
+  protected IContextMenuExtension<? extends AbstractContextMenu> createLocalExtension() {
+    return new LocalContextMenuExtension<AbstractContextMenu>(this);
   }
 
 }

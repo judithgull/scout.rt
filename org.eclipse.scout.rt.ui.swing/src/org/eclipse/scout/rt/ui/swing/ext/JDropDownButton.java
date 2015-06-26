@@ -11,17 +11,12 @@
 package org.eclipse.scout.rt.ui.swing.ext;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.Graphics;
 import java.awt.Insets;
 import java.awt.Point;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 
 import javax.swing.AbstractButton;
-import javax.swing.BorderFactory;
-import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.UIManager;
@@ -39,8 +34,6 @@ public class JDropDownButton extends JComponent {
 
   private AbstractButton m_pushButton;
   private JButton m_menuButton;
-
-//  private Icon enabledDownArrow, disDownArrow;
 
   public JDropDownButton(AbstractButton mainButton) {
     setOpaque(false);
@@ -63,18 +56,18 @@ public class JDropDownButton extends JComponent {
     });
     add(m_pushButton, BorderLayout.CENTER);
     //
+
     m_menuButton = new JButton();
-    IconGroup iconGroup = MenuArrowDownIcon.createMenuArrowDownIconGroup(new Insets(1, 2, 15, 1));
+    IconGroup iconGroup = ButtonMenuArrowDownIcon.createMenuArrowDownIconGroup(new Insets(3, 1, 13, 1));
     m_menuButton.setIcon(iconGroup.getIcon(IconState.NORMAL));
     m_menuButton.setRolloverIcon(iconGroup.getIcon(IconState.ROLLOVER));
     m_menuButton.setDisabledIcon(iconGroup.getIcon(IconState.DISABLED));
+
     m_menuButton.setFocusPainted(false);
     m_menuButton.setFocusable(false);
-    m_menuButton.setBorder(BorderFactory.createEmptyBorder());
     add(m_menuButton, BorderLayout.EAST);
 
-    FlowLayoutEx layout = new FlowLayoutEx(FlowLayoutEx.HORIZONTAL, 0, 0);
-    setLayout(layout);// new DropDownButtonLayout(m_pushButton, m_menuButton, 12));
+    setLayout(new DropDownButtonLayout(m_pushButton, m_menuButton, 12));
     updateUI();
   }
 
@@ -94,50 +87,6 @@ public class JDropDownButton extends JComponent {
   @Override
   public boolean isEnabled() {
     return m_pushButton.isEnabled();
-  }
-
-  /**
-   * An icon to draw a small downward-pointing arrow.
-   */
-  private static class SmallDownArrow implements Icon {
-
-    Color arrowColor = Color.black;
-
-    @Override
-    public void paintIcon(Component c, Graphics g, int x, int y) {
-      g.setColor(arrowColor);
-      g.drawLine(x, y, x + 4, y);
-      g.drawLine(x + 1, y + 1, x + 3, y + 1);
-      g.drawLine(x + 2, y + 2, x + 2, y + 2);
-    }
-
-    @Override
-    public int getIconWidth() {
-      return 6;
-    }
-
-    @Override
-    public int getIconHeight() {
-      return 4;
-    }
-  }
-
-  /**
-   * An icon to draw a disabled small downward-pointing arrow.
-   */
-  private static class SmallDisabledDownArrow extends SmallDownArrow {
-
-    public SmallDisabledDownArrow() {
-      arrowColor = new Color(140, 140, 140);
-    }
-
-    @Override
-    public void paintIcon(Component c, Graphics g, int x, int y) {
-      super.paintIcon(c, g, x, y);
-      g.setColor(Color.white);
-      g.drawLine(x + 3, y + 2, x + 4, y + 1);
-      g.drawLine(x + 3, y + 3, x + 5, y + 1);
-    }
   }
 
   @Override

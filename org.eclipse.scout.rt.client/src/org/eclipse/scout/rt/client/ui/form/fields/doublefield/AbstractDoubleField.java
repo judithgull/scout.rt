@@ -18,9 +18,16 @@ import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.doublefield.IDoubleFieldExtension;
+import org.eclipse.scout.rt.client.ui.form.fields.bigdecimalfield.AbstractBigDecimalField;
 import org.eclipse.scout.rt.client.ui.form.fields.decimalfield.AbstractDecimalField;
 import org.eclipse.scout.rt.shared.data.form.ValidationRule;
 
+/**
+ * @deprecated Will be removed in N release. Use {@link AbstractBigDecimalField} instead.
+ */
+@SuppressWarnings("deprecation")
+@Deprecated
 @ClassId("65251930-63db-4da4-ae28-9a25d75dcafb")
 public abstract class AbstractDoubleField extends AbstractDecimalField<Double> implements IDoubleField {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractDoubleField.class);
@@ -36,26 +43,6 @@ public abstract class AbstractDoubleField extends AbstractDecimalField<Double> i
   /*
    * Configuration
    */
-
-  /**
-   * @deprecated Will be removed in the 5.0 Release., use {@link #getConfiguredMinValue()}.<br>
-   *             As long as this deprecated version is overridden in subclasses. This setting wins over
-   *             {@link #getConfiguredMinValue()} in {@link #initConfig()}.
-   */
-  @Deprecated
-  protected Double getConfiguredMinimumValue() {
-    return getConfiguredMinValue();
-  }
-
-  /**
-   * @deprecated Will be removed in the 5.0 Release., use {@link #getConfiguredMaxValue()}.<br>
-   *             As long as this deprecated version is overridden in subclasses. This setting wins over
-   *             {@link #getConfiguredMaxValue()} in {@link #initConfig()}.
-   */
-  @Deprecated
-  protected Double getConfiguredMaximumValue() {
-    return getConfiguredMaxValue();
-  }
 
   @ConfigProperty(ConfigProperty.DOUBLE)
   @Order(300)
@@ -74,26 +61,13 @@ public abstract class AbstractDoubleField extends AbstractDecimalField<Double> i
   }
 
   @Override
-  protected void initConfig() {
-    super.initConfig();
-    setMinValue(getConfiguredMinimumValue());
-    setMaxValue(getConfiguredMaximumValue());
+  protected Double getMinPossibleValue() {
+    return -Double.MAX_VALUE;
   }
 
-  /**
-   * Set the minimum value for this field. If value is <code>null</code>, it is replaced by Double.MIN_VALUE.
-   */
   @Override
-  public void setMinValue(Double value) {
-    super.setMinValue(value == null ? -Double.MAX_VALUE : value);
-  }
-
-  /**
-   * Set the maximum value for this field. If value is <code>null</code>, it is replaced by -Double.MAX_VALUE.
-   */
-  @Override
-  public void setMaxValue(Double value) {
-    super.setMaxValue(value == null ? Double.MAX_VALUE : value);
+  protected Double getMaxPossibleValue() {
+    return Double.MAX_VALUE;
   }
 
   /**
@@ -107,5 +81,17 @@ public abstract class AbstractDoubleField extends AbstractDecimalField<Double> i
       retVal = Double.valueOf(parsedVal.doubleValue());
     }
     return retVal;
+  }
+
+  protected static class LocalDoubleFieldExtension<OWNER extends AbstractDoubleField> extends LocalDecimalFieldExtension<Double, OWNER> implements IDoubleFieldExtension<OWNER> {
+
+    public LocalDoubleFieldExtension(OWNER owner) {
+      super(owner);
+    }
+  }
+
+  @Override
+  protected IDoubleFieldExtension<? extends AbstractDoubleField> createLocalExtension() {
+    return new LocalDoubleFieldExtension<AbstractDoubleField>(this);
   }
 }

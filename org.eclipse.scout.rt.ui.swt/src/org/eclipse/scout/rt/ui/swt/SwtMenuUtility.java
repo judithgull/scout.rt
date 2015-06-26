@@ -10,16 +10,17 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.ui.swt;
 
-import java.util.LinkedList;
 import java.util.List;
 
-import org.eclipse.scout.commons.job.JobEx;
+import org.eclipse.jface.bindings.keys.KeyStroke;
+import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.action.ActionUtility;
 import org.eclipse.scout.rt.client.ui.action.IActionFilter;
+import org.eclipse.scout.rt.client.ui.action.keystroke.KeyStrokeNormalizer;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
-import org.eclipse.scout.rt.client.ui.basic.calendar.ICalendar;
+import org.eclipse.scout.rt.ui.swt.util.SwtUtility;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.MenuItem;
@@ -72,7 +73,7 @@ public final class SwtMenuUtility {
   }
 
   public static void fillMenu(Menu menu, List<IMenu> childActions, IActionFilter filter, ISwtEnvironment environment, boolean separatorFirstIfHasMenus) {
-    List<IMenu> visibleNormalizedActions = ActionUtility.visibleNormalizedActions(childActions, filter);
+    List<IMenu> visibleNormalizedActions = ActionUtility.normalizedActions(childActions, filter);
     if (separatorFirstIfHasMenus && visibleNormalizedActions.size() > 0) {
       new MenuItem(menu, SWT.SEPARATOR);
     }
@@ -82,37 +83,31 @@ public final class SwtMenuUtility {
 
   }
 
+  /**
+   * Returns a formatted version of the Scout keystroke passed as argument.
+   * Returns an empty string if it could not be formatted.
+   */
+  public static String formatKeystroke(String keyStroke) {
+    KeyStrokeNormalizer scoutKeystroke = new KeyStrokeNormalizer(keyStroke);
+    scoutKeystroke.normalize();
 
-  public static List<IMenu> collectMenus(final ICalendar calendar, final boolean emptySpaceActions, final boolean componentActions, ISwtEnvironment swtEnvironment) {
-    final List<IMenu> menuList = new LinkedList<IMenu>();
-    Runnable t = new Runnable() {
-      @Override
-      public void run() {
-        if (emptySpaceActions) {
-          menuList.addAll(calendar.getUIFacade().fireNewPopupFromUI());
-        }
-        if (componentActions) {
-          menuList.addAll(calendar.getUIFacade().fireComponentPopupFromUI());
-        }
+    int naturalKey = KeyStroke.NO_KEY;
+    if (StringUtility.hasText(scoutKeystroke.getKey())) {
+      if (scoutKeystroke.getKey().length() == 1) {
+        naturalKey = scoutKeystroke.getKey().charAt(0);
       }
-    };
-
-    JobEx job = swtEnvironment.invokeScoutLater(t, 5000);
-    try {
-      job.join(1200);
-    }
-    catch (InterruptedException ex) {
-      LOG.warn("Exception occured while collecting menus.", ex);
+      else if (SwtUtility.getScoutSwtKeyMap().containsKey(scoutKeystroke.getKey().toLowerCase())) {
+        naturalKey = SwtUtility.getScoutSwtKeyMap().get(scoutKeystroke.getKey().toLowerCase());
+      }
+      else {
+        LOG.error("Was not able to create shortcut label for " + keyStroke);
+      }
     }
 
-    return menuList;
-  }
-
-  public static List<IMenu> collectComponentMenus(final ICalendar calendar, ISwtEnvironment swtEnvironment) {
-    return collectMenus(calendar, false, true, swtEnvironment);
-  }
-
-  public static List<IMenu> collectEmptySpaceMenus(final ICalendar calendar, ISwtEnvironment swtEnvironment) {
-    return collectMenus(calendar, true, false, swtEnvironment);
+    if (naturalKey != KeyStroke.NO_KEY) {
+      KeyStroke ks = KeyStroke.getInstance(((scoutKeystroke.hasShift()) ? SWT.SHIFT : SWT.None) | ((scoutKeystroke.hasCtrl()) ? SWT.CONTROL : SWT.None) | ((scoutKeystroke.hasAlt()) ? SWT.ALT : SWT.None), naturalKey);
+      return ks.format();
+    }
+    return "";
   }
 }

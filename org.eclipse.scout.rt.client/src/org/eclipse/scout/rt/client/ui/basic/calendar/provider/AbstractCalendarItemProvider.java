@@ -10,7 +10,6 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.basic.calendar.provider;
 
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -25,6 +24,7 @@ import org.eclipse.scout.commons.DateUtility;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
 import org.eclipse.scout.commons.annotations.Order;
+import org.eclipse.scout.commons.annotations.OrderedCollection;
 import org.eclipse.scout.commons.beans.AbstractPropertyObserver;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
@@ -32,19 +32,29 @@ import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ClientAsyncJob;
 import org.eclipse.scout.rt.client.ClientSyncJob;
 import org.eclipse.scout.rt.client.IClientSession;
+import org.eclipse.scout.rt.client.extension.ui.action.tree.MoveActionNodesHandler;
+import org.eclipse.scout.rt.client.extension.ui.basic.calendar.provider.CalendarItemProviderChains.CalendarItemProviderDecorateCellChain;
+import org.eclipse.scout.rt.client.extension.ui.basic.calendar.provider.CalendarItemProviderChains.CalendarItemProviderItemActionChain;
+import org.eclipse.scout.rt.client.extension.ui.basic.calendar.provider.CalendarItemProviderChains.CalendarItemProviderItemMovedChain;
+import org.eclipse.scout.rt.client.extension.ui.basic.calendar.provider.CalendarItemProviderChains.CalendarItemProviderLoadItemsChain;
+import org.eclipse.scout.rt.client.extension.ui.basic.calendar.provider.CalendarItemProviderChains.CalendarItemProviderLoadItemsInBackgroundChain;
+import org.eclipse.scout.rt.client.extension.ui.basic.calendar.provider.ICalendarItemProviderExtension;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 import org.eclipse.scout.rt.client.ui.basic.cell.Cell;
+import org.eclipse.scout.rt.shared.extension.AbstractExtension;
+import org.eclipse.scout.rt.shared.extension.ContributionComposite;
+import org.eclipse.scout.rt.shared.extension.IContributionOwner;
+import org.eclipse.scout.rt.shared.extension.IExtensibleObject;
+import org.eclipse.scout.rt.shared.extension.IExtension;
+import org.eclipse.scout.rt.shared.extension.ObjectExtensions;
 import org.eclipse.scout.rt.shared.services.common.calendar.ICalendarAppointment;
 import org.eclipse.scout.rt.shared.services.common.calendar.ICalendarItem;
 import org.eclipse.scout.rt.shared.services.common.calendar.ICalendarTask;
 import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.service.SERVICES;
 
-public abstract class AbstractCalendarItemProvider extends AbstractPropertyObserver implements ICalendarItemProvider {
+public abstract class AbstractCalendarItemProvider extends AbstractPropertyObserver implements ICalendarItemProvider, IContributionOwner, IExtensibleObject {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractCalendarItemProvider.class);
-
-  public static final long DAY_MILLIS = 24L * 3600L * 1000L;
-  public static final long MONTH_MILLIS = DAY_MILLIS * 32L;
 
   private P_ReloadJob m_reloadJob;
 
@@ -52,21 +62,38 @@ public abstract class AbstractCalendarItemProvider extends AbstractPropertyObser
   private List<IMenu> m_menus;
   private Date m_minDateLoaded;
   private Date m_maxDateLoaded;
+  private IContributionOwner m_contributionHolder;
+  private final ObjectExtensions<AbstractCalendarItemProvider, ICalendarItemProviderExtension<? extends AbstractCalendarItemProvider>> m_objectExtensions;
 
   public AbstractCalendarItemProvider() {
     this(true);
   }
 
   public AbstractCalendarItemProvider(boolean callInitializer) {
+    m_objectExtensions = new ObjectExtensions<AbstractCalendarItemProvider, ICalendarItemProviderExtension<? extends AbstractCalendarItemProvider>>(this);
     if (callInitializer) {
       callInitializer();
     }
   }
 
+  @Override
+  public final List<Object> getAllContributions() {
+    return m_contributionHolder.getAllContributions();
+  }
+
+  @Override
+  public final <T> List<T> getContributionsByClass(Class<T> type) {
+    return m_contributionHolder.getContributionsByClass(type);
+  }
+
+  @Override
+  public final <T> T getContribution(Class<T> contribution) {
+    return m_contributionHolder.getContribution(contribution);
+  }
+
   protected void callInitializer() {
     if (!m_initialized) {
-      initConfig();
-      ensureItemsLoadedInternal(new Date(System.currentTimeMillis() - MONTH_MILLIS), new Date(System.currentTimeMillis() + MONTH_MILLIS));
+      interceptInitConfig();
       m_initialized = true;
     }
   }
@@ -89,8 +116,7 @@ public abstract class AbstractCalendarItemProvider extends AbstractPropertyObser
   protected List<Class<? extends IMenu>> getDeclaredMenus() {
     Class[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
     List<Class<IMenu>> filtered = ConfigurationUtility.filterClasses(dca, IMenu.class);
-    List<Class<? extends IMenu>> foca = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(filtered, IMenu.class);
-    return ConfigurationUtility.removeReplacedClasses(foca);
+    return ConfigurationUtility.removeReplacedClasses(filtered);
   }
 
   /**
@@ -119,7 +145,7 @@ public abstract class AbstractCalendarItemProvider extends AbstractPropertyObser
     ClientSyncJob job = new ClientSyncJob(getClass().getSimpleName() + " load items", session) {
       @Override
       protected void runVoid(IProgressMonitor monitor) throws Throwable {
-        execLoadItems(minDate, maxDate, result);
+        interceptLoadItems(minDate, maxDate, result);
       }
     };
     job.schedule();
@@ -149,39 +175,68 @@ public abstract class AbstractCalendarItemProvider extends AbstractPropertyObser
   protected void execItemAction(ICalendarItem item) throws ProcessingException {
   }
 
+  protected final void interceptInitConfig() {
+    m_objectExtensions.initConfig(createLocalExtension(), new Runnable() {
+      @Override
+      public void run() {
+        initConfig();
+      }
+    });
+  }
+
   protected void initConfig() {
+    m_contributionHolder = new ContributionComposite(this);
     setMoveItemEnabled(getConfiguredMoveItemEnabled());
     setRefreshIntervalMillis(getConfiguredRefreshIntervallMillis());
     // menus
-    List<IMenu> menuList = new ArrayList<IMenu>();
-    for (Class<? extends IMenu> menuClazz : getDeclaredMenus()) {
+    List<Class<? extends IMenu>> declaredMenus = getDeclaredMenus();
+    OrderedCollection<IMenu> menus = new OrderedCollection<IMenu>();
+    for (Class<? extends IMenu> menuClazz : declaredMenus) {
       try {
         IMenu menu = ConfigurationUtility.newInnerInstance(this, menuClazz);
         menu.initAction();
-        menuList.add(menu);
+        menus.addOrdered(menu);
       }
       catch (Exception e) {
         SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + menuClazz.getName() + "'.", e));
       }
     }
+    List<IMenu> contributedMenus = m_contributionHolder.getContributionsByClass(IMenu.class);
+    menus.addAllOrdered(contributedMenus);
 
     try {
-      injectMenusInternal(menuList);
+      injectMenusInternal(menus);
     }
     catch (Exception e) {
       LOG.error("error occured while dynamically contribute menus.", e);
     }
-    m_menus = menuList;
+    new MoveActionNodesHandler<IMenu>(menus).moveModelObjects();
+    m_menus = menus.getOrderedList();
+  }
+
+  @Override
+  public final List<? extends ICalendarItemProviderExtension<? extends AbstractCalendarItemProvider>> getAllExtensions() {
+    return m_objectExtensions.getAllExtensions();
+  }
+
+  protected ICalendarItemProviderExtension<? extends AbstractCalendarItemProvider> createLocalExtension() {
+    return new LocalCalendarItemProviderExtension<AbstractCalendarItemProvider>(this);
+  }
+
+  @Override
+  public <T extends IExtension<?>> T getExtension(Class<T> c) {
+    return m_objectExtensions.getExtension(c);
   }
 
   /**
    * Override this internal method only in order to make use of dynamic menus<br>
-   * Used to manage menu list and add/remove menus
-   * 
-   * @param menuList
-   *          live and mutable list of configured menus
+   * Used to manage menu list and add/remove menus.<br>
+   * To change the order or specify the insert position use {@link IMenu#setOrder(double)}.
+   *
+   * @param menus
+   *          live and mutable collection of configured menus
    */
-  protected void injectMenusInternal(List<IMenu> menuList) {
+  protected void injectMenusInternal(OrderedCollection<IMenu> menus) {
   }
 
   /*
@@ -200,7 +255,7 @@ public abstract class AbstractCalendarItemProvider extends AbstractPropertyObser
   public final void decorateCell(Cell cell, ICalendarItem item) {
     decorateCellInternal(cell, item);
     try {
-      execDecorateCell(cell, item);
+      interceptDecorateCell(cell, item);
     }
     catch (ProcessingException e) {
       SERVICES.getService(IExceptionHandlerService.class).handleException(e);
@@ -327,7 +382,7 @@ public abstract class AbstractCalendarItemProvider extends AbstractPropertyObser
   @Override
   public void onItemAction(ICalendarItem item) throws ProcessingException {
     try {
-      execItemAction(item);
+      interceptItemAction(item);
     }
     catch (ProcessingException e) {
       throw e;
@@ -340,7 +395,7 @@ public abstract class AbstractCalendarItemProvider extends AbstractPropertyObser
   @Override
   public void onItemMoved(ICalendarItem item, Date newDate) throws ProcessingException {
     try {
-      execItemMoved(item, newDate);
+      interceptItemMoved(item, newDate);
     }
     catch (ProcessingException e) {
       throw e;
@@ -393,41 +448,39 @@ public abstract class AbstractCalendarItemProvider extends AbstractPropertyObser
       if (!monitor.isCanceled()) {
         // call user code
         try {
-          execLoadItemsInBackground(ClientSyncJob.getCurrentSession(), m_loadingMinDate, m_loadingMaxDate, m_result);
+          interceptLoadItemsInBackground(ClientSyncJob.getCurrentSession(), m_loadingMinDate, m_loadingMaxDate, m_result);
         }
         catch (ProcessingException e) {
           if (!e.isInterruption()) {
             LOG.error(null, e);
           }
         }
-        if (!m_result.isEmpty()) {
-          ClientSyncJob setItemsJob = new ClientSyncJob(AbstractCalendarItemProvider.this.getClass().getSimpleName() + " setItems", ClientSyncJob.getCurrentSession()) {
-            @Override
-            protected void runVoid(IProgressMonitor monitor2) throws Throwable {
-              synchronized (AbstractCalendarItemProvider.this) {
-                if (!monitor.isCanceled()) {
-                  setItemsInternal(m_loadingMinDate, m_loadingMaxDate, m_result);
-                  reschedule(monitor);
-                }
+        ClientSyncJob setItemsJob = new ClientSyncJob(AbstractCalendarItemProvider.this.getClass().getSimpleName() + " setItems", ClientSyncJob.getCurrentSession()) {
+          @Override
+          protected void runVoid(IProgressMonitor monitor2) throws Throwable {
+            synchronized (AbstractCalendarItemProvider.this) {
+              if (!monitor.isCanceled()) {
+                setItemsInternal(m_loadingMinDate, m_loadingMaxDate, m_result);
+                reschedule(monitor);
               }
             }
+          }
 
-            private void reschedule(final IProgressMonitor monitor2) {
-              long n = getRefreshIntervalMillis();
-              if (n > 0 && !monitor2.isCanceled()) {
-                //-> Rescheduling (and cancelling a currently running job) should only happen, if a previous job actually succeeded in loading the calendar items
-                //    AND loading dates are still consistent with ui (If they are not consistent, monitor is cancled during setItemsInternal(...))
-                loadItemsAsyncInternal(ClientSyncJob.getCurrentSession(), m_loadingMinDate, m_loadingMaxDate, n);
-              }
+          private void reschedule(final IProgressMonitor monitor2) {
+            long n = getRefreshIntervalMillis();
+            if (n > 0 && !monitor2.isCanceled()) {
+              //-> Rescheduling (and cancelling a currently running job) should only happen, if a previous job actually succeeded in loading the calendar items
+              //    AND loading dates are still consistent with ui (If they are not consistent, monitor is cancled during setItemsInternal(...))
+              loadItemsAsyncInternal(ClientSyncJob.getCurrentSession(), m_loadingMinDate, m_loadingMaxDate, n);
             }
-          };
-          setItemsJob.schedule();
-          try {
-            setItemsJob.join();
           }
-          catch (InterruptedException e) {
-            // nop
-          }
+        };
+        setItemsJob.schedule();
+        try {
+          setItemsJob.join();
+        }
+        catch (InterruptedException e) {
+          // nop
         }
         setLoadInProgressInSyncJob(false);
       }
@@ -435,4 +488,70 @@ public abstract class AbstractCalendarItemProvider extends AbstractPropertyObser
     }
   }
 
+  /**
+   * The extension delegating to the local methods. This Extension is always at the end of the chain and will not call
+   * any further chain elements.
+   */
+  protected static class LocalCalendarItemProviderExtension<OWNER extends AbstractCalendarItemProvider> extends AbstractExtension<OWNER> implements ICalendarItemProviderExtension<OWNER> {
+
+    public LocalCalendarItemProviderExtension(OWNER owner) {
+      super(owner);
+    }
+
+    @Override
+    public void execLoadItems(CalendarItemProviderLoadItemsChain chain, Date minDate, Date maxDate, Set<ICalendarItem> result) throws ProcessingException {
+      getOwner().execLoadItems(minDate, maxDate, result);
+    }
+
+    @Override
+    public void execItemAction(CalendarItemProviderItemActionChain chain, ICalendarItem item) throws ProcessingException {
+      getOwner().execItemAction(item);
+    }
+
+    @Override
+    public void execLoadItemsInBackground(CalendarItemProviderLoadItemsInBackgroundChain chain, IClientSession session, Date minDate, Date maxDate, Set<ICalendarItem> result) throws ProcessingException {
+      getOwner().execLoadItemsInBackground(session, minDate, maxDate, result);
+    }
+
+    @Override
+    public void execItemMoved(CalendarItemProviderItemMovedChain chain, ICalendarItem item, Date newDate) throws ProcessingException {
+      getOwner().execItemMoved(item, newDate);
+    }
+
+    @Override
+    public void execDecorateCell(CalendarItemProviderDecorateCellChain chain, Cell cell, ICalendarItem item) throws ProcessingException {
+      getOwner().execDecorateCell(cell, item);
+    }
+
+  }
+
+  protected final void interceptLoadItems(Date minDate, Date maxDate, Set<ICalendarItem> result) throws ProcessingException {
+    List<? extends ICalendarItemProviderExtension<? extends AbstractCalendarItemProvider>> extensions = getAllExtensions();
+    CalendarItemProviderLoadItemsChain chain = new CalendarItemProviderLoadItemsChain(extensions);
+    chain.execLoadItems(minDate, maxDate, result);
+  }
+
+  protected final void interceptItemAction(ICalendarItem item) throws ProcessingException {
+    List<? extends ICalendarItemProviderExtension<? extends AbstractCalendarItemProvider>> extensions = getAllExtensions();
+    CalendarItemProviderItemActionChain chain = new CalendarItemProviderItemActionChain(extensions);
+    chain.execItemAction(item);
+  }
+
+  protected final void interceptLoadItemsInBackground(IClientSession session, Date minDate, Date maxDate, Set<ICalendarItem> result) throws ProcessingException {
+    List<? extends ICalendarItemProviderExtension<? extends AbstractCalendarItemProvider>> extensions = getAllExtensions();
+    CalendarItemProviderLoadItemsInBackgroundChain chain = new CalendarItemProviderLoadItemsInBackgroundChain(extensions);
+    chain.execLoadItemsInBackground(session, minDate, maxDate, result);
+  }
+
+  protected final void interceptItemMoved(ICalendarItem item, Date newDate) throws ProcessingException {
+    List<? extends ICalendarItemProviderExtension<? extends AbstractCalendarItemProvider>> extensions = getAllExtensions();
+    CalendarItemProviderItemMovedChain chain = new CalendarItemProviderItemMovedChain(extensions);
+    chain.execItemMoved(item, newDate);
+  }
+
+  protected final void interceptDecorateCell(Cell cell, ICalendarItem item) throws ProcessingException {
+    List<? extends ICalendarItemProviderExtension<? extends AbstractCalendarItemProvider>> extensions = getAllExtensions();
+    CalendarItemProviderDecorateCellChain chain = new CalendarItemProviderDecorateCellChain(extensions);
+    chain.execDecorateCell(cell, item);
+  }
 }

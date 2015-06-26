@@ -10,32 +10,58 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.basic.table.columns;
 
+import java.util.List;
+
+import org.eclipse.scout.commons.ConfigurationUtility;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.TypeCastUtility;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
 import org.eclipse.scout.commons.annotations.Order;
+import org.eclipse.scout.commons.annotations.OrderedCollection;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
-import org.eclipse.scout.rt.client.services.lookup.ILookupCallProvisioningService;
-import org.eclipse.scout.rt.client.services.lookup.TableProvisioningContext;
+import org.eclipse.scout.rt.client.extension.ui.basic.table.columns.IColumnExtension;
+import org.eclipse.scout.rt.client.extension.ui.basic.table.columns.IMixedSmartColumnExtension;
+import org.eclipse.scout.rt.client.extension.ui.basic.table.columns.MixedSmartColumnChains.MixedSmartColumnConvertKeyToValueChain;
+import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 import org.eclipse.scout.rt.client.ui.basic.table.ITableRow;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.smartfield.AbstractMixedSmartField;
+import org.eclipse.scout.rt.client.ui.form.fields.smartfield.AbstractSmartField;
+import org.eclipse.scout.rt.shared.extension.ContributionComposite;
+import org.eclipse.scout.rt.shared.extension.IContributionOwner;
 import org.eclipse.scout.rt.shared.services.common.code.CODES;
 import org.eclipse.scout.rt.shared.services.common.code.ICodeType;
+import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.rt.shared.services.lookup.ILookupCall;
 import org.eclipse.scout.service.SERVICES;
 
-public abstract class AbstractMixedSmartColumn<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE> extends AbstractContentAssistColumn<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE> implements IMixedSmartColumn<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE> {
+public abstract class AbstractMixedSmartColumn<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE> extends AbstractContentAssistColumn<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE> implements IMixedSmartColumn<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE>, IContributionOwner {
 
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractMixedSmartColumn.class);
 
   private boolean m_sortCodesByDisplayText;
+  private IContributionOwner m_contributionHolder;
 
   public AbstractMixedSmartColumn() {
     super();
+  }
+
+  @Override
+  public final List<Object> getAllContributions() {
+    return m_contributionHolder.getAllContributions();
+  }
+
+  @Override
+  public final <T> List<T> getContributionsByClass(Class<T> type) {
+    return m_contributionHolder.getContributionsByClass(type);
+  }
+
+  @Override
+  public final <T> T getContribution(Class<T> contribution) {
+    return m_contributionHolder.getContribution(contribution);
   }
 
   /**
@@ -44,7 +70,7 @@ public abstract class AbstractMixedSmartColumn<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE>
    * lookup call, the values are sorted by display text.
    * <p>
    * Subclasses can override this method. Default is {@code false}.
-   * 
+   *
    * @return {@code true} if values are sorted by display text, {@code false} otherwise.
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
@@ -56,7 +82,7 @@ public abstract class AbstractMixedSmartColumn<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE>
   /**
    * When the smart proposal finds no matching records and this property is not
    * null, then it displays a link or menu with this label.<br>
-   * When clicked the method {@link #execBrowseNew(String)} is invoked, which in
+   * When clicked the method {@link AbstractSmartField#execBrowseNew(String)} is invoked, which in
    * most cases is implemented as opening a "New XY..." dialog
    */
   @ConfigProperty(ConfigProperty.STRING)
@@ -67,7 +93,7 @@ public abstract class AbstractMixedSmartColumn<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE>
 
   /**
    * the default implementation simply casts one to the other type
-   * 
+   *
    * @param key
    * @return
    */
@@ -78,22 +104,10 @@ public abstract class AbstractMixedSmartColumn<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE>
     return (VALUE_TYPE) key;
   }
 
-  /**
-   * the default implementation simply casts one to the other type
-   * 
-   * @param key
-   * @return
-   */
-  @SuppressWarnings("unchecked")
-  @ConfigOperation
-  @Order(410)
-  protected LOOKUP_CALL_KEY_TYPE execConvertValueToKey(VALUE_TYPE value) {
-    return (LOOKUP_CALL_KEY_TYPE) value;
-  }
-
   @Override
   protected void initConfig() {
     super.initConfig();
+    m_contributionHolder = new ContributionComposite(this);
     setSortCodesByDisplayText(getConfiguredSortCodesByDisplayText());
   }
 
@@ -111,22 +125,6 @@ public abstract class AbstractMixedSmartColumn<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE>
   @Override
   public void setSortCodesByDisplayText(boolean b) {
     m_sortCodesByDisplayText = b;
-  }
-
-  @Override
-  public ILookupCall<LOOKUP_CALL_KEY_TYPE> prepareLookupCall(ITableRow row) {
-    if (getLookupCall() != null) {
-      ILookupCall<LOOKUP_CALL_KEY_TYPE> call = SERVICES.getService(ILookupCallProvisioningService.class).newClonedInstance(getLookupCall(), new TableProvisioningContext(getTable(), row, AbstractMixedSmartColumn.this));
-      call.setKey(execConvertValueToKey(getValueInternal(row)));
-      call.setText(null);
-      call.setAll(null);
-      call.setRec(null);
-      execPrepareLookup(call, row);
-      return call;
-    }
-    else {
-      return null;
-    }
   }
 
   @SuppressWarnings("unchecked")
@@ -166,7 +164,34 @@ public abstract class AbstractMixedSmartColumn<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE>
 
       @Override
       protected void execPrepareLookup(ILookupCall<LOOKUP_CALL_KEY_TYPE> call) throws ProcessingException {
-        AbstractMixedSmartColumn.this.execPrepareLookup(call, row);
+        AbstractMixedSmartColumn.this.interceptPrepareLookup(call, row);
+      }
+
+      @Override
+      protected LOOKUP_CALL_KEY_TYPE execConvertValueToKey(VALUE_TYPE value) {
+        return AbstractMixedSmartColumn.this.interceptConvertValueToKey(value);
+      }
+
+      @Override
+      protected VALUE_TYPE execConvertKeyToValue(LOOKUP_CALL_KEY_TYPE key) {
+        return AbstractMixedSmartColumn.this.interceptConvertKeyToValue(key);
+      }
+
+      @Override
+      protected void injectMenusInternal(OrderedCollection<IMenu> menus) {
+        Class[] menuCandidates = ConfigurationUtility.getDeclaredPublicClasses(AbstractMixedSmartColumn.this.getClass());
+        List<Class<IMenu>> menuClazzes = ConfigurationUtility.filterClasses(menuCandidates, IMenu.class);
+        for (Class<? extends IMenu> menuClazz : menuClazzes) {
+          try {
+            menus.addOrdered(ConfigurationUtility.newInnerInstance(AbstractMixedSmartColumn.this, menuClazz));
+          }
+          catch (Exception e) {
+            SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException(this.getClass().getSimpleName(), e));
+          }
+        }
+
+        List<IMenu> contributedMenus = AbstractMixedSmartColumn.this.m_contributionHolder.getContributionsByClass(IMenu.class);
+        menus.addAllOrdered(contributedMenus);
       }
     };
 
@@ -178,6 +203,7 @@ public abstract class AbstractMixedSmartColumn<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE>
     f.setActiveFilterEnabled(getConfiguredActiveFilterEnabled());
     f.setBrowseAutoExpandAll(getConfiguredBrowseAutoExpandAll());
     f.setBrowseLoadIncremental(getConfiguredBrowseLoadIncremental());
+
     return f;
   }
 
@@ -192,8 +218,8 @@ public abstract class AbstractMixedSmartColumn<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE>
         return StringUtility.compareIgnoreCase(s1, s2);
       }
       else {
-        LOOKUP_CALL_KEY_TYPE t1 = execConvertValueToKey(getValue(r1));
-        LOOKUP_CALL_KEY_TYPE t2 = execConvertValueToKey(getValue(r2));
+        LOOKUP_CALL_KEY_TYPE t1 = interceptConvertValueToKey(getValue(r1));
+        LOOKUP_CALL_KEY_TYPE t2 = interceptConvertValueToKey(getValue(r2));
         Integer sort1 = (t1 != null ? codeType.getCodeIndex(t1) : -1);
         Integer sort2 = (t2 != null ? codeType.getCodeIndex(t2) : -1);
         int c = sort1.compareTo(sort2);
@@ -208,5 +234,28 @@ public abstract class AbstractMixedSmartColumn<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE>
     else {
       return super.compareTableRows(r1, r2);
     }
+  }
+
+  protected final VALUE_TYPE interceptConvertKeyToValue(LOOKUP_CALL_KEY_TYPE key) {
+    List<? extends IColumnExtension<VALUE_TYPE, ? extends AbstractColumn<VALUE_TYPE>>> extensions = getAllExtensions();
+    MixedSmartColumnConvertKeyToValueChain<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE> chain = new MixedSmartColumnConvertKeyToValueChain<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE>(extensions);
+    return chain.execConvertKeyToValue(key);
+  }
+
+  protected static class LocalMixedSmartColumnExtension<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE, OWNER extends AbstractMixedSmartColumn<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE>> extends LocalContentAssistColumnExtension<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE, OWNER> implements IMixedSmartColumnExtension<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE, OWNER> {
+
+    public LocalMixedSmartColumnExtension(OWNER owner) {
+      super(owner);
+    }
+
+    @Override
+    public VALUE_TYPE execConvertKeyToValue(MixedSmartColumnConvertKeyToValueChain<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE> chain, LOOKUP_CALL_KEY_TYPE key) {
+      return getOwner().execConvertKeyToValue(key);
+    }
+  }
+
+  @Override
+  protected IMixedSmartColumnExtension<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE, ? extends AbstractMixedSmartColumn<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE>> createLocalExtension() {
+    return new LocalMixedSmartColumnExtension<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE, AbstractMixedSmartColumn<VALUE_TYPE, LOOKUP_CALL_KEY_TYPE>>(this);
   }
 }

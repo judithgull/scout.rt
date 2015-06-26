@@ -24,25 +24,25 @@ import org.eclipse.scout.commons.serialization.SerializationUtility;
 import org.eclipse.scout.rt.server.admin.inspector.CallInspector;
 import org.eclipse.scout.rt.server.admin.inspector.ProcessInspector;
 import org.eclipse.scout.rt.server.admin.inspector.SessionInspector;
-import org.eclipse.scout.rt.server.internal.Activator;
 import org.eclipse.scout.rt.server.services.common.clientnotification.IClientNotificationService;
 import org.eclipse.scout.rt.server.transaction.AbstractTransactionMember;
 import org.eclipse.scout.rt.server.transaction.ITransaction;
 import org.eclipse.scout.rt.shared.ScoutTexts;
 import org.eclipse.scout.rt.shared.security.RemoteServiceAccessPermission;
 import org.eclipse.scout.rt.shared.services.common.clientnotification.IClientNotification;
-import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.rt.shared.services.common.security.ACCESS;
+import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelRequest;
+import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelResponse;
 import org.eclipse.scout.rt.shared.servicetunnel.RemoteServiceAccessDenied;
 import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelRequest;
 import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelResponse;
 import org.eclipse.scout.rt.shared.servicetunnel.VersionMismatchException;
 import org.eclipse.scout.rt.shared.validate.DefaultValidator;
 import org.eclipse.scout.rt.shared.validate.IValidationStrategy;
+import org.eclipse.scout.rt.shared.validate.IValidator;
 import org.eclipse.scout.rt.shared.validate.InputValidation;
 import org.eclipse.scout.rt.shared.validate.OutputValidation;
 import org.eclipse.scout.service.IService;
-import org.eclipse.scout.service.IService2;
 import org.eclipse.scout.service.SERVICES;
 import org.eclipse.scout.service.ServiceUtility;
 import org.osgi.framework.Bundle;
@@ -59,35 +59,39 @@ import org.osgi.framework.Version;
  * {@link #defaultValidateOutput(IValidationStrategy, Object, Method, Object, Object[])}
  * <p>
  * Set the config.ini properties to activate default validation:
- * 
+ *
  * <pre>
  *   org.eclipse.scout.rt.server.validateInput=true
  *   org.eclipse.scout.rt.server.validateOutput=false
  * </pre>
  */
-@SuppressWarnings("deprecation")
 public class DefaultTransactionDelegate {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(DefaultTransactionDelegate.class);
-  private static final Boolean VALIDATE_INPUT = "true".equals(Activator.getDefault().getBundle().getBundleContext().getProperty("org.eclipse.scout.rt.server.validateInput"));
-  private static final Boolean VALIDATE_OUTPUT = "true".equals(Activator.getDefault().getBundle().getBundleContext().getProperty("org.eclipse.scout.rt.server.validateOutput"));
 
   public static final Pattern DEFAULT_QUERY_NAMES_PATTERN = Pattern.compile("(get|is|has|load|read|find|select)([A-Z].*)?");
   public static final Pattern DEFAULT_PROCESS_NAMES_PATTERN = Pattern.compile("(set|put|add|remove|store|write|create|insert|update|delete)([A-Z].*)?");
 
   private final Version m_requestMinVersion;
   private final boolean m_debug;
-  private final Bundle[] m_loaderBundles;
   private long m_requestStart;
   private long m_requestEnd;
 
+  /**
+   * @deprecated use {@link #DefaultTransactionDelegate(Version, boolean)} instead. Will be removed in the 6.0 Release.
+   */
+  @Deprecated
   public DefaultTransactionDelegate(Bundle[] loaderBundles, Version requestMinVersion, boolean debug) {
-    m_loaderBundles = loaderBundles;
-    m_requestMinVersion = requestMinVersion;
-    m_debug = debug;
+    this(requestMinVersion, debug);
   }
 
-  public ServiceTunnelResponse invoke(ServiceTunnelRequest serviceReq) throws Exception {
-    ServiceTunnelResponse response;
+  public DefaultTransactionDelegate(Version requestMinVersion, boolean debug) {
+    m_requestMinVersion = requestMinVersion;
+    m_debug = debug;
+
+  }
+
+  public IServiceTunnelResponse invoke(IServiceTunnelRequest serviceReq) throws Exception {
+    IServiceTunnelResponse response;
     m_requestStart = System.nanoTime();
     try {
       response = invokeImpl(serviceReq);
@@ -103,16 +107,6 @@ public class DefaultTransactionDelegate {
       catch (Throwable ignore) {
         // nop
       }
-      //log it
-      if (transaction == null || !transaction.isCancelled()) {
-        if (t instanceof ProcessingException) {
-          ((ProcessingException) t).addContextMessage("invoking " + serviceReq.getServiceInterfaceClassName() + ":" + serviceReq.getOperation());
-          SERVICES.getService(IExceptionHandlerService.class).handleException((ProcessingException) t);
-        }
-        else {
-          LOG.error("invoking " + serviceReq.getServiceInterfaceClassName() + ":" + serviceReq.getOperation(), t);
-        }
-      }
       Throwable p = replaceOutboundException(t);
       response = new ServiceTunnelResponse(null, null, p);
     }
@@ -122,8 +116,14 @@ public class DefaultTransactionDelegate {
       }
     }
     m_requestEnd = System.nanoTime();
-    response.setProcessingDuration((m_requestEnd - m_requestStart) / 1000000L);
+    if (response instanceof ServiceTunnelResponse) {
+      ((ServiceTunnelResponse) response).setProcessingDuration((m_requestEnd - m_requestStart) / 1000000L);
+    }
     return response;
+  }
+
+  protected IValidator createValidator(IValidationStrategy validationStrategy) {
+    return new DefaultValidator(validationStrategy);
   }
 
   /**
@@ -148,7 +148,7 @@ public class DefaultTransactionDelegate {
   /**
    * This method is executed within a {@link IServerSession} context using a {@link ServerJob}
    */
-  protected ServiceTunnelResponse invokeImpl(ServiceTunnelRequest serviceReq) throws Throwable {
+  protected IServiceTunnelResponse invokeImpl(IServiceTunnelRequest serviceReq) throws Throwable {
     String soapOperation = ServiceTunnelRequest.toSoapOperation(serviceReq.getServiceInterfaceClassName(), serviceReq.getOperation());
     IServerSession serverSession = ThreadContext.getServerSession();
     String authenticatedUser = serverSession.getUserId();
@@ -163,7 +163,7 @@ public class DefaultTransactionDelegate {
       }
       Version requestVersion = Version.parseVersion(v);
       if (requestVersion.compareTo(m_requestMinVersion) < 0) {
-        ServiceTunnelResponse serviceRes = new ServiceTunnelResponse(null, null, new VersionMismatchException(requestVersion.toString(), m_requestMinVersion.toString()));
+        IServiceTunnelResponse serviceRes = new ServiceTunnelResponse(null, null, new VersionMismatchException(requestVersion.toString(), m_requestMinVersion.toString()));
         return serviceRes;
       }
     }
@@ -271,7 +271,7 @@ public class DefaultTransactionDelegate {
       throw new SecurityException("access denied (code 1c).");
     }
     //exists
-    if (verifyMethod.getDeclaringClass() == IService.class || verifyMethod.getDeclaringClass() == IService2.class) {
+    if (verifyMethod.getDeclaringClass() == IService.class) {
       throw new SecurityException("access denied (code 1d).");
     }
     //continue
@@ -335,18 +335,18 @@ public class DefaultTransactionDelegate {
   }
 
   /**
-   * Validate inbound data.Called by {@link #invokeImpl(ServiceTunnelRequest)}.
+   * Validate inbound data.Called by {@link #invokeImpl(IServiceTunnelRequest)}.
    * <p>
    * For default handling use
-   * 
+   *
    * <pre>
-   * new {@link DefaultValidator#DefaultValidator(IValidationStrategy)}.validate()
+   * the validation methods of {@link #createValidator(IValidationStrategy)}
    * </pre>
    * <p>
    * Override this method to do central input validation inside the transaction context.
    * <p>
    * This method is part of the protected api and can be overridden.
-   * 
+   *
    * @param validationStrategy
    *          may be null, add corresponding null handling.
    */
@@ -355,11 +355,11 @@ public class DefaultTransactionDelegate {
   }
 
   protected void defaultValidateInput(IValidationStrategy validationStrategy, Object service, Method op, Object[] args) throws Exception {
-    new DefaultValidator(validationStrategy).validateMethodCall(op, args);
+    createValidator(validationStrategy).validateMethodCall(op, args);
   }
 
   /**
-   * Validate outbound data. Default does nothing. Called by {@link #invokeImpl(ServiceTunnelRequest)}.
+   * Validate outbound data. Default does nothing. Called by {@link #invokeImpl(IServiceTunnelRequest)}.
    * Override this method to do central output validation inside the transaction context.
    * <p>
    * This method is part of the protected api and can be overridden.
@@ -370,7 +370,7 @@ public class DefaultTransactionDelegate {
 
   protected void defaultValidateOutput(IValidationStrategy validationStrategy, Object service, Method op, Object returnValue, Object[] outArgs) throws Exception {
     if ((outArgs != null && outArgs.length > 0) || returnValue != null) {
-      DefaultValidator v = new DefaultValidator(validationStrategy);
+      IValidator v = createValidator(validationStrategy);
       if (outArgs != null && outArgs.length > 0) {
         for (Object arg : outArgs) {
           v.validateParameter(arg, null);
@@ -423,7 +423,7 @@ public class DefaultTransactionDelegate {
 
   /**
    * Pass 2 decides the strategy by java bean, collections framework and business process naming
-   * 
+   *
    * <pre>
    * <i>Java bean naming</i>
    * {@link IValidationStrategy.QUERY}: get*, is*

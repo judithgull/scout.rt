@@ -15,8 +15,11 @@ import java.beans.PropertyChangeListener;
 import java.util.Date;
 import java.util.List;
 
+import org.eclipse.scout.commons.job.JobEx;
 import org.eclipse.scout.rt.client.ui.action.ActionUtility;
+import org.eclipse.scout.rt.client.ui.action.IActionFilter;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.root.ICalendarContextMenu;
 import org.eclipse.scout.rt.client.ui.basic.calendar.CalendarComponent;
 import org.eclipse.scout.rt.client.ui.basic.calendar.ICalendar;
 import org.eclipse.scout.rt.client.ui.form.fields.calendarfield.ICalendarField;
@@ -236,7 +239,10 @@ public class RwtScoutCalendarField extends AbstractRwtScoutSvgComposite<ICalenda
   }
 
   private List<IMenu> getContextMenusFromScout() {
-    return RwtMenuUtility.collectMenus(getScoutObject().getCalendar(), true, true, getUiEnvironment());
+    ICalendarContextMenu contextMenu = getScoutObject().getCalendar().getContextMenu();
+    IActionFilter actionFilter = ActionUtility.createMenuFilterMenuTypes(contextMenu.getCurrentMenuTypes(), true);
+    List<IMenu> normalizedActions = ActionUtility.normalizedActions(contextMenu.getChildActions(), actionFilter);
+    return normalizedActions;
   }
 
   private final class P_InnerCalendarPropertyChangeListener implements PropertyChangeListener {
@@ -246,9 +252,9 @@ public class RwtScoutCalendarField extends AbstractRwtScoutSvgComposite<ICalenda
       if (isIgnoredScoutEvent(PropertyChangeEvent.class, e.getPropertyName())) {
         return;
       }
-      if (isHandleScoutPropertyChange(e.getPropertyName(), e.getNewValue()) &&
-          getUiEnvironment().getDisplay() != null &&
-          !getUiEnvironment().getDisplay().isDisposed()) {
+      if (isHandleScoutPropertyChange(e.getPropertyName(), e.getNewValue())
+          && getUiEnvironment().getDisplay() != null
+          && !getUiEnvironment().getDisplay().isDisposed()) {
         Runnable t = new Runnable() {
           @Override
           public void run() {
@@ -278,9 +284,23 @@ public class RwtScoutCalendarField extends AbstractRwtScoutSvgComposite<ICalenda
     @Override
     public void menuShown(MenuEvent e) {
       super.menuShown(e);
-
       Menu menu = ((Menu) e.getSource());
-      RwtMenuUtility.fillMenu(menu, getContextMenusFromScout(), ActionUtility.createVisibleFilter(), RwtScoutCalendarField.this.getUiEnvironment());
+      final ICalendarContextMenu contextMenu = getScoutObject().getCalendar().getContextMenu();
+      Runnable t = new Runnable() {
+        @Override
+        public void run() {
+          contextMenu.callAboutToShow(ActionUtility.createMenuFilterMenuTypes(contextMenu.getCurrentMenuTypes(), false));
+        }
+      };
+      JobEx job = getUiEnvironment().invokeScoutLater(t, 1200);
+      try {
+        job.join(1200);
+      }
+      catch (InterruptedException ex) {
+        //nop
+      }
+      IActionFilter displayFilter = ActionUtility.createMenuFilterMenuTypes(contextMenu.getCurrentMenuTypes(), true);
+      RwtMenuUtility.fillMenu(menu, contextMenu.getChildActions(), displayFilter, RwtScoutCalendarField.this.getUiEnvironment());
     }
   } // end class P_ContextMenuListener
 

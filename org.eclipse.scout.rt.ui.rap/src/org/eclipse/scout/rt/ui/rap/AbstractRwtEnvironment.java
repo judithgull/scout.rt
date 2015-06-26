@@ -12,7 +12,8 @@ package org.eclipse.scout.rt.ui.rap;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-import java.io.Serializable;
+import java.net.URL;
+import java.security.AccessController;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -22,6 +23,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import javax.security.auth.Subject;
 import javax.servlet.http.HttpSession;
@@ -30,13 +32,18 @@ import javax.servlet.http.HttpSessionBindingListener;
 
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
-import org.eclipse.core.runtime.NullProgressMonitor;
+import org.eclipse.core.runtime.Platform;
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.rap.rwt.RWT;
-import org.eclipse.rap.rwt.lifecycle.PhaseEvent;
-import org.eclipse.rap.rwt.lifecycle.PhaseId;
-import org.eclipse.rap.rwt.lifecycle.PhaseListener;
+import org.eclipse.rap.rwt.application.AbstractEntryPoint;
+import org.eclipse.rap.rwt.internal.application.ApplicationContextImpl;
+import org.eclipse.rap.rwt.internal.protocol.RequestMessage;
+import org.eclipse.rap.rwt.internal.protocol.ResponseMessage;
+import org.eclipse.rap.rwt.internal.remote.MessageFilter;
+import org.eclipse.rap.rwt.internal.remote.MessageFilterChain;
+import org.eclipse.rap.rwt.service.UISession;
 import org.eclipse.scout.commons.CollectionUtility;
+import org.eclipse.scout.commons.CompareUtility;
 import org.eclipse.scout.commons.EventListenerList;
 import org.eclipse.scout.commons.LocaleThreadLocal;
 import org.eclipse.scout.commons.StringUtility;
@@ -44,7 +51,7 @@ import org.eclipse.scout.commons.exception.IProcessingStatus;
 import org.eclipse.scout.commons.job.JobEx;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
-import org.eclipse.scout.rt.client.ClientAsyncJob;
+import org.eclipse.scout.rt.client.ClientJob;
 import org.eclipse.scout.rt.client.ClientSyncJob;
 import org.eclipse.scout.rt.client.IClientSession;
 import org.eclipse.scout.rt.client.ILocaleListener;
@@ -66,7 +73,6 @@ import org.eclipse.scout.rt.shared.ui.UiDeviceType;
 import org.eclipse.scout.rt.shared.ui.UiLayer;
 import org.eclipse.scout.rt.shared.ui.UserAgent;
 import org.eclipse.scout.rt.ui.rap.basic.IRwtScoutComposite;
-import org.eclipse.scout.rt.ui.rap.basic.WidgetPrinter;
 import org.eclipse.scout.rt.ui.rap.busy.RwtBusyHandler;
 import org.eclipse.scout.rt.ui.rap.concurrency.RwtScoutSynchronizer;
 import org.eclipse.scout.rt.ui.rap.extension.UiDecorationExtensionPoint;
@@ -76,6 +82,7 @@ import org.eclipse.scout.rt.ui.rap.form.fields.IRwtScoutFormField;
 import org.eclipse.scout.rt.ui.rap.html.HtmlAdapter;
 import org.eclipse.scout.rt.ui.rap.keystroke.IRwtKeyStroke;
 import org.eclipse.scout.rt.ui.rap.keystroke.KeyStrokeManager;
+import org.eclipse.scout.rt.ui.rap.patches.PatchInstaller;
 import org.eclipse.scout.rt.ui.rap.servletfilter.LogoutFilter;
 import org.eclipse.scout.rt.ui.rap.servletfilter.LogoutHandler;
 import org.eclipse.scout.rt.ui.rap.util.ColorFactory;
@@ -92,8 +99,7 @@ import org.eclipse.scout.rt.ui.rap.window.desktop.IRwtScoutFormFooter;
 import org.eclipse.scout.rt.ui.rap.window.desktop.IRwtScoutFormHeader;
 import org.eclipse.scout.rt.ui.rap.window.desktop.navigation.RwtScoutNavigationSupport;
 import org.eclipse.scout.rt.ui.rap.window.dialog.RwtScoutDialog;
-import org.eclipse.scout.rt.ui.rap.window.filechooser.IRwtScoutFileChooser;
-import org.eclipse.scout.rt.ui.rap.window.filechooser.IRwtScoutFileChooserService;
+import org.eclipse.scout.rt.ui.rap.window.filechooser.RwtScoutFileChooser;
 import org.eclipse.scout.rt.ui.rap.window.messagebox.RwtScoutMessageBoxDialog;
 import org.eclipse.scout.rt.ui.rap.window.popup.RwtScoutPopup;
 import org.eclipse.scout.service.SERVICES;
@@ -118,11 +124,12 @@ import org.eclipse.swt.widgets.TrayItem;
 import org.eclipse.ui.forms.widgets.Form;
 import org.eclipse.ui.forms.widgets.FormToolkit;
 import org.osgi.framework.Bundle;
-import org.osgi.framework.Version;
 
-@SuppressWarnings("deprecation")
-public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
+@SuppressWarnings("restriction")
+public abstract class AbstractRwtEnvironment extends AbstractEntryPoint implements IRwtEnvironment {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractRwtEnvironment.class);
+
+  private static final String CLIENT_SESSION_LIFECYCLE = AbstractRwtEnvironment.class.getName() + "#CSL";
 
   private Subject m_subject;
 
@@ -170,7 +177,6 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
     m_applicationBundle = applicationBundle;
     m_clientSessionClazz = clientSessionClazz;
     m_environmentListeners = new EventListenerList();
-    m_requestInterceptor = new P_RequestInterceptor();
     //Linked hash map to preserve the order of the opening
     m_openForms = new LinkedHashMap<IForm, IRwtScoutPart>();
     m_status = RwtEnvironmentEvent.INACTIVE;
@@ -225,61 +231,58 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
   }
 
   /**
-   * This method is synchronized because the UI thread disposing the old environment has to run first before the
-   * {@link P_HttpSessionInvalidationListener}) continues to close the desktop. Synchronization is done on the
-   * environment instance.
+   * This method is called when the {@link Display} of this environment is disposed.
    */
-  protected synchronized void dispose() {
-    try {
-      closeFormParts();
-      if (m_historySupport != null) {
-        m_historySupport.uninstall();
-        m_historySupport = null;
+  protected void dispose() {
+    closeFormParts();
+    if (m_historySupport != null) {
+      m_historySupport.uninstall();
+      m_historySupport = null;
+    }
+    if (m_desktopKeyStrokes != null) {
+      for (IRwtKeyStroke uiKeyStroke : m_desktopKeyStrokes) {
+        removeGlobalKeyStroke(uiKeyStroke);
       }
-      if (m_desktopKeyStrokes != null) {
-        for (IRwtKeyStroke uiKeyStroke : m_desktopKeyStrokes) {
-          removeGlobalKeyStroke(uiKeyStroke);
-        }
-        m_desktopKeyStrokes.clear();
+      m_desktopKeyStrokes.clear();
+    }
+    if (m_iconLocator != null) {
+      m_iconLocator.dispose();
+      m_iconLocator = null;
+    }
+    if (m_colorFactory != null) {
+      m_colorFactory.dispose();
+      m_colorFactory = null;
+    }
+    m_keyStrokeManager = null;
+    if (m_fontRegistry != null) {
+      m_fontRegistry.dispose();
+      m_fontRegistry = null;
+    }
+    if (m_formToolkit != null) {
+      m_formToolkit.dispose();
+      m_formToolkit = null;
+    }
+    detachScoutListeners();
+    if (m_synchronizer != null) {
+      m_synchronizer = null;
+    }
+    detachBusyHandler();
+    if (m_requestInterceptor != null) {
+      /**
+       * TODO: remove cast and restriction annotation when
+       * {@link ApplicationContextImpl#addMessageFilter(MessageFilter)} is API
+       */
+      ApplicationContextImpl impl = (ApplicationContextImpl) RWT.getApplicationContext();
+      if (impl != null) {
+        impl.removeMessageFilter(m_requestInterceptor);
       }
-      if (m_iconLocator != null) {
-        m_iconLocator.dispose();
-        m_iconLocator = null;
-      }
-      if (m_colorFactory != null) {
-        m_colorFactory.dispose();
-        m_colorFactory = null;
-      }
-      m_keyStrokeManager = null;
-      if (m_fontRegistry != null) {
-        m_fontRegistry.dispose();
-        m_fontRegistry = null;
-      }
-      if (m_formToolkit != null) {
-        m_formToolkit.dispose();
-        m_formToolkit = null;
-      }
-      detachScoutListeners();
-      if (m_synchronizer != null) {
-        m_synchronizer = null;
-      }
-      detachBusyHandler();
-      if (m_requestInterceptor != null) {
-        RWT.getLifeCycle().removePhaseListener(m_requestInterceptor);
-        m_requestInterceptor = null;
-      }
+      m_requestInterceptor = null;
+    }
 
-      m_status = RwtEnvironmentEvent.STOPPED;
-      fireEnvironmentChanged(new RwtEnvironmentEvent(this, RwtEnvironmentEvent.STOPPED));
-    }
-    finally {
-      notifyAll();
-    }
+    m_status = RwtEnvironmentEvent.STOPPED;
+    fireEnvironmentChanged(new RwtEnvironmentEvent(this, RwtEnvironmentEvent.STOPPED));
   }
 
-  /**
-   * @see {@link LogoutFilter}
-   */
   protected String getLogoutLocation() {
     String path = RWT.getRequest().getServletPath();
 
@@ -347,9 +350,18 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
       m_status = RwtEnvironmentEvent.STARTING;
 
       // enable HTTP request handling
-      // the first beforeRequest-event has to be fired manually, because currently no PhaseListener is attached
-      beforeHttpRequest();
-      RWT.getLifeCycle().addPhaseListener(m_requestInterceptor);
+      // the first beforeRequest-event has to be fired manually, because currently no MessageFilter is attached
+      beforeHttpRequestInternal();
+      m_requestInterceptor = new P_RequestInterceptor(RWT.getUISession().getId());
+
+      /**
+       * TODO: remove cast and restriction annotation when
+       * {@link ApplicationContextImpl#addMessageFilter(MessageFilter)} is API
+       */
+      ApplicationContextImpl impl = (ApplicationContextImpl) RWT.getApplicationContext();
+      if (impl != null) {
+        impl.addMessageFilter(m_requestInterceptor);
+      }
 
       fireEnvironmentChanged(new RwtEnvironmentEvent(this, m_status));
 
@@ -372,9 +384,7 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
       m_desktop = m_clientSession.getDesktop();
 
       // init RWT locale with the locale of the client session
-      if (clientSession.getLocale() != null && !clientSession.getLocale().equals(RWT.getLocale())) {
-        RWT.setLocale(clientSession.getLocale());
-      }
+      setLocaleInUi(clientSession.getLocale());
 
       if (m_synchronizer == null) {
         m_synchronizer = new RwtScoutSynchronizer(this);
@@ -410,6 +420,9 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
       }
       applyScoutState();
 
+      // Discovers and installs RAP JavaScript patches.
+      installPatches();
+
       // notify ui available
       // notify desktop that it is loaded
       new ClientSyncJob("Desktop opened", getClientSession()) {
@@ -438,33 +451,77 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
   }
 
   /**
-   * As default, the {@link IClientSession} is attached to the http session. This means, the client session lives as
-   * long the http session lives. If the http session expires, the client session will be stopped.
-   * <p>
-   * This method creates and loads a new client session if there is no client session attached to the http session yet.
-   * If there already is one attached, the attached session will be returned.
+   * This method is called every time a new {@link UISession} is created. This happens if:
+   * <ul>
+   * <li>the user visits the web application for the first time;</li>
+   * <li>the user reloads the web application by either the browser's address bar or reload button;</li>
+   * </ul>
+   * To enhance the user's experience, a new {@link IClientSession} is only created once the user enters the application
+   * for the first time, accesses the web application in another resolution (e.g. /tablet instead of /web) or a
+   * different {@link Subject} or the {@link HttpSession} was invalidated due to a session timeout.
    */
   protected IClientSession initClientSession(UserAgent userAgent) {
-    HttpSession httpSession = RWT.getUISession().getHttpSession();
-    IClientSession clientSession = (IClientSession) httpSession.getAttribute(IClientSession.class.getName());
-    if (clientSession != null) {
-      //If the subject has changed always create a new clientSession
-      //Also create a new clientSession if the userAgent changed (f.e. switch from /web to /mobile)
-      if (!getSubject().equals(clientSession.getSubject()) || !userAgent.equals(clientSession.getUserAgent())) {
-        //Force client session shutdown
-        httpSession.setAttribute(P_HttpSessionInvalidationListener.class.getName(), null);
-        //Make sure a new client session will be initialized
-        clientSession = null;
-      }
-    }
+    final HttpSession httpSession = RWT.getUISession().getHttpSession();
+    final IClientSession clientSession = (IClientSession) httpSession.getAttribute(IClientSession.class.getName());
+
+    // Create ClientSession at first login.
     if (clientSession == null || !clientSession.isActive()) {
-      LocaleThreadLocal.set(RwtUtility.getBrowserInfo().getLocale());
-      clientSession = SERVICES.getService(IClientSessionRegistryService.class).newClientSession(m_clientSessionClazz, getSubject(), UUID.randomUUID().toString(), userAgent);
-
-      httpSession.setAttribute(IClientSession.class.getName(), clientSession);
-      httpSession.setAttribute(P_HttpSessionInvalidationListener.class.getName(), new P_HttpSessionInvalidationListener(clientSession, this));
+      return createNewSession(httpSession, userAgent);
     }
 
+    // Create ClientSession at subject or userAgent change.
+    boolean subjectChanged = !getSubject().equals(clientSession.getSubject());
+    boolean userAgentChanged = !userAgent.equals(clientSession.getUserAgent());
+
+    if (subjectChanged || userAgentChanged) {
+      httpSession.setAttribute(CLIENT_SESSION_LIFECYCLE, null); // Close the current session by removing the attribute from the httpSession - this triggers the valueUnbound method which in turn destroys the ClientSession.
+      return createNewSession(httpSession, userAgent);
+    }
+
+    return clientSession;
+  }
+
+  /**
+   * Callback for creating a new {@link IClientSession}.
+   */
+  protected IClientSession createNewSession(HttpSession httpSession, UserAgent userAgent) {
+    // Create and register a new ClientSession.
+    LocaleThreadLocal.set(RwtUtility.getBrowserInfo().getLocale());
+    final IClientSession clientSession = SERVICES.getService(IClientSessionRegistryService.class).newClientSession(m_clientSessionClazz, getSubject(), UUID.randomUUID().toString(), userAgent);
+
+    httpSession.setAttribute(IClientSession.class.getName(), clientSession);
+
+    // Register callback for HttpSession-invalidation.
+    httpSession.setAttribute(CLIENT_SESSION_LIFECYCLE, new HttpSessionBindingListener() {
+
+      @Override
+      public void valueBound(HttpSessionBindingEvent event) {
+        // NOOP
+      }
+
+      @Override
+      public void valueUnbound(final HttpSessionBindingEvent event) {
+        try {
+          destroyApplication(event, clientSession);
+        }
+        catch (Exception e) {
+          String msg = new StringBuilder()
+          .append(" [thread=").append(Thread.currentThread())
+          .append(", httpSession=").append(event.getSession().getId())
+          .append(", clientSession=").append(clientSession)
+          .append(", environment=").append(AbstractRwtEnvironment.this)
+          .append(", userAgent=").append(clientSession.getUserAgent())
+          .append("]").toString();
+
+          if (Platform.isRunning()) {
+            LOG.error("Failed to stop application." + msg, e);
+          }
+          else {
+            LOG.warn("Failed to stop application because platform was already terminated." + msg, e);
+          }
+        }
+      }
+    });
     return clientSession;
   }
 
@@ -481,11 +538,15 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
   /**
    * Do NOT override this internal method, instead use {@link #beforeHttpRequest()}.
    */
-  protected void beforeHttpRequestInternal() {
-    if (getClientSession() != null) {
-      LocaleThreadLocal.set(getClientSession().getLocale());
+  protected final void beforeHttpRequestInternal() {
+    IClientSession clientSession = getClientSession();
+    if (clientSession != null) {
+      setLocaleInUi(clientSession.getLocale());
+      // update subject which can be changed by the web container without relogin (f.e. on WebSphere with an LTPA token authentication)
+      Subject subject = Subject.getSubject(AccessController.getContext());
+      setSubject(subject);
+      getClientSession().setSubject(subject);
     }
-
     beforeHttpRequest();
   }
 
@@ -498,7 +559,7 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
   /**
    * Do NOT override this internal method, instead use {@link #afterHttpRequest()}.
    */
-  protected void afterHttpRequestInternal() {
+  protected final void afterHttpRequestInternal() {
     afterHttpRequest();
   }
 
@@ -790,12 +851,7 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
 
   @Override
   public void showFileChooserFromScout(IFileChooser fileChooser) {
-    IRwtScoutFileChooserService rwtScoutFileChooserService = SERVICES.getService(IRwtScoutFileChooserService.class);
-    if (rwtScoutFileChooserService == null) {
-      LOG.warn("Missing bundle: org.eclipse.scout.rt.ui.rap.incubator.filechooser. Please activate it in your Scout perspective under Technologies.");
-      return;
-    }
-    IRwtScoutFileChooser sfc = rwtScoutFileChooserService.createFileChooser(getParentShellIgnoringPopups(SWT.SYSTEM_MODAL | SWT.APPLICATION_MODAL | SWT.MODELESS), fileChooser);
+    RwtScoutFileChooser sfc = new RwtScoutFileChooser(getParentShellIgnoringPopups(SWT.SYSTEM_MODAL | SWT.APPLICATION_MODAL | SWT.MODELESS), fileChooser);
     sfc.showFileChooser();
   }
 
@@ -933,6 +989,19 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
     m_popupOwnerBounds = ownerBounds;
   }
 
+  public IForm findActiveForm() {
+    Control comp = getDisplay().getFocusControl();
+    while (comp != null) {
+      Object o = comp.getData(IRwtScoutFormField.CLIENT_PROPERTY_SCOUT_OBJECT);
+      if (o instanceof IForm) {
+        return (IForm) o;
+      }
+      // next
+      comp = comp.getParent();
+    }
+    return null;
+  }
+
   @Override
   public void showFormPart(IForm form) {
     if (form == null) {
@@ -1037,15 +1106,7 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
             break;
           }
           case IProcessingStatus.CANCEL: {
-            //Necessary for backward compatibility to Eclipse 3.4 needed for Lotus Notes 8.5.2
-            Version frameworkVersion = new Version(Activator.getDefault().getBundle().getBundleContext().getProperty("osgi.framework.version"));
-            if (frameworkVersion.getMajor() == 3
-                && frameworkVersion.getMinor() <= 4) {
-              iconId = SWT.ICON_INFORMATION;
-            }
-            else {
-              iconId = 1 << 8;//SWT.ICON_CANCEL
-            }
+            iconId = 1 << SWT.ICON_CANCEL;
             break;
           }
           default: {
@@ -1209,10 +1270,7 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
             @Override
             public void run() {
               try {
-                IFormField f = findFocusOwnerField();
-                if (f != null) {
-                  e.setFocusedField(f);
-                }
+                e.setFocusedField(findFocusOwnerField());
               }
               finally {
                 synchronized (lock) {
@@ -1224,10 +1282,36 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
           synchronized (lock) {
             invokeUiLater(t);
             try {
-              lock.wait(2000L);
+              lock.wait(TimeUnit.SECONDS.toMillis(2));
             }
             catch (InterruptedException e1) {
-              //nop
+              LOG.warn("Interrupted while waiting for the focus owner to be found.", e1);
+            }
+          }
+          break;
+        }
+        case DesktopEvent.TYPE_FIND_ACTIVE_FORM: {
+          final Object lock = new Object();
+          Runnable t = new Runnable() {
+            @Override
+            public void run() {
+              try {
+                e.setActiveForm(findActiveForm());
+              }
+              finally {
+                synchronized (lock) {
+                  lock.notifyAll();
+                }
+              }
+            }
+          };
+          synchronized (lock) {
+            invokeUiLater(t);
+            try {
+              lock.wait(TimeUnit.SECONDS.toMillis(2));
+            }
+            catch (InterruptedException e1) {
+              LOG.warn("Interrupted while waiting for the active form to be found.", e1);
             }
           }
           break;
@@ -1356,13 +1440,7 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
   }
 
   protected void handleScoutPrintInRwt(DesktopEvent e) {
-    WidgetPrinter wp = new WidgetPrinter(getParentShellIgnoringPopups(SWT.SYSTEM_MODAL | SWT.APPLICATION_MODAL | SWT.MODELESS));
-    try {
-      wp.print(e.getPrintDevice(), e.getPrintParameters());
-    }
-    catch (Throwable ex) {
-      LOG.error(null, ex);
-    }
+    LOG.error("Printing in RAP not supported");
   }
 
   protected String getDesktopOpenedTaskText() {
@@ -1389,6 +1467,17 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
     m_activateDesktopCalled = activateDesktopCalled;
   }
 
+  protected void setLocaleInUi(Locale locale) {
+    Locale rwtLocale = RWT.getLocale();
+    Locale uiThreadLocale = LocaleThreadLocal.get();
+    if (!CompareUtility.equals(rwtLocale, locale)) {
+      RWT.setLocale(locale);
+    }
+    if (!CompareUtility.equals(uiThreadLocale, locale)) {
+      LocaleThreadLocal.set(locale);
+    }
+  }
+
   private class P_LocaleListener implements ILocaleListener {
     @Override
     public void localeChanged(LocaleChangeEvent event) {
@@ -1396,51 +1485,38 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
       invokeUiLater(new Runnable() {
         @Override
         public void run() {
-          if (!hasSameLocale(RWT.getLocale(), locale)) {
-            setLocale(locale);
-          }
+          setLocaleInUi(locale);
         }
       });
     }
-
-    private void setLocale(Locale locale) {
-      RWT.setLocale(locale);
-    }
-
-    private boolean hasSameLocale(Locale locale1, Locale locale2) {
-      boolean result = false;
-      if (locale1 != null && locale2 != null) {
-        result = locale1.equals(locale2);
-      }
-      return result;
-    }
   }
 
-  private final class P_RequestInterceptor implements PhaseListener {
-    private static final long serialVersionUID = 1L;
+  private class P_RequestInterceptor implements MessageFilter {
 
-    @Override
-    public PhaseId getPhaseId() {
-      return PhaseId.ANY;
+    private final String m_rwtUiSessionId;
+
+    public P_RequestInterceptor(String rwtUiSessionId) {
+      m_rwtUiSessionId = rwtUiSessionId;
     }
 
     @Override
-    public void beforePhase(PhaseEvent event) {
-      if (event.getPhaseId() != PhaseId.PREPARE_UI_ROOT) {
-        return;
+    public ResponseMessage handleMessage(RequestMessage request, MessageFilterChain chain) {
+      if (!isCorrespondingRwtEnvironment()) {
+        return chain.handleMessage(request);
       }
-
       beforeHttpRequestInternal();
-    }
-
-    @Override
-    public void afterPhase(PhaseEvent event) {
-      if (event.getPhaseId() != PhaseId.RENDER) {
-        return;
-      }
-
+      ResponseMessage ret = chain.handleMessage(request);
       afterHttpRequestInternal();
+      return ret;
     }
+
+    /**
+     * Checks if the current request corresponds to this Rwt-Environment.
+     */
+    protected boolean isCorrespondingRwtEnvironment() {
+      return m_rwtUiSessionId != null && m_rwtUiSessionId.equals(RWT.getUISession().getId());
+    }
+
   }
 
   private class P_DisplayDisposeListener implements Listener {
@@ -1455,52 +1531,72 @@ public abstract class AbstractRwtEnvironment implements IRwtEnvironment {
 
   }
 
-  private static final class P_HttpSessionInvalidationListener implements HttpSessionBindingListener, Serializable {
-    private static final long serialVersionUID = 7099577980770179637L;
-    private final IClientSession m_clientSession;
-    private final AbstractRwtEnvironment m_environment;
-
-    public P_HttpSessionInvalidationListener(IClientSession clientSession, AbstractRwtEnvironment environment) {
-      m_clientSession = clientSession;
-      m_environment = environment;
+  /**
+   * Destroys the application by stopping the {@link IClientSession}.
+   */
+  protected void destroyApplication(HttpSessionBindingEvent event, IClientSession clientSession) {
+    // Only stop the session if not already done, e.g. by a manual logout of the user.
+    final IDesktop desktop = clientSession.getDesktop();
+    if (!clientSession.isActive() || desktop == null || !desktop.isOpened()) {
+      return;
     }
 
-    @Override
-    public void valueBound(HttpSessionBindingEvent event) {
+    if (LOG.isInfoEnabled()) {
+      String msg = "ClientSession is going down [thread={0}, httpSession={1}, clientSession={2}, environment={3}, userAgent={4}]";
+      LOG.info(msg, new Object[]{Thread.currentThread(), event.getSession().getId(), clientSession, this, clientSession.getUserAgent()});
     }
 
-    @Override
-    public void valueUnbound(HttpSessionBindingEvent event) {
-      if (LOG.isInfoEnabled()) {
-        UserAgent userAgent = m_clientSession.getUserAgent();
-        String msg = "Thread: {0} Session goes down...; UserAgent: {2}";
-        LOG.info(msg, new Object[]{Long.valueOf(Thread.currentThread().getId()), userAgent});
-      }
+    // Synchronize with Scout model job to stop the application.
+    ClientJob job = new ClientSyncJob("HTTP session invalidator", clientSession) {
 
-      final IDesktop desktop = m_clientSession.getDesktop();
-      if (!m_clientSession.isActive() || desktop == null || !desktop.isOpened()) {
-        //client session was probably already stopped by the model itself
-        return;
+      @Override
+      protected void runVoid(IProgressMonitor monitor) throws Throwable {
+        // Fire a forced close request to prevent the user from interrupting the process in Desktop#execBeforeClosing.
+        // Mostly the shutdown process cannot be prevented anyway because #valueUnbound is called when the HttpSession gets expired
+        // except for being invoked when the user agent is switched. (see AbstractRwtEnvironment#initClientSession).
+        desktop.getUIFacade().fireDesktopClosingFromUI(true);
       }
+    };
+    job.schedule();
 
-      // wait until the environment has been stopped or a maximum of 5s before continuing to close the desktop.
-      synchronized (m_environment) {
-        if (!m_environment.isStopped()) {
-          try {
-            m_environment.wait(5000);
-          }
-          catch (InterruptedException e) {
-            LOG.warn("Interrupted while waiting for environment to stop.");
-          }
+    // Wait for the ClientSession to be stopped for maximal 30 seconds.
+    // This is necessary if the session is stopped due to an userAgent switch; otherwise, cleanup might occur on the newly created client session.
+    Object sessionLock = clientSession.getStateLock();
+    long timeoutMillis = TimeUnit.SECONDS.toMillis(30);
+    long timeoutExpires = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
+    synchronized (sessionLock) {
+      try {
+        while (clientSession.isActive() && System.nanoTime() < timeoutExpires) { // Conditional guard against spurious wakeup.
+          sessionLock.wait(timeoutMillis);
         }
       }
-
-      new ClientAsyncJob("HTTP session inactivator", m_clientSession) {
-        @Override
-        protected void runVoid(IProgressMonitor monitor) throws Throwable {
-          desktop.getUIFacade().fireDesktopClosingFromUI(true);
-        }
-      }.runNow(new NullProgressMonitor());
+      catch (InterruptedException e) {
+        LOG.error("Interrupted while waiting for the ClientSession to be stopped.", e);
+      }
     }
+  }
+
+  /**
+   * Discovers and installs JavaScript patches.
+   */
+  protected void installPatches() {
+    List<URL> patches = new ArrayList<URL>();
+
+    // Discover patches.
+    contributePatches(patches);
+
+    // Install the patches.
+    for (URL patch : patches) {
+      PatchInstaller.install(patch);
+    }
+  }
+
+  /**
+   * Overwrite this method to contribute JavaScript patches.
+   *
+   * @param patches
+   *          live-list of the JavaScript-Files to be installed.
+   */
+  protected void contributePatches(List<URL> patches) {
   }
 }

@@ -2,7 +2,7 @@
 <feature
       id="org.eclipse.scout.rt.rap.basic.target"
       label="%featureName"
-      version="4.0.0.qualifier"
+      version="5.0.0.qualifier"
       provider-name="%providerName"
       license-feature="org.eclipse.license"
       license-feature-version="0.0.0">
@@ -20,15 +20,22 @@
    </license>
 
    <url>
-      <update label="%updateSiteName" url="http://download.eclipse.org/releases/luna"/>
-      <discovery label="%updateSiteName" url="http://download.eclipse.org/releases/luna"/>
+      <update label="%updateSiteName" url="http://download.eclipse.org/releases/mars"/>
+      <discovery label="%updateSiteName" url="http://download.eclipse.org/releases/mars"/>
    </url>
 
    <plugin
          id="javax.servlet"
          download-size="0"
          install-size="0"
-         version="0.0.0"
+         version="3.1.0.v201410161800"
+         unpack="false"/>
+    
+   <plugin
+         id="javax.servlet"
+         download-size="0"
+         install-size="0"
+         version="3.0.0.v201112011016"
          unpack="false"/>
 
    <plugin

@@ -20,6 +20,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.TimeUnit;
 
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
@@ -38,7 +39,6 @@ import org.eclipse.scout.commons.exception.IProcessingStatus;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.holders.Holder;
 import org.eclipse.scout.commons.holders.IHolder;
-import org.eclipse.scout.commons.internal.runtime.CompatibilityUtility;
 import org.eclipse.scout.commons.job.JobEx;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
@@ -83,8 +83,6 @@ import org.eclipse.scout.rt.ui.swt.util.ScoutFormToolkit;
 import org.eclipse.scout.rt.ui.swt.util.SwtIconLocator;
 import org.eclipse.scout.rt.ui.swt.util.SwtUtility;
 import org.eclipse.scout.rt.ui.swt.window.ISwtScoutPart;
-import org.eclipse.scout.rt.ui.swt.window.SwtScoutPartEvent;
-import org.eclipse.scout.rt.ui.swt.window.SwtScoutPartListener;
 import org.eclipse.scout.rt.ui.swt.window.desktop.editor.AbstractScoutEditorPart;
 import org.eclipse.scout.rt.ui.swt.window.desktop.editor.ScoutFormEditorInput;
 import org.eclipse.scout.rt.ui.swt.window.desktop.tray.ISwtScoutTray;
@@ -127,6 +125,7 @@ import org.eclipse.ui.IViewReference;
 import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.IWorkbenchListener;
 import org.eclipse.ui.IWorkbenchPage;
+import org.eclipse.ui.IWorkbenchPart;
 import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.PartInitException;
 import org.eclipse.ui.PerspectiveAdapter;
@@ -138,10 +137,9 @@ import org.osgi.framework.Bundle;
 
 /**
  * <h3>SwtEnvironment</h3> ...
- * 
+ *
  * @since 1.0.0 06.03.2008
  */
-@SuppressWarnings("restriction")
 public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver implements ISwtEnvironment {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractSwtEnvironment.class);
   public static final String PROP_WIDGET_IDS_ENABLED = "org.eclipse.scout.rt.widgetIdsEnabled";
@@ -867,12 +865,35 @@ public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver im
     }
     // dialogs
     for (IForm dialog : desktop.getDialogStack()) {
-      // showDialogFromScout(dialogs[i]);
       showStandaloneForm(dialog);
     }
     for (IMessageBox messageBoxe : desktop.getMessageBoxStack()) {
       showMessageBoxFromScout(messageBoxe);
     }
+  }
+
+  public IForm findActiveForm() {
+    Shell activeShell = getDisplay().getActiveShell();
+    if (activeShell == null) {
+      return null;
+    }
+
+    Object data = activeShell.getData();
+    if (data instanceof ISwtScoutPart) {
+      return ((ISwtScoutPart) data).getForm();
+    }
+    else if (data instanceof IWorkbenchWindow) {
+      IWorkbenchPage activePage = ((IWorkbenchWindow) data).getActivePage();
+      if (activePage == null) {
+        return null;
+      }
+
+      IWorkbenchPart activePart = activePage.getActivePart();
+      if (activePart instanceof ISwtScoutPart) {
+        return ((ISwtScoutPart) activePart).getForm();
+      }
+    }
+    return null;
   }
 
   public IFormField findFocusOwnerField() {
@@ -1087,30 +1108,8 @@ public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver im
     if (owner == null) {
       return null;
     }
-    Rectangle ownerBounds = getPopupOwnerBounds();
-    if (ownerBounds == null) {
-      ownerBounds = owner.getBounds();
-      Point pDisp = owner.toDisplay(0, 0);
-      ownerBounds.x = pDisp.x;
-      ownerBounds.y = pDisp.y;
-    }
-    final SwtScoutPopup popup = new SwtScoutPopup(this, owner, ownerBounds, SWT.RESIZE);
+    final SwtScoutPopup popup = new SwtScoutPopup(this, owner, true, SWT.RESIZE);
     popup.setMaxHeightHint(280);
-    popup.addSwtScoutPartListener(new SwtScoutPartListener() {
-      @Override
-      public void partChanged(SwtScoutPartEvent e) {
-        switch (e.getType()) {
-          case SwtScoutPartEvent.TYPE_CLOSED: {
-            popup.closePart();
-            break;
-          }
-          case SwtScoutPartEvent.TYPE_CLOSING: {
-            popup.closePart();
-            break;
-          }
-        }
-      }
-    });
     //close popup when PARENT shell is activated or closed
     owner.getShell().addShellListener(new ShellAdapter() {
       @Override
@@ -1198,13 +1197,7 @@ public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver im
               break;
             }
             case IProcessingStatus.CANCEL: {
-              //Necessary for backward compatibility to Eclipse 3.4 needed for Lotus Notes 8.5.2
-              if (CompatibilityUtility.isEclipseVersionLessThan35()) {
-                iconId = SWT.ICON_INFORMATION;
-              }
-              else {
-                iconId = 1 << 8;//SWT.ICON_CANCEL
-              }
+              iconId = 1 << 8;//SWT.ICON_CANCEL
               break;
             }
             default: {
@@ -1236,15 +1229,19 @@ public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver im
   protected void updateWindowTitle() {
     if (getScoutDesktop() != null) {
       final String title = getScoutDesktop().getTitle();
-      for (IWorkbenchWindow w : PlatformUI.getWorkbench().getWorkbenchWindows()) {
-        final Shell s = w.getShell();
-        if (!s.isDisposed()) {
-          s.getDisplay().asyncExec(new Runnable() {
-            @Override
-            public void run() {
-              s.setText(title);
-            }
-          });
+      // title is null when the getConfiguredTitle on AbstractDesktop returns null.
+      // If the title is null the product title will be left in the titlebar.
+      if (title == null) {
+        for (IWorkbenchWindow w : PlatformUI.getWorkbench().getWorkbenchWindows()) {
+          final Shell s = w.getShell();
+          if (!s.isDisposed()) {
+            s.getDisplay().asyncExec(new Runnable() {
+              @Override
+              public void run() {
+                s.setText(title);
+              }
+            });
+          }
         }
       }
     }
@@ -1380,10 +1377,7 @@ public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver im
             @Override
             public void run() {
               try {
-                IFormField f = findFocusOwnerField();
-                if (f != null) {
-                  e.setFocusedField(f);
-                }
+                e.setFocusedField(findFocusOwnerField());
               }
               finally {
                 synchronized (lock) {
@@ -1395,10 +1389,36 @@ public abstract class AbstractSwtEnvironment extends AbstractPropertyObserver im
           synchronized (lock) {
             invokeSwtLater(t);
             try {
-              lock.wait(2000L);
+              lock.wait(TimeUnit.SECONDS.toMillis(2));
             }
             catch (InterruptedException e1) {
-              //nop
+              LOG.warn("Interrupted while waiting for the focus owner to be found.", e1);
+            }
+          }
+          break;
+        }
+        case DesktopEvent.TYPE_FIND_ACTIVE_FORM: {
+          final Object lock = new Object();
+          Runnable t = new Runnable() {
+            @Override
+            public void run() {
+              try {
+                e.setActiveForm(findActiveForm());
+              }
+              finally {
+                synchronized (lock) {
+                  lock.notifyAll();
+                }
+              }
+            }
+          };
+          synchronized (lock) {
+            invokeSwtLater(t);
+            try {
+              lock.wait(TimeUnit.SECONDS.toMillis(2));
+            }
+            catch (InterruptedException e1) {
+              LOG.warn("Interrupted while waiting for the active form to be found.", e1);
             }
           }
           break;

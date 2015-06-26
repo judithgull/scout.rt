@@ -41,7 +41,8 @@ public abstract class AbstractMenuSeparator extends AbstractMenu {
   }
 
   @Override
-  protected final void execToggleAction(boolean selected) throws ProcessingException {
+  protected final void execSelectionChanged(boolean selection) throws ProcessingException {
     // void
   }
+
 }

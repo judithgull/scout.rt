@@ -36,6 +36,7 @@ import org.eclipse.scout.commons.dnd.TransferObject;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.IDNDSupport;
+import org.eclipse.scout.rt.client.ui.MouseButton;
 import org.eclipse.scout.rt.client.ui.action.IAction;
 import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
 import org.eclipse.scout.rt.client.ui.action.keystroke.KeyStroke;
@@ -395,6 +396,17 @@ public final class SwtUtility {
     return (style & SWT.POP_UP) != 0;
   }
 
+  public static MouseButton swtToScoutMouseButton(int swtButton) {
+    switch (swtButton) {
+      case 1:
+        return MouseButton.Left;
+      case 3:
+        return MouseButton.Right;
+      default:
+        return MouseButton.Unknown;
+    }
+  }
+
   public static ISwtKeyStroke[] getKeyStrokes(IKeyStroke stroke, ISwtEnvironment environment) {
     ArrayList<ISwtKeyStroke> swtKeyStrokes = new ArrayList<ISwtKeyStroke>();
     List<Integer> keyCodes = getSwtKeyCodes(stroke);
@@ -423,7 +435,7 @@ public final class SwtUtility {
    * Converts {@link IKeyStroke} to a swt keycode (This is a bitwise OR
    * of zero or more SWT key modifier masks (i.e. SWT.CTRL or SWT.ALT) and a
    * character code).
-   * 
+   *
    * @param stroke
    * @return
    */
@@ -509,28 +521,31 @@ public final class SwtUtility {
     SCOUT_SWT_KEY_MAP.put("7", SWT.KEYPAD_7);
     SCOUT_SWT_KEY_MAP.put("8", SWT.KEYPAD_8);
     SCOUT_SWT_KEY_MAP.put("9", SWT.KEYPAD_9);
-    SCOUT_SWT_KEY_MAP.put("enter", (int) SWT.CR);
+    SCOUT_SWT_KEY_MAP.put(IKeyStroke.ENTER, (int) SWT.CR);
     SCOUT_SWT_KEY_MAP.put("back_space", (int) SWT.BS);
-    SCOUT_SWT_KEY_MAP.put("tab", (int) SWT.TAB);
+    SCOUT_SWT_KEY_MAP.put(IKeyStroke.TAB, (int) SWT.TAB);
     // SCOUT_SWT_KEY_MAP.put("cancel", SWT.CANCEL);
     // SCOUT_SWT_KEY_MAP.put("clear", KeyEvent.VK_CLEAR);
-    SCOUT_SWT_KEY_MAP.put("shift", SWT.SHIFT);
+    SCOUT_SWT_KEY_MAP.put(IKeyStroke.SHIFT, SWT.SHIFT);
+    SCOUT_SWT_KEY_MAP.put(IKeyStroke.CONTROL, SWT.CONTROL);
     SCOUT_SWT_KEY_MAP.put("ctrl", SWT.CONTROL);
-    SCOUT_SWT_KEY_MAP.put("control", SWT.CONTROL);
-    SCOUT_SWT_KEY_MAP.put("alt", SWT.ALT);
+    SCOUT_SWT_KEY_MAP.put(IKeyStroke.ALT, SWT.ALT);
     SCOUT_SWT_KEY_MAP.put("alternate", SWT.ALT);
+
     SCOUT_SWT_KEY_MAP.put("pause", SWT.PAUSE);
     SCOUT_SWT_KEY_MAP.put("caps_lock", SWT.CAPS_LOCK);
-    SCOUT_SWT_KEY_MAP.put("escape", (int) SWT.ESC);
-    SCOUT_SWT_KEY_MAP.put("space", (int) ' ');
+    SCOUT_SWT_KEY_MAP.put(IKeyStroke.ESCAPE, (int) SWT.ESC);
+    SCOUT_SWT_KEY_MAP.put(IKeyStroke.SPACE, (int) ' ');
     SCOUT_SWT_KEY_MAP.put("page_up", SWT.PAGE_UP);
     SCOUT_SWT_KEY_MAP.put("page_down", SWT.PAGE_DOWN);
     SCOUT_SWT_KEY_MAP.put("end", SWT.END);
     SCOUT_SWT_KEY_MAP.put("home", SWT.HOME);
-    SCOUT_SWT_KEY_MAP.put("left", SWT.ARROW_LEFT);
-    SCOUT_SWT_KEY_MAP.put("up", SWT.ARROW_UP);
-    SCOUT_SWT_KEY_MAP.put("right", SWT.ARROW_RIGHT);
-    SCOUT_SWT_KEY_MAP.put("down", SWT.ARROW_DOWN);
+
+    SCOUT_SWT_KEY_MAP.put(IKeyStroke.LEFT, SWT.ARROW_LEFT);
+    SCOUT_SWT_KEY_MAP.put(IKeyStroke.UP, SWT.ARROW_UP);
+    SCOUT_SWT_KEY_MAP.put(IKeyStroke.RIGHT, SWT.ARROW_RIGHT);
+    SCOUT_SWT_KEY_MAP.put(IKeyStroke.DOWN, SWT.ARROW_DOWN);
+
     SCOUT_SWT_KEY_MAP.put("multiply", SWT.KEYPAD_MULTIPLY);
     SCOUT_SWT_KEY_MAP.put("add", SWT.KEYPAD_ADD);
     SCOUT_SWT_KEY_MAP.put("separater", SWT.KEYPAD_CR);
@@ -540,18 +555,18 @@ public final class SwtUtility {
     SCOUT_SWT_KEY_MAP.put("delete", (int) SWT.DEL);
     SCOUT_SWT_KEY_MAP.put("num_lock", SWT.NUM_LOCK);
     SCOUT_SWT_KEY_MAP.put("scroll_lock", SWT.SCROLL_LOCK);
-    SCOUT_SWT_KEY_MAP.put("f1", SWT.F1);
-    SCOUT_SWT_KEY_MAP.put("f2", SWT.F2);
-    SCOUT_SWT_KEY_MAP.put("f3", SWT.F3);
-    SCOUT_SWT_KEY_MAP.put("f4", SWT.F4);
-    SCOUT_SWT_KEY_MAP.put("f5", SWT.F5);
-    SCOUT_SWT_KEY_MAP.put("f6", SWT.F6);
-    SCOUT_SWT_KEY_MAP.put("f7", SWT.F7);
-    SCOUT_SWT_KEY_MAP.put("f8", SWT.F8);
-    SCOUT_SWT_KEY_MAP.put("f9", SWT.F9);
-    SCOUT_SWT_KEY_MAP.put("f10", SWT.F10);
-    SCOUT_SWT_KEY_MAP.put("f11", SWT.F11);
-    SCOUT_SWT_KEY_MAP.put("f12", SWT.F12);
+    SCOUT_SWT_KEY_MAP.put(IKeyStroke.F1, SWT.F1);
+    SCOUT_SWT_KEY_MAP.put(IKeyStroke.F2, SWT.F2);
+    SCOUT_SWT_KEY_MAP.put(IKeyStroke.F3, SWT.F3);
+    SCOUT_SWT_KEY_MAP.put(IKeyStroke.F4, SWT.F4);
+    SCOUT_SWT_KEY_MAP.put(IKeyStroke.F5, SWT.F5);
+    SCOUT_SWT_KEY_MAP.put(IKeyStroke.F6, SWT.F6);
+    SCOUT_SWT_KEY_MAP.put(IKeyStroke.F7, SWT.F7);
+    SCOUT_SWT_KEY_MAP.put(IKeyStroke.F8, SWT.F8);
+    SCOUT_SWT_KEY_MAP.put(IKeyStroke.F9, SWT.F9);
+    SCOUT_SWT_KEY_MAP.put(IKeyStroke.F10, SWT.F10);
+    SCOUT_SWT_KEY_MAP.put(IKeyStroke.F11, SWT.F11);
+    SCOUT_SWT_KEY_MAP.put(IKeyStroke.F12, SWT.F12);
     SCOUT_SWT_KEY_MAP.put("f13", SWT.F13);
     SCOUT_SWT_KEY_MAP.put("f14", SWT.F14);
     SCOUT_SWT_KEY_MAP.put("f15", SWT.F15);
@@ -657,6 +672,10 @@ public final class SwtUtility {
     // SCOUT_SWT_KEY_MAP.put("stop",(int) KeyEvent.VK_STOP);
     // SCOUT_SWT_KEY_MAP.put("compose",(int) KeyEvent.VK_COMPOSE);
     // SCOUT_SWT_KEY_MAP.put("alt_graph",(int) KeyEvent.VK_ALT_GRAPH);
+  }
+
+  public static Map<String, Integer> getScoutSwtKeyMap() {
+    return SCOUT_SWT_KEY_MAP;
   }
 
   /**
@@ -1040,7 +1059,7 @@ public final class SwtUtility {
 
   /**
    * Escapes every mnemonic character '&' in the string by simply doubling the character.
-   * 
+   *
    * @param text
    *          the string to be escaped, also <code>null</code> or empty string values are allowed
    * @return the escaped string
@@ -1060,7 +1079,7 @@ public final class SwtUtility {
    * <ul>
    * <li>control-alternate-f1 --> Ctrl+Alt+F1
    * </ul>
-   * 
+   *
    * @since 3.10.0-M4
    */
   public static String getKeyStrokePrettyPrinted(IAction scoutAction) {
@@ -1073,7 +1092,7 @@ public final class SwtUtility {
   /**
    * Pretty printed version of the key stroke.
    * See {@link RwtUtility#getKeyStrokePrettyPrinted(IAction)}
-   * 
+   *
    * @since 3.10.0-M4
    */
   public static String getKeyStrokePrettyPrinted(String s) {
@@ -1088,7 +1107,7 @@ public final class SwtUtility {
 
   /**
    * Run the inputVerifier on the currently focused control. See {@link #runSwtInputVerifier(Control)} for more details.
-   * 
+   *
    * @since 3.10.0-M5
    */
   public static boolean runSwtInputVerifier() {
@@ -1097,7 +1116,7 @@ public final class SwtUtility {
 
   /**
    * Force the control's inputVerifier to run
-   * 
+   *
    * @since 3.10.0-M5
    */
   public static boolean runSwtInputVerifier(Control control) {

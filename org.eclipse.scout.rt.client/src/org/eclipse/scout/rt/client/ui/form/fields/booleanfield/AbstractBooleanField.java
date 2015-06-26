@@ -16,6 +16,7 @@ import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.booleanfield.IBooleanFieldExtension;
 import org.eclipse.scout.rt.client.ui.form.fields.AbstractValueField;
 import org.eclipse.scout.rt.shared.ScoutTexts;
 
@@ -41,7 +42,7 @@ public abstract class AbstractBooleanField extends AbstractValueField<Boolean> i
     /* setAutoDisplayText(false); */
     propertySupport.setProperty(PROP_VALUE, false);
     // ticket 79554
-    propertySupport.setProperty(PROP_DISPLAY_TEXT, execFormatValue(getValue()));
+    propertySupport.setProperty(PROP_DISPLAY_TEXT, interceptFormatValue(getValue()));
   }
 
   @Override
@@ -91,10 +92,10 @@ public abstract class AbstractBooleanField extends AbstractValueField<Boolean> i
       text = null;
     }
     if (text != null) {
-      if (text.equals("1")) {
+      if ("1".equals(text)) {
         retVal = true;
       }
-      else if (text.equalsIgnoreCase("true")) {
+      else if ("true".equalsIgnoreCase(text)) {
         retVal = true;
       }
       else {
@@ -104,6 +105,14 @@ public abstract class AbstractBooleanField extends AbstractValueField<Boolean> i
     return retVal;
   }
 
+  /**
+   * A boolean field is considered empty if unchecked.
+   */
+  @Override
+  protected boolean execIsEmpty() throws ProcessingException {
+    return !isChecked();
+  }
+
   @Override
   public IBooleanFieldUIFacade getUIFacade() {
     return m_uiFacade;
@@ -111,11 +120,22 @@ public abstract class AbstractBooleanField extends AbstractValueField<Boolean> i
 
   private class P_UIFacade implements IBooleanFieldUIFacade {
     @Override
-    public boolean setSelectedFromUI() {
+    public void setSelectedFromUI(boolean b) {
       if (isEnabled() && isVisible()) {
-        setChecked(!isChecked());
+        setChecked(b);
       }
-      return isChecked();
     }
+  }
+
+  protected static class LocalBooleanFieldExtension<OWNER extends AbstractBooleanField> extends LocalValueFieldExtension<Boolean, OWNER> implements IBooleanFieldExtension<OWNER> {
+
+    public LocalBooleanFieldExtension(OWNER owner) {
+      super(owner);
+    }
+  }
+
+  @Override
+  protected IBooleanFieldExtension<? extends AbstractBooleanField> createLocalExtension() {
+    return new LocalBooleanFieldExtension<AbstractBooleanField>(this);
   }
 }

@@ -25,11 +25,6 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.eclipse.core.runtime.CoreException;
-import org.eclipse.core.runtime.IConfigurationElement;
-import org.eclipse.core.runtime.IExtension;
-import org.eclipse.core.runtime.IExtensionPoint;
-import org.eclipse.core.runtime.IExtensionRegistry;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.NullProgressMonitor;
@@ -48,21 +43,20 @@ import org.eclipse.scout.rt.server.commons.cache.IHttpSessionCacheService;
 import org.eclipse.scout.rt.server.commons.servletfilter.HttpServletEx;
 import org.eclipse.scout.rt.server.commons.servletfilter.helper.HttpAuthJaasFilter;
 import org.eclipse.scout.rt.server.internal.Activator;
+import org.eclipse.scout.rt.server.internal.ServerSessionClassFinder;
 import org.eclipse.scout.rt.server.services.common.session.IServerSessionRegistryService;
 import org.eclipse.scout.rt.shared.servicetunnel.DefaultServiceTunnelContentHandler;
 import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelContentHandler;
-import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelRequest;
-import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelResponse;
+import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelRequest;
+import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelResponse;
 import org.eclipse.scout.rt.shared.ui.UserAgent;
 import org.eclipse.scout.service.SERVICES;
 import org.osgi.framework.Bundle;
-import org.osgi.framework.BundleContext;
-import org.osgi.framework.ServiceReference;
 import org.osgi.framework.Version;
 
 /**
- * Use this servlet to dispatch scout gui service requests using {@link ServiceTunnelRequest},
- * {@link ServiceTunnelResponse} and any {@link IServiceTunnelContentHandler} implementation.
+ * Use this servlet to dispatch scout gui service requests using {@link IServiceTunnelRequest},
+ * {@link IServiceTunnelResponse} and any {@link IServiceTunnelContentHandler} implementation.
  * <p>
  * Override the methods
  * {@link DefaultTransactionDelegate#validateInput(org.eclipse.scout.rt.shared.validate.IValidationStrategy, Object, java.lang.reflect.Method, Object[])
@@ -76,6 +70,7 @@ import org.osgi.framework.Version;
  * When using RAP (rich ajax platform) as the ui web app then there must be a {@link WebSessionIdPrincipal} in the
  * subject, in order to map those requests to virtual sessions instead of (the unique) http session.
  */
+@SuppressWarnings("deprecation")
 public class ServiceTunnelServlet extends HttpServletEx {
   public static final String HTTP_DEBUG_PARAM = "org.eclipse.scout.rt.server.http.debug";
 
@@ -89,18 +84,24 @@ public class ServiceTunnelServlet extends HttpServletEx {
 
   private transient IServiceTunnelContentHandler m_contentHandler;
   private transient Bundle[] m_orderedBundleList;
-  private Object m_orderedBundleListLock = new Boolean(true);
-  private Object m_msgEncoderLock = new Boolean(true);
+  private final Object m_orderedBundleListLock = new Object();
+  private final Object m_msgEncoderLock = new Object();
   private Class<? extends IServerSession> m_serverSessionClass;
   private Version m_requestMinVersion;
   private final boolean m_debug;
   private final boolean m_isMultiClientSessionCookieStore;
 
   private final VirtualSessionCache m_ajaxSessionCache = new VirtualSessionCache();
+  private volatile boolean m_isAjaxSessionTimeoutInitialized = false;
+
+  public ServiceTunnelServlet(boolean multiClientSessionCookieStore, boolean debug) {
+    m_isMultiClientSessionCookieStore = multiClientSessionCookieStore;
+    m_debug = debug;
+  }
 
   public ServiceTunnelServlet() {
-    m_debug = StringUtility.parseBoolean(Activator.getDefault().getBundle().getBundleContext().getProperty(HTTP_DEBUG_PARAM));
-    m_isMultiClientSessionCookieStore = StringUtility.parseBoolean(Activator.getDefault().getBundle().getBundleContext().getProperty(MULTI_CLIENT_SESSION_COOKIESTORE));
+    this(StringUtility.parseBoolean(Activator.getDefault().getBundle().getBundleContext().getProperty(MULTI_CLIENT_SESSION_COOKIESTORE), true),
+        StringUtility.parseBoolean(Activator.getDefault().getBundle().getBundleContext().getProperty(HTTP_DEBUG_PARAM)));
   }
 
   @Override
@@ -109,42 +110,49 @@ public class ServiceTunnelServlet extends HttpServletEx {
     m_requestMinVersion = initRequestMinVersion(config);
   }
 
-  @SuppressWarnings("unchecked")
   protected void lazyInit(HttpServletRequest req, HttpServletResponse res) throws ServletException {
     if (m_serverSessionClass == null) {
       m_serverSessionClass = locateServerSessionClass(req, res);
     }
-
     if (m_serverSessionClass == null) {
-      String qname = getServletConfig().getInitParameter("session");
-      if (qname != null) {
-        int i = qname.lastIndexOf('.');
-        try {
-          m_serverSessionClass = (Class<? extends IServerSession>) Platform.getBundle(qname.substring(0, i)).loadClass(qname);
-        }
-        catch (ClassNotFoundException e) {
-          throw new ServletException("Loading class " + qname, e);
-        }
-      }
+      m_serverSessionClass = loadSessionClassByParam();
     }
     if (m_serverSessionClass == null) {
-      // find bundle that defines this servlet
-      try {
-        Bundle bundle = findServletContributor(req.getServletPath());
-        if (bundle != null) {
-          m_serverSessionClass = (Class<? extends IServerSession>) bundle.loadClass(bundle.getSymbolicName() + ".ServerSession");
-        }
-      }
-      catch (Throwable t) {
-        // nop
-      }
+      //legacy support
+      m_serverSessionClass = new ServerSessionClassFinder().findClassByConvention(req.getServletPath());
     }
     if (m_serverSessionClass == null) {
       throw new ServletException("Expected init-param \"session\"");
     }
   }
 
+  /**
+   * Load the IServerSession class by servlet config parameter
+   *
+   * @throws ServletException
+   */
+  @SuppressWarnings("unchecked")
+  private Class<? extends IServerSession> loadSessionClassByParam() throws ServletException {
+    String qname = getServletConfig().getInitParameter("session");
+    if (qname != null) {
+      int i = qname.lastIndexOf('.');
+      try {
+        m_serverSessionClass = (Class<? extends IServerSession>) Platform.getBundle(qname.substring(0, i)).loadClass(qname);
+      }
+      catch (ClassNotFoundException e) {
+        throw new ServletException("Loading class " + qname, e);
+      }
+    }
+    return null;
+  }
+
   protected Class<? extends IServerSession> locateServerSessionClass(HttpServletRequest req, HttpServletResponse res) {
+    try {
+      return SERVICES.getService(IServerJobService.class).getServerSessionClass();
+    }
+    catch (ProcessingException e) {
+      LOG.debug("No server session found");
+    }
     return null;
   }
 
@@ -161,7 +169,7 @@ public class ServiceTunnelServlet extends HttpServletEx {
    * <p>
    * If there is no min-version defined it uses the Bundle-Version of the bundle which contains the running product.
    * </p>
-   * 
+   *
    * @param config
    * @return
    */
@@ -188,7 +196,7 @@ public class ServiceTunnelServlet extends HttpServletEx {
    */
   protected IServiceTunnelContentHandler createContentHandler(Class<? extends IServerSession> sessionClass) {
     DefaultServiceTunnelContentHandler e = new DefaultServiceTunnelContentHandler();
-    e.initialize(getOrderedBundleList(), sessionClass.getClassLoader());
+    e.initialize();
     return e;
   }
 
@@ -201,6 +209,11 @@ public class ServiceTunnelServlet extends HttpServletEx {
     return m_contentHandler;
   }
 
+  /**
+   * @deprecated use {@link SerializationUtility} instead. Will be removed in the N release.
+   * @return
+   */
+  @Deprecated
   protected Bundle[] getOrderedBundleList() {
     synchronized (m_orderedBundleListLock) {
       if (m_orderedBundleList == null) {
@@ -211,7 +224,7 @@ public class ServiceTunnelServlet extends HttpServletEx {
     return m_orderedBundleList;
   }
 
-  private IServerSession lookupServerSession(HttpServletRequest req, HttpServletResponse res, Subject subject, ServiceTunnelRequest serviceRequest) throws ProcessingException, ServletException {
+  protected IServerSession lookupServerSession(HttpServletRequest req, HttpServletResponse res, Subject subject, IServiceTunnelRequest serviceRequest) throws ProcessingException, ServletException {
     UserAgent userAgent = UserAgent.createByIdentifier(serviceRequest.getUserAgent());
     String virtualSessionId = serviceRequest.getVirtualSessionId();
     if (virtualSessionId != null && !m_isMultiClientSessionCookieStore) {
@@ -225,35 +238,52 @@ public class ServiceTunnelServlet extends HttpServletEx {
   protected IServerSession lookupScoutServerSessionOnHttpSession(HttpServletRequest req, HttpServletResponse res, Subject subject, UserAgent userAgent) throws ProcessingException, ServletException {
     //external request: apply locking, this is the session initialization phase
     IHttpSessionCacheService cacheService = SERVICES.getService(IHttpSessionCacheService.class);
-    synchronized (req.getSession()) {
-      IServerSession serverSession = (IServerSession) cacheService.getAndTouch(IServerSession.class.getName(), req, res);
-      if (serverSession == null) {
-        serverSession = SERVICES.getService(IServerSessionRegistryService.class).newServerSession(m_serverSessionClass, subject, userAgent);
-        serverSession.setIdInternal(SERVICES.getService(IClientIdentificationService.class).getClientId(req, res));
-        cacheService.put(IServerSession.class.getName(), serverSession, req, res);
+    IServerSession serverSession = (IServerSession) cacheService.getAndTouch(IServerSession.class.getName(), req, res);
+    if (serverSession == null) {
+      synchronized (req.getSession()) {
+        serverSession = (IServerSession) cacheService.get(IServerSession.class.getName(), req, res); // double checking
+        if (serverSession == null) {
+          serverSession = SERVICES.getService(IServerSessionRegistryService.class).newServerSession(m_serverSessionClass, subject, userAgent);
+          serverSession.setIdInternal(SERVICES.getService(IClientIdentificationService.class).getClientId(req, res));
+          cacheService.put(IServerSession.class.getName(), serverSession, req, res);
+        }
       }
-      return serverSession;
     }
+    return serverSession;
   }
 
   private IServerSession lookupScoutServerSessionOnVirtualSession(HttpServletRequest req, HttpServletResponse res, String ajaxSessionId, Subject subject, UserAgent userAgent) throws ProcessingException, ServletException {
-    synchronized (m_ajaxSessionCache) {
-      //update session timeout
-      int maxInactive = req.getSession().getMaxInactiveInterval();
-      if (maxInactive < 0) {
-        maxInactive = 3600;
+    initializeAjaxSessionTimeout(req);
+    IServerSession serverSession = m_ajaxSessionCache.get(ajaxSessionId);
+    if (serverSession == null) {
+      synchronized (m_ajaxSessionCache) {
+        serverSession = m_ajaxSessionCache.get(ajaxSessionId);
+        if (serverSession == null) { // double checking
+          return createAndCacheNewServerSession(ajaxSessionId, subject, userAgent, req, res);
+        }
       }
-      m_ajaxSessionCache.setSessionTimeoutMillis(Math.max(1000L, 1000L * maxInactive));
-      IServerSession serverSession = m_ajaxSessionCache.get(ajaxSessionId);
-      if (serverSession == null) {
-        serverSession = SERVICES.getService(IServerSessionRegistryService.class).newServerSession(m_serverSessionClass, subject, userAgent);
-        m_ajaxSessionCache.put(ajaxSessionId, serverSession);
-      }
-      else {
-        m_ajaxSessionCache.touch(ajaxSessionId);
-      }
-      return serverSession;
     }
+    m_ajaxSessionCache.touch(ajaxSessionId);
+    return serverSession;
+  }
+
+  /**
+   * Initialize Ajax Session timeout only once from the HTTP session
+   */
+  protected void initializeAjaxSessionTimeout(HttpServletRequest req) {
+    if (!m_isAjaxSessionTimeoutInitialized) {
+      final long defaultSessionTimeout = 1800L;
+      final long millisecondsInSeconds = 1000L;
+      m_ajaxSessionCache.setSessionTimeoutMillis(Math.max(millisecondsInSeconds * defaultSessionTimeout, millisecondsInSeconds * req.getSession().getMaxInactiveInterval()));
+      m_isAjaxSessionTimeoutInitialized = true;
+    }
+  }
+
+  private IServerSession createAndCacheNewServerSession(String ajaxSessionId, Subject subject, UserAgent userAgent, HttpServletRequest req, HttpServletResponse res) throws ProcessingException {
+    IServerSession serverSession = SERVICES.getService(IServerSessionRegistryService.class).newServerSession(m_serverSessionClass, subject, userAgent);
+    serverSession.setIdInternal(SERVICES.getService(IClientIdentificationService.class).getClientId(req, res));
+    m_ajaxSessionCache.put(ajaxSessionId, serverSession);
+    return serverSession;
   }
 
   @Override
@@ -297,17 +327,17 @@ public class ServiceTunnelServlet extends HttpServletEx {
     try {
       lazyInit(req, res);
       Map<Class, Object> backup = ThreadContext.backup();
-      Locale oldLocale = LocaleThreadLocal.get();
+      Locale oldLocale = LocaleThreadLocal.get(false);
       try {
         ThreadContext.putHttpServletRequest(req);
         ThreadContext.putHttpServletResponse(res);
         //read request
-        ServiceTunnelRequest serviceRequest = deserializeInput(req.getInputStream());
+        IServiceTunnelRequest serviceRequest = deserializeInput(req.getInputStream());
         LocaleThreadLocal.set(serviceRequest.getLocale());
         //virtual or http session?
         IServerSession serverSession = lookupServerSession(req, res, subject, serviceRequest);
         //invoke
-        AtomicReference<ServiceTunnelResponse> serviceResponseHolder = new AtomicReference<ServiceTunnelResponse>();
+        AtomicReference<IServiceTunnelResponse> serviceResponseHolder = new AtomicReference<IServiceTunnelResponse>();
         ServerJob job = createServiceTunnelServerJob(serverSession, serviceRequest, serviceResponseHolder, subject);
         job.setTransactionSequence(serviceRequest.getRequestSequence());
         job.runNow(new NullProgressMonitor());
@@ -341,11 +371,11 @@ public class ServiceTunnelServlet extends HttpServletEx {
     }
   }
 
-  protected ServiceTunnelRequest deserializeInput(InputStream in) throws Exception {
+  protected IServiceTunnelRequest deserializeInput(InputStream in) throws Exception {
     return getServiceTunnelContentHandler().readRequest(in);
   }
 
-  protected void serializeOutput(HttpServletResponse httpResponse, ServiceTunnelResponse res) throws Exception {
+  protected void serializeOutput(HttpServletResponse httpResponse, IServiceTunnelResponse res) throws Exception {
     // security: do not send back error stack trace
     if (res.getException() != null) {
       res.getException().setStackTrace(new StackTraceElement[0]);
@@ -358,39 +388,10 @@ public class ServiceTunnelServlet extends HttpServletEx {
     getServiceTunnelContentHandler().writeResponse(httpResponse.getOutputStream(), res);
   }
 
-  private Bundle findServletContributor(String alias) throws CoreException {
-    BundleContext context = Activator.getDefault().getBundle().getBundleContext();
-    ServiceReference ref = context.getServiceReference(IExtensionRegistry.class.getName());
-    Bundle bundle = null;
-    if (ref != null) {
-      IExtensionRegistry reg = (IExtensionRegistry) context.getService(ref);
-      if (reg != null) {
-        IExtensionPoint xpServlet = reg.getExtensionPoint("org.eclipse.equinox.http.registry.servlets");
-        if (xpServlet != null) {
-          for (IExtension xServlet : xpServlet.getExtensions()) {
-            for (IConfigurationElement cServlet : xServlet.getConfigurationElements()) {
-              if (cServlet.getName().equals("servlet")) {
-                if (this.getClass().getName().equals(cServlet.getAttribute("class"))) {
-                  // half match, go on looping
-                  bundle = Platform.getBundle(xServlet.getContributor().getName());
-                  if (alias.equals(cServlet.getAttribute("alias"))) {
-                    // full match, return
-                    return bundle;
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    return bundle;
-  }
-
   /**
    * Create the {@link ServerJob} that runs the request as a single atomic transaction
    */
-  protected ServerJob createServiceTunnelServerJob(IServerSession serverSession, ServiceTunnelRequest serviceRequest, AtomicReference<ServiceTunnelResponse> serviceResponseHolder, Subject subject) {
+  protected ServerJob createServiceTunnelServerJob(IServerSession serverSession, IServiceTunnelRequest serviceRequest, AtomicReference<IServiceTunnelResponse> serviceResponseHolder, Subject subject) {
     return new RemoteServiceJob(serverSession, serviceRequest, serviceResponseHolder, subject);
   }
 
@@ -399,36 +400,45 @@ public class ServiceTunnelServlet extends HttpServletEx {
    * <p>
    * This method is part of the protected api and can be overridden.
    */
-  protected ServiceTunnelResponse runServerJobTransaction(ServiceTunnelRequest req) throws Exception {
-    return runServerJobTransactionWithDelegate(req, getOrderedBundleList(), m_requestMinVersion, m_debug);
+  protected IServiceTunnelResponse runServerJobTransaction(IServiceTunnelRequest req) throws Exception {
+    return runServerJobTransactionWithDelegate(req, m_requestMinVersion, m_debug);
   }
 
-  protected ServiceTunnelResponse runServerJobTransactionWithDelegate(ServiceTunnelRequest req, Bundle[] loaderBundles, Version requestMinVersion, boolean debug) throws Exception {
-    return new DefaultTransactionDelegate(loaderBundles, requestMinVersion, debug).invoke(req);
+  /**
+   * @deprecated use {@link #runServerJobTransactionWithDelegate(IServiceTunnelRequest, Version, boolean)} instead. Will
+   *             be removed with the N-Release.
+   */
+  @Deprecated
+  protected IServiceTunnelResponse runServerJobTransactionWithDelegate(IServiceTunnelRequest req, Bundle[] loaderBundles, Version requestMinVersion, boolean debug) throws Exception {
+    return runServerJobTransactionWithDelegate(req, requestMinVersion, debug);
+  }
+
+  protected IServiceTunnelResponse runServerJobTransactionWithDelegate(IServiceTunnelRequest req, Version requestMinVersion, boolean debug) throws Exception {
+    return new DefaultTransactionDelegate(requestMinVersion, debug).invoke(req);
   }
 
   private class RemoteServiceJob extends ServerJob {
 
-    private final ServiceTunnelRequest m_serviceRequest;
-    private final AtomicReference<ServiceTunnelResponse> m_serviceResponseHolder;
+    private final IServiceTunnelRequest m_serviceRequest;
+    private final AtomicReference<IServiceTunnelResponse> m_serviceResponseHolder;
 
-    public RemoteServiceJob(IServerSession serverSession, ServiceTunnelRequest serviceRequest, AtomicReference<ServiceTunnelResponse> serviceResponseHolder, Subject subject) {
+    public RemoteServiceJob(IServerSession serverSession, IServiceTunnelRequest serviceRequest, AtomicReference<IServiceTunnelResponse> serviceResponseHolder, Subject subject) {
       super("RemoteServiceCall", serverSession, subject);
       m_serviceRequest = serviceRequest;
       m_serviceResponseHolder = serviceResponseHolder;
     }
 
-    public ServiceTunnelRequest getServiceRequest() {
+    public IServiceTunnelRequest getServiceRequest() {
       return m_serviceRequest;
     }
 
-    public AtomicReference<ServiceTunnelResponse> getServiceResponseHolder() {
+    public AtomicReference<IServiceTunnelResponse> getServiceResponseHolder() {
       return m_serviceResponseHolder;
     }
 
     @Override
     protected IStatus runTransaction(IProgressMonitor monitor) throws Exception {
-      ServiceTunnelResponse serviceRes = runServerJobTransaction(getServiceRequest());
+      IServiceTunnelResponse serviceRes = runServerJobTransaction(getServiceRequest());
       getServiceResponseHolder().set(serviceRes);
       return Status.OK_STATUS;
     }

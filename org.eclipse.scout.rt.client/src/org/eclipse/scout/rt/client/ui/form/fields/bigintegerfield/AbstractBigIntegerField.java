@@ -19,6 +19,7 @@ import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.bigintegerfield.IBigIntegerFieldExtension;
 import org.eclipse.scout.rt.client.ui.form.fields.numberfield.AbstractNumberField;
 import org.eclipse.scout.rt.shared.data.form.ValidationRule;
 
@@ -55,6 +56,16 @@ public abstract class AbstractBigIntegerField extends AbstractNumberField<BigInt
     return AbstractBigIntegerField.DEFAULT_MAX_VALUE;
   }
 
+  @Override
+  protected BigInteger getMinPossibleValue() {
+    return AbstractBigIntegerField.DEFAULT_MIN_VALUE;
+  }
+
+  @Override
+  protected BigInteger getMaxPossibleValue() {
+    return AbstractBigIntegerField.DEFAULT_MAX_VALUE;
+  }
+
   /**
    * uses {@link #parseToBigDecimalInternal(String)} to parse text and returns the result as BigInteger
    */
@@ -66,6 +77,18 @@ public abstract class AbstractBigIntegerField extends AbstractNumberField<BigInt
       retVal = parsedVal.toBigIntegerExact();
     }
     return retVal;
+  }
+
+  protected static class LocalBigIntegerFieldExtension<OWNER extends AbstractBigIntegerField> extends LocalNumberFieldExtension<BigInteger, OWNER> implements IBigIntegerFieldExtension<OWNER> {
+
+    public LocalBigIntegerFieldExtension(OWNER owner) {
+      super(owner);
+    }
+  }
+
+  @Override
+  protected IBigIntegerFieldExtension<? extends AbstractBigIntegerField> createLocalExtension() {
+    return new LocalBigIntegerFieldExtension<AbstractBigIntegerField>(this);
   }
 
 }

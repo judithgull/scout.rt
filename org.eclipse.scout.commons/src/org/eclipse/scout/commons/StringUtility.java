@@ -40,28 +40,37 @@ public final class StringUtility {
 
   private static final String[] EMPTY_ARRAY = new String[0];
 
-  public static interface ITagProcessor {
+  public interface ITagProcessor {
     String/* tagReplacement */processTag(String tagName, String tagContent);
   }
 
   private StringUtility() {
   }
 
-  public static boolean isNullOrEmpty(String s) {
+  /**
+   * Checks whether a given string is {@code null} or empty. A string is considered empty if it
+   * equals the empty string "" (internally this method checks whether the string length is 0).
+   *
+   * @param s
+   *          the string to be checked
+   * @return {@code true} if {@code s} is {@code null} or equals the empty string, {@code false} otherwise
+   */
+  public static boolean isNullOrEmpty(CharSequence s) {
     return s == null || s.length() == 0;
   }
 
   /**
-   * Checks whether the given {@link String} contains visible characters. <br>
+   * Checks whether the given {@link CharSequence} contains visible characters. <br>
    * More formally:
-   * Checks whether the given {@link String} contains at least one character bigger than the whitespace character:
+   * Checks whether the given {@link CharSequence} contains at least one character bigger than the whitespace character:
    * '\u0020'.
-   * 
+   *
    * @param s
-   *          The {@link String} to check.
-   * @return <code>true</code> if the provided {@link String} contains visible characters. <code>false</code> otherwise.
+   *          The {@link CharSequence} to check.
+   * @return <code>true</code> if the provided {@link CharSequence} contains visible characters. <code>false</code>
+   *         otherwise.
    */
-  public static boolean hasText(String s) {
+  public static boolean hasText(CharSequence s) {
     if (s == null) {
       return false;
     }
@@ -154,14 +163,14 @@ public final class StringUtility {
     if (humanReadableFilterText.indexOf('*') < 0) {
       humanReadableFilterText += "*";
     }
-    return Pattern.compile(StringUtility.toRegExPattern(humanReadableFilterText), patternFlags);
+    return Pattern.compile(toRegExPattern(humanReadableFilterText), patternFlags);
   }
 
   /**
    * Tokenize a String s by given character c. Take care about empty String
    * between two separating chars. {@link java.util.StringTokenizer} does not
    * care about empty string between separating chars.
-   * 
+   *
    * @param s
    *          String to tokenize.
    * @param c
@@ -195,17 +204,17 @@ public final class StringUtility {
     return returnValue;
   }
 
-  private static final Set<String> booleanTrue = new HashSet<String>(3);
+  private static final Set<String> BOOLEAN_TRUE = new HashSet<String>(3);
   static {
-    booleanTrue.add("true");
-    booleanTrue.add("yes");
-    booleanTrue.add("1");
+    BOOLEAN_TRUE.add("true");
+    BOOLEAN_TRUE.add("yes");
+    BOOLEAN_TRUE.add("1");
   }
-  private static final Set<String> booleanFalse = new HashSet<String>(3);
+  private static final Set<String> BOOLEAN_FLASE = new HashSet<String>(3);
   static {
-    booleanFalse.add("false");
-    booleanFalse.add("no");
-    booleanFalse.add("0");
+    BOOLEAN_FLASE.add("false");
+    BOOLEAN_FLASE.add("no");
+    BOOLEAN_FLASE.add("0");
   }
 
   /**
@@ -232,16 +241,16 @@ public final class StringUtility {
     }
     s = s.toLowerCase().trim();
     if (defaultValue) {
-      return !booleanFalse.contains(s);
+      return !BOOLEAN_FLASE.contains(s);
     }
     else {
-      return booleanTrue.contains(s);
+      return BOOLEAN_TRUE.contains(s);
     }
   }
 
   /**
    * This method parses a string and returns the associated boolean value.
-   * 
+   *
    * @see #parseBoolean(String, boolean)
    */
   public static boolean parseBoolean(String s) {
@@ -335,14 +344,14 @@ public final class StringUtility {
    * blank (" ").
    * <p>
    * Examples:
-   * 
+   *
    * <pre>
    * "a\r\nb" -> "a b"
    * "a\nb" -> "a b"
    * </pre>
-   * 
+   *
    * </p>
-   * 
+   *
    * @param text
    *          the {@link String} thats new line characters should be removed
    * @return a string derived from this string by replacing every occurrence of new line character with a
@@ -355,7 +364,7 @@ public final class StringUtility {
   /**
    * Returns a new string resulting from replacing all new line characters ("\n", "\r\n", "\n\r" or "\r") with the given
    * replacement string.
-   * 
+   *
    * @param text
    *          the {@link String} thats new line characters should be removed
    * @param replacement
@@ -571,23 +580,21 @@ public final class StringUtility {
     if (s == null) {
       return null;
     }
-    StringBuffer buf = new StringBuffer();
-    if (s != null) {
-      char[] ch = s.toCharArray();
-      int col = 0;
-      for (int i = 0; i < ch.length; i++) {
-        if (ch[i] == '\n' || ch[i] == '\r') {
-          col = 0;
-          buf.append(ch[i]);
+    StringBuilder buf = new StringBuilder();
+    char[] ch = s.toCharArray();
+    int col = 0;
+    for (int i = 0; i < ch.length; i++) {
+      if (ch[i] == '\n' || ch[i] == '\r') {
+        col = 0;
+        buf.append(ch[i]);
+      }
+      else {
+        col++;
+        if (col > lineSize) {
+          buf.append('\n');
+          col = 1;
         }
-        else {
-          col++;
-          if (col > lineSize) {
-            buf.append('\n');
-            col = 1;
-          }
-          buf.append(ch[i]);
-        }
+        buf.append(ch[i]);
       }
     }
     return buf.toString();
@@ -597,12 +604,12 @@ public final class StringUtility {
     if (s == null) {
       return null;
     }
-    StringBuffer buf = new StringBuffer();
+    StringBuilder buf = new StringBuilder();
     for (String line : s.split("[\\n\\r]")) {
       if (buf.length() > 0) {
         buf.append("\n");
       }
-      StringBuffer wrappedLine = new StringBuffer();
+      StringBuilder wrappedLine = new StringBuilder();
       for (String word : line.split("[ \\t]")) {
         if (wrappedLine.length() > 0 && wrappedLine.length() + 1 + word.length() > lineSize) {
           buf.append(wrappedLine.toString());
@@ -630,7 +637,7 @@ public final class StringUtility {
     return s.trim();
   }
 
-  public static boolean isQuotedText(String s) {
+  public static boolean isQuotedText(CharSequence s) {
     if (s == null || s.length() == 0) {
       return false;
     }
@@ -694,7 +701,7 @@ public final class StringUtility {
       return s;
     }
     int len = s.length();
-    StringBuffer buf = new StringBuffer(len * 2);
+    StringBuilder buf = new StringBuilder(len * 2);
     for (int i = 0; i < len; i++) {
       char ch = s.charAt(i);
       switch (ch) {
@@ -760,7 +767,7 @@ public final class StringUtility {
     }
     char ch;
     int len = s.length();
-    StringBuffer buf = new StringBuffer(len);
+    StringBuilder buf = new StringBuilder(len);
 
     for (int k = 0; k < len;) {
       ch = s.charAt(k++);
@@ -834,7 +841,7 @@ public final class StringUtility {
     if (a == null || a.length == 0) {
       return null;
     }
-    StringBuffer buf = new StringBuffer(a.length * 2);
+    StringBuilder buf = new StringBuilder(a.length * 2);
     int hi, lo;
     for (int i = 0; i < a.length; i++) {
       lo = (a[i]) & 0xff;
@@ -856,7 +863,7 @@ public final class StringUtility {
   /**
    * decision function: return DECODE(value,test1,result1,test2,result2,....,defaultResult)
    * <p>
-   * decode('B','A',1,'B',2,'C',3,-1) --> 'B'
+   * decode('B','A',1,'B',2,'C',3,-1) --> 2
    */
   public static Object decode(Object... a) {
     Object ref = a[0];
@@ -937,6 +944,11 @@ public final class StringUtility {
     return s;
   }
 
+  /**
+   * Compares two Strings, ignoring case considerations.
+   * Uses the method <code>java.lang.String.equalsIgnoreCase()</code>.
+   * Null strings are converted to zero length strings before comparison.
+   */
   public static boolean equalsIgnoreCase(String a, String b) {
     if (a == null) {
       a = "";
@@ -947,7 +959,21 @@ public final class StringUtility {
     return a.equalsIgnoreCase(b);
   }
 
+  /**
+   * @deprecated Use {@link #notEqualsIgnoreCase(String, String)} instead. Will be removed in the
+   *             N-Release.
+   */
+  @Deprecated
   public static boolean notEequalsIgnoreCase(String a, String b) {
+    return notEqualsIgnoreCase(a, b);
+  }
+
+  /**
+   * Compares two Strings, ignoring case considerations.
+   * Uses the method <code>java.lang.String.equalsIgnoreCase()</code>.
+   * Null strings are converted to zero length strings before comparison.
+   */
+  public static boolean notEqualsIgnoreCase(String a, String b) {
     if (a == null) {
       a = "";
     }
@@ -974,14 +1000,12 @@ public final class StringUtility {
 
   /**
    * Returns true if the given String contains a NewLine character, e.g. \n
-   * 
+   *
    * @since 3.10.0-M4
    */
   public static boolean containsNewLines(String s) {
-    if (s != null) {
-      if (s.indexOf('\n') >= 0 || s.indexOf('\r') >= 0) {
-        return true;
-      }
+    if (s != null && (s.indexOf('\n') >= 0 || s.indexOf('\r') >= 0)) {
+      return true;
     }
     return false;
   }
@@ -1017,7 +1041,7 @@ public final class StringUtility {
   /**
    * Format phone numbers (to international phone number format - eg +41 41 882
    * 32 21)
-   * 
+   *
    * @since
    * @param phoneNumber
    *          Unformatted/Formatted phone number with optional country code.
@@ -1113,7 +1137,7 @@ public final class StringUtility {
     return formattedPhoneNumber;
   }
 
-  public static int length(String s) {
+  public static int length(CharSequence s) {
     if (s == null) {
       return 0;
     }
@@ -1190,7 +1214,7 @@ public final class StringUtility {
 
   /**
    * Returns a copy of the {@link String} with leading and trailing newlines omitted.
-   * 
+   *
    * @param s
    * @return
    */
@@ -1209,7 +1233,7 @@ public final class StringUtility {
     if (s == null || fill == null || s.length() >= len || fill.length() == 0) {
       return s;
     }
-    StringBuffer buf = new StringBuffer(s);
+    StringBuilder buf = new StringBuilder(s);
     while (buf.length() < len) {
       buf.insert(0, fill);
     }
@@ -1220,7 +1244,7 @@ public final class StringUtility {
     if (s == null || fill == null || s.length() >= len || fill.length() == 0) {
       return s;
     }
-    StringBuffer buf = new StringBuffer(s);
+    StringBuilder buf = new StringBuilder(s);
     while (buf.length() < len) {
       buf.append(fill);
     }
@@ -1261,7 +1285,7 @@ public final class StringUtility {
 
   /**
    * Returns the string-representation of <code>value</code>, or <code>valueWhenNull</code> if value is null.
-   * 
+   *
    * @param value
    * @param valueWhenNull
    * @see #substituteWhenEmpty(Object, String)
@@ -1293,7 +1317,7 @@ public final class StringUtility {
     if (s == null || sOld == null || sNew == null) {
       return s;
     }
-    StringBuffer buf = new StringBuffer();
+    StringBuilder buf = new StringBuilder();
     int oldLen = sOld.length();
     int pos = 0;
     sOld = sOld.toLowerCase();
@@ -1362,7 +1386,7 @@ public final class StringUtility {
    * Concatenates the raw input of {@link Object}s separated by <code>delimiter</code>. On
    * each object {@link Object#toString()} is invoked.<br />
    * <code>null</code> values or those {@link Object#toString()} is empty are neglected.
-   * 
+   *
    * @param delimiter
    * @param values
    * @return never <code>null</code>, empty String in case no elements are appended
@@ -1420,7 +1444,7 @@ public final class StringUtility {
    * prefixes and suffixes are neglected.
    * <p>
    * <b>Example</b>: <code>box("(", "foo", ")");</code> returns <code>"(foo)"</code>.
-   * 
+   *
    * @param prefix
    * @param s
    *          the string to box.
@@ -1462,14 +1486,7 @@ public final class StringUtility {
   public static byte[] compress(String s) {
     ByteArrayOutputStream buffer = new ByteArrayOutputStream();
     Deflater deflater = new Deflater(Deflater.BEST_COMPRESSION);
-    DeflaterOutputStream deflaterOutputStream = new DeflaterOutputStream(buffer, deflater); // schreibt
-    // die
-    // komprimierten
-    // Daten
-    // in
-    // den
-    // Stream
-    // buffer
+    DeflaterOutputStream deflaterOutputStream = new DeflaterOutputStream(buffer, deflater); // writes the compressed data into the stream buffer
     StringReader in = null;
     try {
       in = new StringReader(s);
@@ -1570,10 +1587,8 @@ public final class StringUtility {
    */
   public static String removePrefixes(String s, String... prefixes) {
     for (int i = 0; i < prefixes.length; i++) {
-      if (prefixes[i] != null) {
-        if (s.toLowerCase().startsWith(prefixes[i].toLowerCase())) {
-          s = s.substring(prefixes[i].length());
-        }
+      if (prefixes[i] != null && s.toLowerCase().startsWith(prefixes[i].toLowerCase())) {
+        s = s.substring(prefixes[i].length());
       }
     }
     return s;
@@ -1693,7 +1708,7 @@ public final class StringUtility {
    * <small>Thereby, the pattern works case-insensitive and in dot-all mode. See {@link Pattern for more information}
    * </small>
    * </p>
-   * 
+   *
    * @param s
    * @param regex
    * @return
@@ -1714,7 +1729,7 @@ public final class StringUtility {
   /**
    * Creates a new string repeating the <code>token</code> <code>repetitions</code> times. If <code>repetitions</code>
    * <= 0 an empty string is returned.
-   * 
+   *
    * @param token
    * @param repetitions
    */
@@ -1729,7 +1744,7 @@ public final class StringUtility {
   /**
    * Similar to {@link #nvl(Object, String)} but returns <code>valueWhenEmpty</code> not only if value is null, but as
    * well when the String representation of <code>value</code> is empty or contains only whitespaces.
-   * 
+   *
    * @param property
    * @param string
    * @return
@@ -1741,7 +1756,7 @@ public final class StringUtility {
 
   /**
    * Checks whether the given string modification still fulfills the given {@link DecimalFormat} max length constraints.
-   * 
+   *
    * @param format
    *          The {@link DecimalFormat} holding the constraints: {@link DecimalFormat#getMaximumIntegerDigits()},
    *          {@link DecimalFormat#getMaximumFractionDigits()}.
@@ -1756,7 +1771,11 @@ public final class StringUtility {
    * @return <code>true</code> if the given {@link DecimalFormat} length constraints are still fulfilled after the
    *         string modification has been applied or if the resulting string is no valid number. <code>false</code>
    *         otherwise.
+   * @deprecated use {@link AbstractNumberField#isWithinNumberFormatLimits(DecimalFormat, String, int, int, String)}
+   *             instead.
+   *             Will be removed in the N-Release
    */
+  @Deprecated
   public static boolean isWithinNumberFormatLimits(DecimalFormat format, String curText, int offset, int replaceLen, String insertText) {
     // !! IMPORTANT NOTE: There is also a JavaScript implementation of this method: org/eclipse/scout/rt/ui/rap/form/fields/numberfield/RwtScoutNumberField.js
     // When changing this implementation also consider updating the js version!
@@ -1776,7 +1795,7 @@ public final class StringUtility {
     }
 
     Pattern pat = Pattern.compile("[^1-9" + format.getDecimalFormatSymbols().getZeroDigit() + "]");
-	String decimalSeparator = String.valueOf(format.getDecimalFormatSymbols().getDecimalSeparator());
+    String decimalSeparator = String.valueOf(format.getDecimalFormatSymbols().getDecimalSeparator());
     String[] parts = futureText.split(Pattern.quote(decimalSeparator));
     if (parts.length >= 1) {
       String intPartDigits = pat.matcher(parts[0]).replaceAll("");

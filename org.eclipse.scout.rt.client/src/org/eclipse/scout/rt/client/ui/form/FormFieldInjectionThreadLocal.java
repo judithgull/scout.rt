@@ -11,11 +11,14 @@
 package org.eclipse.scout.rt.client.ui.form;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.eclipse.scout.commons.annotations.InjectFieldTo;
+import org.eclipse.scout.commons.annotations.OrderedCollection;
 import org.eclipse.scout.commons.annotations.Replace;
 import org.eclipse.scout.rt.client.ui.form.fields.AbstractFormField;
+import org.eclipse.scout.rt.client.ui.form.fields.ICompositeField;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 
 /**
@@ -24,7 +27,7 @@ import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
  * This thread local is used by {@link AbstractForm} and {@link AbstractFormField} to put its contributions.
  * <p>
  * The caller is responsible to call #push and #pop as in a stack manner using try...finally.
- * 
+ *
  * @since 3.8.1
  */
 public final class FormFieldInjectionThreadLocal {
@@ -49,6 +52,55 @@ public final class FormFieldInjectionThreadLocal {
    */
   public static void pop(IFormFieldInjection injection) {
     THREAD_LOCAL.get().popInternal(injection);
+    if (THREAD_LOCAL.get().isEmpty()) {
+      THREAD_LOCAL.remove();
+    }
+  }
+
+  /**
+   * Keeps track of the current parent field path. All {@link ICompositeField}s supporting form field injection must
+   * invoke this method before child fields are created. Further, the caller is responsible for invoking
+   * {@link #popContainerField(ICompositeField)}. Use the following code snippet.
+   * <p/>
+   * <b>Code Snippet</b>:
+   *
+   * <pre>
+   * try {
+   *   FormFieldInjectionThreadLocal.pushContainerField(this);
+   *   // create child fields
+   * }
+   * finally {
+   *   FormFieldInjectionThreadLocal.popContainerField(this);
+   * }
+   * </pre>
+   *
+   * @param container
+   * @since 4.1
+   */
+  public static void pushContainerField(ICompositeField container) {
+    THREAD_LOCAL.get().pushContainerFieldInternal(container);
+  }
+
+  /**
+   * @param container
+   * @see #pushContainerField(ICompositeField)
+   * @since 4.1
+   */
+  public static void popContainerField(ICompositeField container) {
+    THREAD_LOCAL.get().popContainerFieldInternal(container);
+    if (THREAD_LOCAL.get().isEmpty()) {
+      THREAD_LOCAL.remove();
+    }
+  }
+
+  /**
+   * @return Returns the list of parent fields of the current form field injection. The list is not modifiable and never
+   *         <code>null</code>.
+   * @see #pushContainerField(ICompositeField)
+   * @since 4.1
+   */
+  public static List<ICompositeField> getContainerFields() {
+    return THREAD_LOCAL.get().getContainerFieldsInternal();
   }
 
   /**
@@ -65,15 +117,17 @@ public final class FormFieldInjectionThreadLocal {
   /**
    * @param container
    *          is the container field that is being added potential injected fields
-   * @param fieldList
-   *          live and mutable list of currently (configured) fields, not yet initialized
+   * @param fields
+   *          live and mutable collection of currently (configured) fields, not yet initialized
    *          or added to the container field
    */
-  public static void injectFields(IFormField container, List<IFormField> fieldList) {
-    THREAD_LOCAL.get().injectFieldsInternal(container, fieldList);
+  public static void injectFields(IFormField container, OrderedCollection<IFormField> fields) {
+    THREAD_LOCAL.get().injectFieldsInternal(container, fields);
   }
 
   private final ArrayList<IFormFieldInjection> m_stack = new ArrayList<IFormFieldInjection>();
+
+  private final List<ICompositeField> m_containerFields = new ArrayList<ICompositeField>();
 
   private FormFieldInjectionThreadLocal() {
   }
@@ -98,12 +152,12 @@ public final class FormFieldInjectionThreadLocal {
     m_stack.remove(m_stack.size() - 1);
   }
 
-  private void injectFieldsInternal(IFormField container, List<IFormField> fieldList) {
+  private void injectFieldsInternal(IFormField container, OrderedCollection<IFormField> fields) {
     if (m_stack.isEmpty()) {
       return;
     }
     for (IFormFieldInjection i : m_stack) {
-      i.injectFields(container, fieldList);
+      i.injectFields(container, fields);
     }
   }
 
@@ -114,5 +168,36 @@ public final class FormFieldInjectionThreadLocal {
     for (IFormFieldInjection i : m_stack) {
       i.filterFields(container, fieldList);
     }
+  }
+
+  private void pushContainerFieldInternal(ICompositeField container) {
+    if (container == null) {
+      throw new IllegalArgumentException("container is null");
+    }
+    m_containerFields.add(container);
+  }
+
+  private void popContainerFieldInternal(ICompositeField container) {
+    if (container == null) {
+      throw new IllegalArgumentException("container is null");
+    }
+    if (m_containerFields.isEmpty()) {
+      throw new IllegalArgumentException("push/pop asymmetry; expected nothing but got " + container.getClass());
+    }
+    if (m_containerFields.isEmpty() || m_containerFields.get(m_containerFields.size() - 1) != container) {
+      throw new IllegalArgumentException("push/pop asymmetry; expected " + m_containerFields.get(m_containerFields.size() - 1).getClass() + " but got " + container.getClass());
+    }
+    m_containerFields.remove(m_containerFields.size() - 1);
+  }
+
+  private List<ICompositeField> getContainerFieldsInternal() {
+    return Collections.unmodifiableList(m_containerFields);
+  }
+
+  /**
+   * @return if both stack and container field list are empty
+   */
+  private boolean isEmpty() {
+    return (m_stack.isEmpty() && m_containerFields.isEmpty());
   }
 }

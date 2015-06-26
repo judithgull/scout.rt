@@ -10,6 +10,9 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.basic.table.columns;
 
+import org.eclipse.scout.rt.client.ui.form.fields.AbstractBasicField;
+import org.eclipse.scout.rt.client.ui.form.fields.IBasicField;
+
 public interface IStringColumn extends IColumn<String> {
   /* enum for formats */
 
@@ -29,7 +32,7 @@ public interface IStringColumn extends IColumn<String> {
 
   /**
    * Sets the display format of this column.
-   * 
+   *
    * @param s
    *          Either {@code null}, {@link #FORMAT_LOWER} or {@link #FORMAT_UPPER}.
    */
@@ -43,14 +46,24 @@ public interface IStringColumn extends IColumn<String> {
 
   boolean isSelectAllOnEdit();
 
-  public void setSelectAllOnEdit(boolean b);
+  void setSelectAllOnEdit(boolean b);
 
-  public void setValidateOnAnyKey(boolean b);
+  /**
+   * @deprecated use {@link IBasicField#setUpdateDisplayTextOnModify(boolean)} and
+   *             {@link AbstractBasicField#execChangedDisplayText()} instead; will be removed in 5.1.0;
+   */
+  @Deprecated
+  void setValidateOnAnyKey(boolean b);
 
-  public boolean isValidateOnAnyKey();
+  /**
+   * @deprecated use {@link IBasicField#setUpdateDisplayTextOnModify(boolean)} and
+   *             {@link AbstractBasicField#execChangedDisplayText()} instead; will be removed in 5.1.0;
+   */
+  @Deprecated
+  boolean isValidateOnAnyKey();
 
-  public void setMaxLength(int len);
+  void setMaxLength(int len);
 
-  public int getMaxLength();
+  int getMaxLength();
 
 }

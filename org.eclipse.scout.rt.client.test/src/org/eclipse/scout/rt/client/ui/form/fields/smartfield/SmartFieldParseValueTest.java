@@ -43,7 +43,7 @@ public class SmartFieldParseValueTest {
     SmartField smartField = new SmartField();
     // single match
     smartField.getUIFacade().setTextFromUI("a");
-    assertEquals(new Long(1L), smartField.getValue());
+    assertEquals(Long.valueOf(1L), smartField.getValue());
     assertNull(smartField.getProposalForm());
 
   }
@@ -61,7 +61,7 @@ public class SmartFieldParseValueTest {
     // close the proposal form
     smartField.getProposalForm().doOk();
     assertNull(smartField.getProposalForm());
-    assertEquals(new Long(1L), smartField.getValue());
+    assertEquals(Long.valueOf(1L), smartField.getValue());
   }
 
   @Test
@@ -118,10 +118,10 @@ public class SmartFieldParseValueTest {
     @Override
     public List<? extends ILookupRow<Long>> getDataByText(ILookupCall<Long> call) throws ProcessingException {
       if ("a*".equals(call.getText())) {
-        return CollectionUtility.arrayList(new LookupRow<Long>(1l, "AName"));
+        return CollectionUtility.arrayList(new LookupRow<Long>(1L, "AName"));
       }
       if ("b*".equals(call.getText())) {
-        return CollectionUtility.arrayList(new LookupRow<Long>(1l, "AName"), new LookupRow<Long>(2l, "bName"));
+        return CollectionUtility.arrayList(new LookupRow<Long>(1L, "AName"), new LookupRow<Long>(2L, "bName"));
       }
       return Collections.emptyList();
     }

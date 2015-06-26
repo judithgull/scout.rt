@@ -55,6 +55,7 @@ import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Menu;
+import org.eclipse.swt.widgets.Text;
 
 public class RwtScoutDateField extends RwtScoutBasicFieldComposite<IDateField> implements IRwtScoutDateField, IPopupSupport {
 
@@ -108,7 +109,7 @@ public class RwtScoutDateField extends RwtScoutBasicFieldComposite<IDateField> i
     StatusLabelEx label = getUiEnvironment().getFormToolkit().createStatusLabel(container, getScoutObject());
 
     m_dateContainer = getUiEnvironment().getFormToolkit().createComposite(container, SWT.BORDER);
-    m_dateContainer.setData(RWT.CUSTOM_VARIANT, RwtUtility.VARIANT_COMPOSITE_INPUT_FIELD_BORDER);
+    m_dateContainer.setData(RWT.CUSTOM_VARIANT, VARIANT_DATEFIELD);
 
     m_menuMarkerComposite = new RwtContextMenuMarkerComposite(m_dateContainer, getUiEnvironment(), SWT.NONE);
     getUiEnvironment().getFormToolkit().adapt(m_menuMarkerComposite);
@@ -252,24 +253,12 @@ public class RwtScoutDateField extends RwtScoutBasicFieldComposite<IDateField> i
   /**
    * The event is fired only if the datepicker popup is open.
    * <p>
-   * The default sets the focus on the ui field if the new focus is inside the date picker. <br/>
    * If the new focus is outside the date picker it makes sure the date picker popup will be closed.
    * </p>
    */
   protected void handleUiFocusLostOnDatePickerPopup(FocusEvent event) {
-    if (isFocusInDatePicker()) {
+    if (!isFocusInDatePicker()) {
       getUiEnvironment().getDisplay().asyncExec(new Runnable() {
-
-        @Override
-        public void run() {
-          getUiField().setFocus();
-        }
-
-      });
-    }
-    else {
-      getUiEnvironment().getDisplay().asyncExec(new Runnable() {
-
         @Override
         public void run() {
           makeSureDateChooserIsClosed();
@@ -290,10 +279,10 @@ public class RwtScoutDateField extends RwtScoutBasicFieldComposite<IDateField> i
     super.setEnabledFromScout(b);
     m_dropDownButton.setEnabled(b);
     if (b) {
-      m_dateContainer.setData(RWT.CUSTOM_VARIANT, RwtUtility.VARIANT_COMPOSITE_INPUT_FIELD_BORDER);
+      m_dateContainer.setData(RWT.CUSTOM_VARIANT, VARIANT_DATEFIELD);
     }
     else {
-      m_dateContainer.setData(RWT.CUSTOM_VARIANT, RwtUtility.VARIANT_COMPOSITE_INPUT_FIELD_BORDER_READONLY);
+      m_dateContainer.setData(RWT.CUSTOM_VARIANT, VARIANT_DATEFIELD_DISABLED);
     }
   }
 
@@ -314,20 +303,28 @@ public class RwtScoutDateField extends RwtScoutBasicFieldComposite<IDateField> i
 
   @Override
   protected void setDisplayTextFromScout(String s) {
-    IDateField scoutField = getScoutObject();
+    Text field = getUiField();
+    String oldText = field.getText();
     if (s == null) {
       s = "";
     }
-    m_displayTextToVerify = s;
-    Date value = scoutField.getValue();
-    if (value != null) {
-      DateFormat format = scoutField.getIsolatedDateFormat();
-      if (format != null) {
-        m_displayTextToVerify = format.format(value);
-      }
+    if (oldText == null) {
+      oldText = "";
     }
-    getUiField().setText(m_displayTextToVerify);
-    getUiField().setCaretOffset(0);
+    if (oldText.equals(s)) {
+      return;
+    }
+    m_displayTextToVerify = s;
+    IDateField f = getScoutObject();
+    Date value = f.getValue();
+    if (f.isHasTime() && value != null) {
+      // If the the field has a time part (2nd field in swing, hooked to the same model field.)
+      // the model's displaytext is ignored, instead the model's value is formatted.
+      DateFormat format = f.getIsolatedDateFormat();
+      m_displayTextToVerify = format.format(value);
+    }
+    //The model's displaytext is set if the model's value is null or the field has no time part.
+    updateTextKeepCurserPosition(m_displayTextToVerify);
   }
 
   @Override
@@ -363,7 +360,7 @@ public class RwtScoutDateField extends RwtScoutBasicFieldComposite<IDateField> i
     }
     final String text = getUiField().getText();
     // only handle if text has changed
-    if (CompareUtility.equals(text, m_displayTextToVerify) && (isDateTimeCompositeMember() || getScoutObject().getErrorStatus() == null)) {
+    if (!m_updateDisplayTextOnModifyWasTrueSinceLastWriteDown && CompareUtility.equals(text, m_displayTextToVerify) && (isDateTimeCompositeMember() || getScoutObject().getErrorStatus() == null)) {
       return;
     }
     m_displayTextToVerify = text;
@@ -384,6 +381,9 @@ public class RwtScoutDateField extends RwtScoutBasicFieldComposite<IDateField> i
       //nop
     }
     getUiEnvironment().dispatchImmediateUiJobs();
+    if (m_updateDisplayTextOnModifyWasTrueSinceLastWriteDown && !m_updateDisplayTextOnModify) {
+      m_updateDisplayTextOnModifyWasTrueSinceLastWriteDown = false;
+    }
   }
 
   @Override
@@ -508,9 +508,13 @@ public class RwtScoutDateField extends RwtScoutBasicFieldComposite<IDateField> i
         && getUiField().isVisible()) {
       if (level >= 0) {
         // notify Scout
+        final String newDisplayText = getUiField().getText();
         Runnable t = new Runnable() {
           @Override
           public void run() {
+            if (!CompareUtility.equals(newDisplayText, getScoutObject().getDisplayText())) {
+              getScoutObject().getUIFacade().setDateTextFromUI(newDisplayText);
+            }
             getScoutObject().getUIFacade().fireDateShiftActionFromUI(level, value);
           }
         };

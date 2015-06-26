@@ -15,6 +15,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -22,13 +23,19 @@ import org.eclipse.scout.commons.DateUtility;
 import org.eclipse.scout.commons.LocaleThreadLocal;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.annotations.ClassId;
+import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.holders.BooleanHolder;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.IFormFieldExtension;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.datefield.DateFieldChains.DateFieldShiftDateChain;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.datefield.DateFieldChains.DateFieldShiftTimeChain;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.datefield.IDateFieldExtension;
 import org.eclipse.scout.rt.client.ui.form.fields.AbstractBasicField;
+import org.eclipse.scout.rt.client.ui.form.fields.AbstractFormField;
 import org.eclipse.scout.rt.shared.ScoutTexts;
 import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.service.SERVICES;
@@ -46,7 +53,7 @@ import org.eclipse.scout.service.SERVICES;
  * <strong>Example:</strong>
  * </p>
  * <blockquote>
- * 
+ *
  * <pre>
  * //Consider a form containing a date field:
  * ...
@@ -71,13 +78,13 @@ import org.eclipse.scout.service.SERVICES;
  * }
  * //The two println statements result in the same value on server and client independent of the timezone of the client and server.
  * </pre>
- * 
+ *
  * </blockquote>
  * </p>
  * <p>
  * <strong>Default values:</strong> Default hasDate=true and hasTime=false
  * </p>
- * 
+ *
  * @see org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelObjectReplacer ServiceTunnelObjectReplacer
  */
 @ClassId("f73eed8c-1e70-4903-a23f-4a29d884e5ea")
@@ -152,6 +159,7 @@ public abstract class AbstractDateField extends AbstractBasicField<Date> impleme
    * <p>
    * see {@link #adjustDate(int, int, int)}
    */
+  @ConfigOperation
   protected void execShiftDate(int level, int value) throws ProcessingException {
     switch (level) {
       case 0: {
@@ -179,6 +187,7 @@ public abstract class AbstractDateField extends AbstractBasicField<Date> impleme
    * <p>
    * see {@link #adjustDate(int, int, int)}
    */
+  @ConfigOperation
   protected void execShiftTime(int level, int value) throws ProcessingException {
     switch (level) {
       case 0: {
@@ -207,12 +216,21 @@ public abstract class AbstractDateField extends AbstractBasicField<Date> impleme
     setAutoDate(getConfiguredAutoDate());
   }
 
+  /**
+   * UpdateDisplayTextOnModify is not supported for DateTimeField.
+   */
+  @Override
+  public final void setUpdateDisplayTextOnModify(boolean b) {
+    super.setUpdateDisplayTextOnModify(b);
+    preventUpdateDisplaytextOnModifiyOnDateTimeField();
+  }
+
   @Override
   public void setFormat(String s) {
     m_format = s;
     if (isInitialized()) {
       if (shouldUpdateDisplayText(false)) {
-        setDisplayText(execFormatValue(getValue()));
+        setDisplayText(interceptFormatValue(getValue()));
       }
     }
   }
@@ -230,8 +248,16 @@ public abstract class AbstractDateField extends AbstractBasicField<Date> impleme
   @Override
   public void setHasTime(boolean b) {
     propertySupport.setPropertyBool(PROP_HAS_TIME, b);
+    preventUpdateDisplaytextOnModifiyOnDateTimeField();
     if (isInitialized()) {
       setValue(getValue());
+    }
+  }
+
+  private void preventUpdateDisplaytextOnModifiyOnDateTimeField() {
+    if (isUpdateDisplayTextOnModify() && isHasDate() && isHasTime()) {
+      LOG.error("UpdateDisplayTextOnModify is not supported for combined Date Time Field.");
+      setUpdateDisplayTextOnModify(false);
     }
   }
 
@@ -243,6 +269,7 @@ public abstract class AbstractDateField extends AbstractBasicField<Date> impleme
   @Override
   public void setHasDate(boolean b) {
     propertySupport.setPropertyBool(PROP_HAS_DATE, b);
+    preventUpdateDisplaytextOnModifiyOnDateTimeField();
     if (isInitialized()) {
       setValue(getValue());
     }
@@ -326,20 +353,17 @@ public abstract class AbstractDateField extends AbstractBasicField<Date> impleme
   // validate value for ranges, mandatory, ...
   @Override
   protected Date validateValueInternal(Date rawValue) throws ProcessingException {
-    //legacy support
-    Object legacyValue = rawValue;
-    if (legacyValue instanceof Number) {
-      rawValue = DateUtility.convertDoubleTimeToDate((Number) legacyValue);
-    }
     Date validValue = null;
     rawValue = super.validateValueInternal(rawValue);
-    try {
-      // apply format
-      DateFormat df = getDateFormat();
-      rawValue = df.parse(df.format(rawValue));
-    }
-    catch (Throwable t) {
-      // nop, take raw value
+    if (rawValue != null) {
+      try {
+        // apply format
+        DateFormat df = getDateFormat();
+        rawValue = df.parse(df.format(rawValue));
+      }
+      catch (Throwable t) {
+        // nop, take raw value
+      }
     }
     validValue = rawValue;
     return validValue;
@@ -559,7 +583,7 @@ public abstract class AbstractDateField extends AbstractBasicField<Date> impleme
     Matcher verboseDeltaMatcher = Pattern.compile("([+-])([0-9]+)").matcher(text);
     if (verboseDeltaMatcher.matches()) {
       int i = Integer.parseInt(verboseDeltaMatcher.group(2));
-      if (verboseDeltaMatcher.group(1).equals("-")) {
+      if ("-".equals(verboseDeltaMatcher.group(1))) {
         i = -i;
       }
       Calendar cal = Calendar.getInstance();
@@ -700,7 +724,7 @@ public abstract class AbstractDateField extends AbstractBasicField<Date> impleme
 /*
       d=parseHelper(df, text, includesTime);
       if(d!=null) return d;
-*/
+ */
   private Date parseDateTimeFormatsInternal(String text, DateFormat defaultFormat, BooleanHolder includesTime) {
     Date d = null;
     if (defaultFormat != null) {
@@ -986,7 +1010,7 @@ public abstract class AbstractDateField extends AbstractBasicField<Date> impleme
     return d;
   }
 
-  private class P_UIFacade implements IDateFieldUIFacade {
+  private class P_UIFacade extends AbstractBasicField.P_UIFacade implements IDateFieldUIFacade {
 
     @Override
     public boolean setDateTextFromUI(String newDate) {
@@ -1115,7 +1139,7 @@ public abstract class AbstractDateField extends AbstractBasicField<Date> impleme
     @Override
     public void fireDateShiftActionFromUI(int level, int value) {
       try {
-        execShiftDate(level, value);
+        interceptShiftDate(level, value);
       }
       catch (ProcessingException e) {
         SERVICES.getService(IExceptionHandlerService.class).handleException(e);
@@ -1128,7 +1152,7 @@ public abstract class AbstractDateField extends AbstractBasicField<Date> impleme
     @Override
     public void fireTimeShiftActionFromUI(int level, int value) {
       try {
-        execShiftTime(level, value);
+        interceptShiftTime(level, value);
       }
       catch (ProcessingException e) {
         SERVICES.getService(IExceptionHandlerService.class).handleException(e);
@@ -1147,5 +1171,39 @@ public abstract class AbstractDateField extends AbstractBasicField<Date> impleme
       setWhileTyping(whileTyping);
       return parseValue(newText);
     }
+  }
+
+  protected final void interceptShiftTime(int level, int value) throws ProcessingException {
+    List<? extends IFormFieldExtension<? extends AbstractFormField>> extensions = getAllExtensions();
+    DateFieldShiftTimeChain chain = new DateFieldShiftTimeChain(extensions);
+    chain.execShiftTime(level, value);
+  }
+
+  protected final void interceptShiftDate(int level, int value) throws ProcessingException {
+    List<? extends IFormFieldExtension<? extends AbstractFormField>> extensions = getAllExtensions();
+    DateFieldShiftDateChain chain = new DateFieldShiftDateChain(extensions);
+    chain.execShiftDate(level, value);
+  }
+
+  protected static class LocalDateFieldExtension<OWNER extends AbstractDateField> extends LocalBasicFieldExtension<Date, OWNER> implements IDateFieldExtension<OWNER> {
+
+    public LocalDateFieldExtension(OWNER owner) {
+      super(owner);
+    }
+
+    @Override
+    public void execShiftTime(DateFieldShiftTimeChain chain, int level, int value) throws ProcessingException {
+      getOwner().execShiftTime(level, value);
+    }
+
+    @Override
+    public void execShiftDate(DateFieldShiftDateChain chain, int level, int value) throws ProcessingException {
+      getOwner().execShiftDate(level, value);
+    }
+  }
+
+  @Override
+  protected IDateFieldExtension<? extends AbstractDateField> createLocalExtension() {
+    return new LocalDateFieldExtension<AbstractDateField>(this);
   }
 }

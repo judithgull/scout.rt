@@ -31,9 +31,11 @@ public class TreeEx extends Tree {
   private boolean m_readOnly = false;
   private TreeItem m_contextItem;
 
+  private Event m_lastMouseDown = null;
+
   public TreeEx(Composite parent, int style) {
     super(parent, style | SWT.FULL_SELECTION);
-    addListener(SWT.MouseDown, new Listener() {
+    addListener(SWT.MouseUp, new Listener() {
       private static final long serialVersionUID = 1L;
 
       @Override
@@ -41,6 +43,29 @@ public class TreeEx extends Tree {
         m_contextItem = getItem(new Point(event.x, event.y));
       }
     });
+  }
+
+  @Override
+  public void notifyListeners(int eventType, Event event) {
+    //add context item to event before the table may change (e.g. scrolling due to node expansion)
+    if (event.type == SWT.MouseDown) {
+      if (!isDuplicateMouseDown(event)) {
+        setContextItem(event);
+      }
+      m_lastMouseDown = event;
+    }
+    super.notifyListeners(eventType, event);
+  }
+
+  private void setContextItem(Event event) {
+    if (event != null) {
+      TreeItem contextItem = getItem(new Point(event.x, event.y));
+      event.data = contextItem;
+    }
+  }
+
+  private boolean isDuplicateMouseDown(Event event) {
+    return m_lastMouseDown != null && event.time == m_lastMouseDown.time;
   }
 
   @Override

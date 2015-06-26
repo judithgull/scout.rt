@@ -10,15 +10,17 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.server.scheduler;
 
+import static org.junit.Assert.assertEquals;
+
 import java.util.Calendar;
 
 import javax.security.auth.Subject;
 
-import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.scout.commons.exception.ProcessingException;
+import org.eclipse.scout.commons.logger.IScoutLogger;
+import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.server.testenvironment.TestEnvironmentServerSession;
 import org.eclipse.scout.rt.testing.server.runner.ScoutServerTestRunner;
-import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -27,43 +29,50 @@ import org.junit.runner.RunWith;
  */
 @RunWith(ScoutServerTestRunner.class)
 public class SchedulerTest {
+
   @Test
   public void testRunningJobCount() throws ProcessingException, InterruptedException {
-    IScheduler scheduler = new Scheduler(new Subject(), TestEnvironmentServerSession.class, new Ticker(Calendar.SECOND));
+    IScheduler scheduler = new TestScheduler();
     scheduler.addJob(new JobAcceptTick("groupId", "jobIdAccept"));
     scheduler.addJob(new JobDontAcceptTick("groupId", "jobIdDontAccept"));
-    Assert.assertEquals("JobCount must be 2", 2, scheduler.getJobCount());
+    assertEquals("JobCount must be 2", 2, scheduler.getJobCount());
     scheduler.start();
 
-    Thread.sleep(1500); //now, JobAcceptTick should be running
-    Assert.assertEquals("JobAcceptTick should be running only", 1, scheduler.getRunningJobCount());
-    Assert.assertEquals("JobAcceptTick should be running only", 1, scheduler.getRunningJobs(null, null).size());
-    Assert.assertEquals("2 Jobs should be in the Scheduler", 2, scheduler.getAllJobs().size());
-    Assert.assertEquals("2 Jobs should be in the Scheduler", 2, scheduler.getJobCount());
+    Thread.sleep(150); //now, JobAcceptTick should be running
+    assertEquals("JobAcceptTick should be running only", 1, scheduler.getRunningJobCount());
+    assertEquals("JobAcceptTick should be running only", 1, scheduler.getRunningJobs(null, null).size());
+    assertEquals("2 Jobs should be in the Scheduler", 2, scheduler.getAllJobs().size());
+    assertEquals("2 Jobs should be in the Scheduler", 2, scheduler.getJobCount());
 
-    Thread.sleep(1000); //now JobAcceptTick should be finished
-    Assert.assertEquals("No running job left", 0, scheduler.getRunningJobCount());
-    Assert.assertEquals("No running job left", 0, scheduler.getRunningJobs(null, null).size());
-    Assert.assertEquals("jobDontAccept should be in the Scheduler", 1, scheduler.getAllJobs().size());
-    Assert.assertEquals("jobDontAccept should be in the Scheduler", 1, scheduler.getJobCount());
+    Thread.sleep(100); //now JobAcceptTick should be finished
+    assertEquals("No running job left", 0, scheduler.getRunningJobCount());
+    assertEquals("No running job left", 0, scheduler.getRunningJobs(null, null).size());
+    assertEquals("jobDontAccept should be in the Scheduler", 1, scheduler.getAllJobs().size());
+    assertEquals("jobDontAccept should be in the Scheduler", 1, scheduler.getJobCount());
   }
 
   @Test
-  public void testServerJobName() throws Throwable {
-    IScheduler scheduler = new Scheduler(new Subject(), TestEnvironmentServerSession.class, new Ticker(Calendar.SECOND));
-    scheduler.start();
-    JobAcceptTick job = new JobAcceptTick("groupId", "jobIdAccept");
-    TickSignal tick = scheduler.getTicker().waitForNextTick();
-    JobFinderThread jobFinderThread = new JobFinderThread();
-    jobFinderThread.start();
-    scheduler.handleJobExecution(job, tick);
-    scheduler.stop();
-    jobFinderThread.join();
-    Assert.assertTrue("The 'Scheduler.groupId.jobIdAccept' Job wasn't found", jobFinderThread.foundJob());
+  public void testServerJobName() throws ProcessingException {
+    TestScheduler scheduler = new TestScheduler();
+    JobAcceptTick job = new JobAcceptTick("groupId", "jobId");
+    assertEquals("Scheduler.groupId.jobId", scheduler.getJobName(job));
+  }
+}
+
+class TestScheduler extends Scheduler {
+
+  public TestScheduler() throws ProcessingException {
+    super(new Subject(), TestEnvironmentServerSession.class, new Ticker(Calendar.SECOND));
+  }
+
+  @Override
+  public String getJobName(ISchedulerJob job) {
+    return super.getJobName(job);
   }
 }
 
 class JobAcceptTick extends AbstractSchedulerJob {
+  private static IScoutLogger LOG = ScoutLogManager.getLogger(JobAcceptTick.class);
 
   public JobAcceptTick(String groupId, String jobId) {
     super(groupId, jobId);
@@ -72,11 +81,10 @@ class JobAcceptTick extends AbstractSchedulerJob {
   @Override
   public void run(IScheduler scheduler, TickSignal signal) throws ProcessingException {
     try {
-      //wait 2 seconds
-      Thread.sleep(2000);
+      Thread.sleep(200);
     }
     catch (InterruptedException e) {
-      e.printStackTrace();
+      LOG.error("Interrupted tick", e);
     }
     setDisposed(true);
   }
@@ -95,30 +103,5 @@ class JobDontAcceptTick extends AbstractSchedulerJob {
   @Override
   public boolean acceptTick(TickSignal signal) {
     return false;
-  }
-}
-
-class JobFinderThread extends Thread {
-  private boolean m_foundJob = false;
-
-  boolean foundJob() {
-    return m_foundJob;
-  }
-
-  @Override
-  public void run() {
-    try {
-      Thread.sleep(500); //wait a little bit until JobAcceptTick is running
-    }
-    catch (InterruptedException e) {
-      e.printStackTrace();
-    }
-    Job[] allJobs = Job.getJobManager().find(null);
-
-    for (Job job : allJobs) {
-      if (job.getName().equals("Scheduler.groupId.jobIdAccept")) {
-        m_foundJob = true;
-      }
-    }
   }
 }

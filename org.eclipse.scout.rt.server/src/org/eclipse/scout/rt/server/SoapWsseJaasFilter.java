@@ -132,18 +132,58 @@ public class SoapWsseJaasFilter implements Filter {
     final InputStream cacheIn = new ByteArrayInputStream(cacheOut.toByteArray());
     cacheOut = null;
     //
-    final HttpServletRequestWrapper replayRequest = new HttpServletRequestWrapper((HttpServletRequest) request) {
+    continueChainWithPrincipal(subject, createReplayRequest(request, cacheIn), (HttpServletResponse) response, chain);
+  }
+
+  /**
+   * @return request with new {@link ServletInputStream} that can be read again with original data
+   */
+  private HttpServletRequestWrapper createReplayRequest(ServletRequest request, final InputStream cacheIn) {
+    return new HttpServletRequestWrapper((HttpServletRequest) request) {
       @Override
       public ServletInputStream getInputStream() throws IOException {
         return new ServletInputStream() {
+          private javax.servlet.ReadListener m_readListener;
+          private boolean m_finished = false;
+
           @Override
           public int read() throws IOException {
-            return cacheIn.read();
+            final int next = cacheIn.read();
+            if (next == -1) {
+              m_finished = true;
+              if (m_readListener != null) {
+                m_readListener.onAllDataRead();
+              }
+            }
+            return next;
+          }
+
+          @Override
+          public boolean isFinished() {
+            return m_finished;
+          }
+
+          @Override
+          public boolean isReady() {
+            return true;
+          }
+
+          @Override
+          public void setReadListener(javax.servlet.ReadListener readListener) {
+            m_readListener = readListener;
+            if (m_readListener != null) {
+              try {
+                m_readListener.onDataAvailable();
+              }
+              catch (IOException e) {
+                LOG.error("Error reading stream", e);
+                m_readListener.onError(e);
+              }
+            }
           }
         };
       }
     };
-    continueChainWithPrincipal(subject, replayRequest, (HttpServletResponse) response, chain);
   }
 
   private void continueChainWithPrincipal(Subject subject, final HttpServletRequest req, final HttpServletResponse res, final FilterChain chain) throws IOException, ServletException {

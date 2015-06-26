@@ -67,7 +67,7 @@ public class DateChooserDialog extends Dialog {
 
   @Override
   protected int getShellStyle() {
-    return SWT.NONE;
+    return SWT.ON_TOP | SWT.NO_FOCUS;
   }
 
   /**
@@ -114,10 +114,33 @@ public class DateChooserDialog extends Dialog {
     }
     // vertical correction
     if (prefBounds.y + prefBounds.height > appBounds.height) {
-      prefBounds.y = appBounds.height - prefBounds.height;
+      if (dialogFitsAboveField(absPrefPos, prefBounds, field)) {
+        prefBounds.y = getYCoordinateForDialogAboveField(absPrefPos, prefBounds, field);
+      }
+      else {
+        prefBounds.y = appBounds.height - prefBounds.height;
+      }
     }
 
     return new Point(prefBounds.x, prefBounds.y);
+  }
+
+  /**
+   * Checks if the dialog does fit above the given field.
+   *
+   * @since 5.0-M2
+   */
+  private boolean dialogFitsAboveField(Point absPrefPos, Rectangle dialogPrefBounds, Control field) {
+    return getYCoordinateForDialogAboveField(absPrefPos, dialogPrefBounds, field) >= 0;
+  }
+
+  /**
+   * Returns the Y-Position for the DateChooserDialog if it should be displayed above the given field.
+   *
+   * @since 5.0-M2
+   */
+  private int getYCoordinateForDialogAboveField(Point absPrefPos, Rectangle dialogPrefBounds, Control field) {
+    return absPrefPos.y - field.getBounds().height - dialogPrefBounds.height;
   }
 
   @Override
@@ -173,13 +196,13 @@ public class DateChooserDialog extends Dialog {
     new TableCellRolloverSupport(viewer);
     table.setHeaderVisible(true);
 
-    table.addListener(SWT.MouseDown, new Listener() {
+    table.addListener(SWT.MouseUp, new Listener() {
       private static final long serialVersionUID = 1L;
 
       @Override
       public void handleEvent(Event event) {
         switch (event.type) {
-          case SWT.MouseDown: {
+          case SWT.MouseUp: {
             TableColumn columnAt = RwtUtility.getRwtColumnAt(table, new Point(event.x, event.y));
             TableItem item = table.getItem(new Point(event.x, event.y));
             if (item != null) {
@@ -208,22 +231,23 @@ public class DateChooserDialog extends Dialog {
     dummyColumn.setMoveable(false);
 
     String[] wd = new DateFormatSymbols(RwtUtility.getClientSessionLocale(parent.getDisplay())).getShortWeekdays();
-    // create the m_columns from monday to saturday
-    for (int i = 2; i < 8; i++) {
+
+    Calendar c = Calendar.getInstance(RwtUtility.getClientSessionLocale(parent.getDisplay()));
+    int dayOfWeek = c.getFirstDayOfWeek();
+
+    do {
       TableColumn col = new TableColumn(table, SWT.CENTER);
       col.setData(RWT.CUSTOM_VARIANT, getDialogVariant());
       col.setWidth(getDateCellWidth());
       col.setResizable(false);
       col.setMoveable(false);
-      col.setText(wd[i]);
+      col.setText(wd[dayOfWeek]);
+
+      dayOfWeek = (dayOfWeek + 8) % 7;
+      dayOfWeek = dayOfWeek == 0 ? 7 : dayOfWeek;
     }
-    // sunday
-    TableColumn col = new TableColumn(table, SWT.CENTER);
-    col.setData(RWT.CUSTOM_VARIANT, getDialogVariant());
-    col.setWidth(getDateCellWidth());
-    col.setResizable(false);
-    col.setMoveable(false);
-    col.setText(wd[Calendar.SUNDAY]);
+    while (dayOfWeek != c.getFirstDayOfWeek());
+
     // viewer
     m_viewer = viewer;
 

@@ -25,6 +25,14 @@ import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ClientSyncJob;
 import org.eclipse.scout.rt.client.IMemoryPolicy;
+import org.eclipse.scout.rt.client.extension.ui.basic.tree.ITreeNodeExtension;
+import org.eclipse.scout.rt.client.extension.ui.desktop.outline.pages.IPageExtension;
+import org.eclipse.scout.rt.client.extension.ui.desktop.outline.pages.PageChains.PageDataChangedChain;
+import org.eclipse.scout.rt.client.extension.ui.desktop.outline.pages.PageChains.PageDisposePageChain;
+import org.eclipse.scout.rt.client.extension.ui.desktop.outline.pages.PageChains.PageInitPageChain;
+import org.eclipse.scout.rt.client.extension.ui.desktop.outline.pages.PageChains.PagePageActivatedChain;
+import org.eclipse.scout.rt.client.extension.ui.desktop.outline.pages.PageChains.PagePageDataLoadedChain;
+import org.eclipse.scout.rt.client.extension.ui.desktop.outline.pages.PageChains.PagePageDeactivatedChain;
 import org.eclipse.scout.rt.client.services.common.icon.IIconProviderService;
 import org.eclipse.scout.rt.client.ui.DataChangeListener;
 import org.eclipse.scout.rt.client.ui.WeakDataChangeListener;
@@ -54,7 +62,7 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
    * use this static method to create a string based on the vargs that can be used as userPreferenceContext
    */
   public static String createUserPreferenceContext(Object... vargs) {
-    StringBuffer buf = new StringBuffer();
+    StringBuilder buf = new StringBuilder();
     if (vargs != null) {
       for (Object o : vargs) {
         if (buf.length() > 0) {
@@ -87,7 +95,7 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
   }
 
   /**
-   * @deprecated Will be removed in the 6.0 Release.
+   * @deprecated Will be removed with the N-Release.
    *             Use {@link #AbstractPage()} in combination with getter and setter (page variable) instead.
    */
   @Deprecated
@@ -111,7 +119,7 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
   }
 
   /**
-   * @deprecated Will be removed with Bug 426088.
+   * @deprecated Will be removed with the N-Release.
    *             Use {@link #AbstractPage(boolean, String)} in combination with getter and setter (page variable)
    *             instead.
    */
@@ -136,7 +144,7 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
    * Set this property to {@code false} if you want to display a detail form within this page.
    * <p>
    * Subclasses can override this method. Default is {@code true}.
-   * 
+   *
    * @return {@code true} if this page's table is visible, {@code false} otherwise
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
@@ -150,7 +158,7 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
    * of this page as a tree node.
    * <p>
    * Subclasses can override this method. Default is {@code null}.
-   * 
+   *
    * @return the title for this page
    */
   @ConfigProperty(ConfigProperty.TEXT)
@@ -164,7 +172,7 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
    * the representation of this page as a tree node.
    * <p>
    * Subclasses can override this method. Default is {@code null}.
-   * 
+   *
    * @return the ID (name) of the icon
    * @see IIconProviderService
    */
@@ -175,32 +183,15 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
   }
 
   /**
-   * Provides a documentation text or description of this page. The text is intended to be included in external
-   * documentation. This method is typically processed by a documentation generation tool or similar.
-   * <p>
-   * Subclasses can override this method. Default is {@code null}.
-   * 
-   * @deprecated: Use a {@link ClassId} annotation as key for Doc-Text. Will be removed in the 5.0 Release.
-   * @return a documentation text, suitable to be included in external documents
-   */
-  /**
-   */
-  @Deprecated
-  @Order(60)
-  protected String getConfiguredDoc() {
-    return null;
-  }
-
-  /**
    * Called after this page has been added to the outline tree. This method may set a detail form or check
    * some parameters.
    * <p>
    * Do not load table data here, this should be done lazily in {@link AbstractPageWithTable.execLoadTableData}.
    * <p>
    * Subclasses can override this method. The default does nothing.
-   * 
+   *
    * @throws ProcessingException
-   * @see #execPageActivated()
+   * @see #interceptPageActivated()
    */
   @ConfigOperation
   @Order(40)
@@ -211,7 +202,7 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
    * Called after this page has been removed from its associated outline tree.
    * <p>
    * Subclasses can override this method. The default does nothing.
-   * 
+   *
    * @throws ProcessingException
    */
   @ConfigOperation
@@ -231,7 +222,7 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
    * outline, a full re-load of the page is performed
    * <li>else the children of this page are marked dirty and the page itself is unloaded
    * </ol>
-   * 
+   *
    * @see IDesktop#dataChanged(Object...)
    */
   @ConfigOperation
@@ -260,7 +251,7 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
         if (desktop != null) {
           Bookmark bm = desktop.createBookmark();
           setChildrenDirty(true);
-          desktop.activateBookmark(bm, false);
+          desktop.activateBookmark(bm);
         }
       }
       catch (ProcessingException e) {
@@ -289,7 +280,7 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
    * been called.
    * <p>
    * Subclasses can override this method. The default does nothing.
-   * 
+   *
    * @throws ProcessingException
    */
   @ConfigOperation
@@ -301,7 +292,7 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
    * Called whenever this page is selected in the outline tree.
    * <p>
    * Subclasses can override this method. The default does nothing.
-   * 
+   *
    * @throws ProcessingException
    */
   @ConfigOperation
@@ -313,7 +304,7 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
    * Called whenever this page is de-selected in the outline tree.
    * <p>
    * Subclasses can override this method. The default does nothing.
-   * 
+   *
    * @throws ProcessingException
    */
   @ConfigOperation
@@ -322,7 +313,7 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
   }
 
   /**
-   * @deprecated Will be removed with Bug 426088.
+   * @deprecated Will be removed with the N-Release.
    *             getter and setter (page variable) instead.
    */
   @Deprecated
@@ -349,7 +340,7 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
     if (cell.getIconId() == null && getConfiguredIconId() != null) {
       cell.setIconId(getConfiguredIconId());
     }
-    execInitPage();
+    interceptInitPage();
   }
 
   @Override
@@ -363,8 +354,6 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
   }
 
   @Override
-  @ConfigOperation
-  @Order(95)
   public final String getUserPreferenceContext() {
     return m_userPreferenceContext;
   }
@@ -415,34 +404,29 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
     try {
       initPage();
       //notify memory policy
-      try {
-        IMemoryPolicy policy = ClientSyncJob.getCurrentSession().getMemoryPolicy();
-        if (policy != null) {
-          policy.pageCreated(this);
-        }
-      }
-      catch (Throwable t) {
-        LOG.error("pageCreated " + getClass().getSimpleName(), t);
+      IMemoryPolicy policy = ClientSyncJob.getCurrentSession().getMemoryPolicy();
+      if (policy != null) {
+        policy.pageCreated(this);
       }
     }
     catch (ProcessingException e) {
       SERVICES.getService(IExceptionHandlerService.class).handleException(e);
     }
-    catch (Throwable t) {
-      SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("Unexpected", t));
+    catch (Exception e) {
+      SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("Unexpected", e));
     }
   }
 
   @Override
   public void nodeRemovedNotify() {
     try {
-      execDisposePage();
+      interceptDisposePage();
     }
     catch (ProcessingException e) {
       SERVICES.getService(IExceptionHandlerService.class).handleException(e);
     }
-    catch (Throwable t) {
-      SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("Unexpected", t));
+    catch (Exception e) {
+      SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("Unexpected", e));
     }
     // automatically remove all data change listeners
     if (m_internalDataChangeListener != null) {
@@ -456,32 +440,26 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
   @Override
   public void pageActivatedNotify() {
     try {
-      execPageActivated();
+      interceptPageActivated();
     }
-    catch (Throwable t) {
-      if (t instanceof ProcessingException && ((ProcessingException) t).isInterruption()) {
-        //nop
-      }
-      else {
-        //ticket 87361: only log a warning
-        LOG.warn("Caught a failure, probably due to operation cancelation by the user", t);
-      }
+    catch (ProcessingException t) {
+      SERVICES.getService(IExceptionHandlerService.class).handleException(t);
+    }
+    catch (Exception e) {
+      SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("Unexpected", e));
     }
   }
 
   @Override
   public void pageDeactivatedNotify() {
     try {
-      execPageDeactivated();
+      interceptPageDeactivated();
     }
-    catch (Throwable t) {
-      if (t instanceof ProcessingException && ((ProcessingException) t).isInterruption()) {
-        //nop
-      }
-      else {
-        //ticket 87361: only log a warning
-        LOG.warn("Caught a failure, probably due to operation cancelation by the user", t);
-      }
+    catch (ProcessingException p) {
+      SERVICES.getService(IExceptionHandlerService.class).handleException(p);
+    }
+    catch (Exception e) {
+      SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("Unexpected", e));
     }
   }
 
@@ -510,7 +488,7 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
   /**
    * Register a {@link DataChangeListener} on the desktop for these dataTypes<br>
    * Example:
-   * 
+   *
    * <pre>
    * registerDataChangeListener(CRMEnum.Company, CRMEnum.Project, CRMEnum.Task);
    * </pre>
@@ -520,7 +498,7 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
       m_internalDataChangeListener = new WeakDataChangeListener() {
         @Override
         public void dataChanged(Object... innerDataTypes) throws ProcessingException {
-          execDataChanged(innerDataTypes);
+          interceptDataChanged(innerDataTypes);
         }
       };
     }
@@ -534,13 +512,13 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
   @Override
   public void dataChanged(Object... dataTypes) {
     try {
-      execDataChanged(dataTypes);
+      interceptDataChanged(dataTypes);
     }
-    catch (ProcessingException e) {
-      SERVICES.getService(IExceptionHandlerService.class).handleException(e);
+    catch (ProcessingException p) {
+      SERVICES.getService(IExceptionHandlerService.class).handleException(p);
     }
-    catch (Throwable t) {
-      SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("Unexpected", t));
+    catch (Exception e) {
+      SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("Unexpected", e));
     }
   }
 
@@ -548,7 +526,7 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
    * Unregister the {@link DataChangeListener} from the desktop for these
    * dataTypes<br>
    * Example:
-   * 
+   *
    * <pre>
    * unregisterDataChangeListener(CRMEnum.Company, CRMEnum.Project, CRMEnum.Task);
    * </pre>
@@ -584,7 +562,7 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
   @Override
   public void loadChildren() throws ProcessingException {
     super.loadChildren();
-    execPageDataLoaded();
+    interceptPageDataLoaded();
   }
 
   @Override
@@ -605,6 +583,84 @@ public abstract class AbstractPage extends AbstractTreeNode implements IPage {
   @Override
   public <T> T getAdapter(Class<T> clazz) {
     return null;
+  }
+
+  protected final void interceptPageDataLoaded() throws ProcessingException {
+    List<? extends ITreeNodeExtension<? extends AbstractTreeNode>> extensions = getAllExtensions();
+    PagePageDataLoadedChain chain = new PagePageDataLoadedChain(extensions);
+    chain.execPageDataLoaded();
+  }
+
+  protected final void interceptPageActivated() throws ProcessingException {
+    List<? extends ITreeNodeExtension<? extends AbstractTreeNode>> extensions = getAllExtensions();
+    PagePageActivatedChain chain = new PagePageActivatedChain(extensions);
+    chain.execPageActivated();
+  }
+
+  protected final void interceptDataChanged(Object... dataTypes) throws ProcessingException {
+    List<? extends ITreeNodeExtension<? extends AbstractTreeNode>> extensions = getAllExtensions();
+    PageDataChangedChain chain = new PageDataChangedChain(extensions);
+    chain.execDataChanged(dataTypes);
+  }
+
+  protected final void interceptInitPage() throws ProcessingException {
+    List<? extends ITreeNodeExtension<? extends AbstractTreeNode>> extensions = getAllExtensions();
+    PageInitPageChain chain = new PageInitPageChain(extensions);
+    chain.execInitPage();
+  }
+
+  protected final void interceptPageDeactivated() throws ProcessingException {
+    List<? extends ITreeNodeExtension<? extends AbstractTreeNode>> extensions = getAllExtensions();
+    PagePageDeactivatedChain chain = new PagePageDeactivatedChain(extensions);
+    chain.execPageDeactivated();
+  }
+
+  protected final void interceptDisposePage() throws ProcessingException {
+    List<? extends ITreeNodeExtension<? extends AbstractTreeNode>> extensions = getAllExtensions();
+    PageDisposePageChain chain = new PageDisposePageChain(extensions);
+    chain.execDisposePage();
+  }
+
+  protected static class LocalPageExtension<OWNER extends AbstractPage> extends LocalTreeNodeExtension<OWNER> implements IPageExtension<OWNER> {
+
+    public LocalPageExtension(OWNER owner) {
+      super(owner);
+    }
+
+    @Override
+    public void execPageDataLoaded(PagePageDataLoadedChain chain) throws ProcessingException {
+      getOwner().execPageDataLoaded();
+    }
+
+    @Override
+    public void execPageActivated(PagePageActivatedChain chain) throws ProcessingException {
+      getOwner().execPageActivated();
+    }
+
+    @Override
+    public void execDataChanged(PageDataChangedChain chain, Object... dataTypes) throws ProcessingException {
+      getOwner().execDataChanged(dataTypes);
+    }
+
+    @Override
+    public void execInitPage(PageInitPageChain chain) throws ProcessingException {
+      getOwner().execInitPage();
+    }
+
+    @Override
+    public void execPageDeactivated(PagePageDeactivatedChain chain) throws ProcessingException {
+      getOwner().execPageDeactivated();
+    }
+
+    @Override
+    public void execDisposePage(PageDisposePageChain chain) throws ProcessingException {
+      getOwner().execDisposePage();
+    }
+  }
+
+  @Override
+  protected IPageExtension<? extends AbstractPage> createLocalExtension() {
+    return new LocalPageExtension<AbstractPage>(this);
   }
 
 }

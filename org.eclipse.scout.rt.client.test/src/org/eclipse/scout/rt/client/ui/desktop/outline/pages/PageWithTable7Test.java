@@ -11,7 +11,6 @@
 package org.eclipse.scout.rt.client.ui.desktop.outline.pages;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
@@ -59,7 +58,7 @@ public class PageWithTable7Test {
   public static class PageWithTableOutline extends AbstractOutline {
 
     @Override
-    protected void execCreateChildPages(Collection<IPage> pageList) throws ProcessingException {
+    protected void execCreateChildPages(List<IPage> pageList) throws ProcessingException {
       pageList.add(new PageWithTable());
     }
   }
@@ -70,8 +69,8 @@ public class PageWithTable7Test {
     private String[] data = new String[]{"first", "second", "third", "fourth"};
 
     @Override
-    protected Object[][] execLoadTableData(SearchFilter filter) throws ProcessingException {
-      return new Object[][]{new Object[]{data[m_counter]}};
+    protected void execLoadData(SearchFilter filter) throws ProcessingException {
+      importTableData(new Object[][]{new Object[]{data[m_counter]}});
     }
 
     @Override

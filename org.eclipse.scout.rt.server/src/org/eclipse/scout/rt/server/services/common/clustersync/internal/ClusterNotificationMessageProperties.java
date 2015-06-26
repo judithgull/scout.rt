@@ -12,9 +12,6 @@ package org.eclipse.scout.rt.server.services.common.clustersync.internal;
 
 import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificationMessageProperties;
 
-/**
- *
- */
 public class ClusterNotificationMessageProperties implements IClusterNotificationMessageProperties {
   private static final long serialVersionUID = 245680805887844037L;
   private final String m_originNode;
@@ -35,4 +32,48 @@ public class ClusterNotificationMessageProperties implements IClusterNotificatio
     return m_originUser;
   }
 
+  @Override
+  public String toString() {
+    return "ClusterNotificationMessageProperties [m_originNode=" + m_originNode + ", m_originUser=" + m_originUser + "]";
+  }
+
+  @Override
+  public int hashCode() {
+    final int prime = 31;
+    int result = 1;
+    result = prime * result + ((m_originNode == null) ? 0 : m_originNode.hashCode());
+    result = prime * result + ((m_originUser == null) ? 0 : m_originUser.hashCode());
+    return result;
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
+    }
+    if (obj == null) {
+      return false;
+    }
+    if (getClass() != obj.getClass()) {
+      return false;
+    }
+    ClusterNotificationMessageProperties other = (ClusterNotificationMessageProperties) obj;
+    if (m_originNode == null) {
+      if (other.m_originNode != null) {
+        return false;
+      }
+    }
+    else if (!m_originNode.equals(other.m_originNode)) {
+      return false;
+    }
+    if (m_originUser == null) {
+      if (other.m_originUser != null) {
+        return false;
+      }
+    }
+    else if (!m_originUser.equals(other.m_originUser)) {
+      return false;
+    }
+    return true;
+  }
 }

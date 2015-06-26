@@ -13,8 +13,6 @@ package org.eclipse.scout.rt.client.ui.basic.activitymap;
 import java.util.Date;
 import java.util.List;
 
-import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
-
 public interface IActivityMapUIFacade<RI, AI> {
 
   void setDaysFromUI(Date[] days);
@@ -30,15 +28,4 @@ public interface IActivityMapUIFacade<RI, AI> {
    *          may be null
    */
   void fireCellActionFromUI(RI resourceId, double[] normalizedRange, ActivityCell<RI, AI> activityCell);
-
-  /**
-   * Popup on activity
-   */
-  List<IMenu> fireEditActivityPopupFromUI();
-
-  /**
-   * Popup on planned activity
-   */
-  List<IMenu> fireNewActivityPopupFromUI();
-
 }

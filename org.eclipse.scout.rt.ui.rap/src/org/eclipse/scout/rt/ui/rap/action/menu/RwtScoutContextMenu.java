@@ -14,6 +14,8 @@ import org.eclipse.scout.commons.beans.BasicPropertySupport;
 import org.eclipse.scout.commons.job.JobEx;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.ui.action.ActionUtility;
+import org.eclipse.scout.rt.client.ui.action.IActionFilter;
 import org.eclipse.scout.rt.client.ui.action.menu.root.IContextMenu;
 import org.eclipse.scout.rt.ui.rap.IRwtEnvironment;
 import org.eclipse.scout.rt.ui.rap.RwtMenuUtility;
@@ -38,8 +40,7 @@ public class RwtScoutContextMenu implements IRwtScoutMenu {
 
   private IContextMenu m_scoutContextMenu;
   private Listener m_uiMenuListener;
-  private Boolean m_childrenCreated = Boolean.valueOf(false);
-
+  private Boolean m_childrenCreated = Boolean.FALSE;
 
   public RwtScoutContextMenu(Shell parentShell, IContextMenu scoutContextMenu, IRwtEnvironment environment) {
     this(parentShell, scoutContextMenu, environment, true);
@@ -81,7 +82,7 @@ public class RwtScoutContextMenu implements IRwtScoutMenu {
           }
         }
         finally {
-          m_childrenCreated = Boolean.valueOf(false);
+          m_childrenCreated = Boolean.FALSE;
         }
       }
     }
@@ -93,7 +94,8 @@ public class RwtScoutContextMenu implements IRwtScoutMenu {
         item.dispose();
       }
     }
-    RwtMenuUtility.fillMenu(getUiMenu(), getScoutContextMenu().getChildActions(), getScoutContextMenu().getActiveFilter(), getEnvironment());
+    IActionFilter filter = ActionUtility.createMenuFilterMenuTypes(getScoutContextMenu().getCurrentMenuTypes(), true);
+    RwtMenuUtility.fillMenu(getUiMenu(), getScoutContextMenu().getChildActions(), filter, getEnvironment());
   }
 
   @Override
@@ -116,15 +118,13 @@ public class RwtScoutContextMenu implements IRwtScoutMenu {
   }
 
   /**
-  *
-  */
+   *
+   */
   protected void handleSwtMenuShow() {
     Runnable t = new Runnable() {
-      @SuppressWarnings("deprecation")
       @Override
       public void run() {
-        getScoutContextMenu().prepareAction();
-        getScoutContextMenu().aboutToShow();
+        getScoutContextMenu().callAboutToShow(ActionUtility.createMenuFilterMenuTypes(getScoutContextMenu().getCurrentMenuTypes(), false));
       }
     };
     JobEx prepareJob = getEnvironment().invokeScoutLater(t, 0);

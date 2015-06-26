@@ -31,7 +31,7 @@ public final class CollectionUtility {
   /**
    * compares the two collection of same content in any order. Is overloaded ({@link #equalsCollection(List, List)} for
    * lists where the order of the list is considered.
-   * 
+   *
    * @param c1
    * @param c2
    * @return true if the two collections contains the same elements in any order.
@@ -74,7 +74,7 @@ public final class CollectionUtility {
   /**
    * compares the two lists of same content in the same order. Is an overloaded of (
    * {@link #equalsCollection(Collection, Collection)}.
-   * 
+   *
    * @param c1
    * @param c2
    * @return true if the two lists contains the same elements in the same order.
@@ -125,6 +125,54 @@ public final class CollectionUtility {
   }
 
   /**
+   * Returns a sub list with the provided indices.
+   * This methods supports negative indices in the sense that -1 addresses the last element and -2 the 2nd last.
+   * For positive indices, the methods uses {@link java.util.List#subList(int, int)} with one change: It is returning
+   * the sub list starting with c[fromIndex] to c[toIndex].
+   * slice(c, 0, 0): first element of c
+   * slice(c, 0, -3): c without the last two elements
+   *
+   * @param c
+   * @param fromIndex
+   * @param toIndex
+   * @return
+   */
+  public static <T> List<T> slice(List<T> c, int fromIndex, int toIndex) {
+    List<T> result = new ArrayList<T>();
+
+    // null check
+    if (c == null) {
+      return result;
+    }
+
+    int len = c.size();
+
+    // arguments check
+    if (fromIndex > len || toIndex > len || fromIndex < -len || toIndex < -len) {
+      throw new IndexOutOfBoundsException("fromIndex or toIndex out of bounds");
+    }
+
+    // special case for empty list
+    if (len > 0 && fromIndex >= len) {
+      throw new IndexOutOfBoundsException("fromIndex or toIndex out of bounds");
+    }
+
+    // map negative indices
+    if (fromIndex < 0) {
+      fromIndex += len;
+    }
+
+    if (toIndex < 0) {
+      toIndex += len + 1;
+    }
+    else if (toIndex == 0 && len > 0 || toIndex > 0) {
+      toIndex++;
+    }
+
+    return new ArrayList<T>(c.subList(fromIndex, toIndex));
+  }
+
+  /**
    * @param c
    * @param values
    * @return <code>true</code> if the collection contains one of the values.
@@ -162,7 +210,7 @@ public final class CollectionUtility {
 
   /**
    * exception safe access of an element of a list by index.
-   * 
+   *
    * @param list
    * @param index
    * @return null if the index is out of the list bounds or the element is null by itself.
@@ -192,7 +240,7 @@ public final class CollectionUtility {
    * Returns a new empty {@link ArrayList}.<br>
    * This method differs to {@link Collections#emptyList()} in that way that the {@link ArrayList} returned by this
    * method can be modified hence is no shared instance.
-   * 
+   *
    * @return An empty but modifiable {@link ArrayList} with an initial capacity of <code>0</code>.
    */
   public static <T> ArrayList<T> emptyArrayList() {
@@ -222,7 +270,7 @@ public final class CollectionUtility {
   /**
    * Null safe creation of a {@link ArrayList} out of a given collection. The returned {@link ArrayList} is modifiable
    * and not null.
-   * 
+   *
    * @param c
    * @return an {@link ArrayList} containing the given collection's elements. Never null.
    */
@@ -236,7 +284,7 @@ public final class CollectionUtility {
   /**
    * Null safe creation of a {@link ArrayList} out of a given collection. The returned {@link ArrayList} is modifiable.
    * The result list is never null and does not contain any null elements.
-   * 
+   *
    * @param c
    * @return an {@link ArrayList} containing the given collection's elements. Never null
    */
@@ -256,7 +304,7 @@ public final class CollectionUtility {
   /**
    * Null safe creation of a {@link HashSet} out of a given collection. The returned {@link HashSet} is modifiable and
    * never null.
-   * 
+   *
    * @param c
    * @return an {@link HashSet} containing the given collection's elements. Never null.
    */
@@ -270,7 +318,7 @@ public final class CollectionUtility {
   /**
    * Null safe creation of a {@link HashSet} out of a given collection without <code>null</code> elements. The returned
    * {@link HashSet} is modifiable and never null.
-   * 
+   *
    * @param c
    * @return an {@link HashSet} containing the given collection's elements without <code>null</code> elements. Never
    *         null.
@@ -285,7 +333,7 @@ public final class CollectionUtility {
    * Null safe creation of a {@link LinkedHashSet} out of a given collection. The returned {@link LinkedHashSet} is
    * modifiable and
    * never null.
-   * 
+   *
    * @param c
    * @return an {@link LinkedHashSet} containing the given collection's elements. Never null.
    */
@@ -299,7 +347,7 @@ public final class CollectionUtility {
   /**
    * Null safe creation of a {@link LinkedHashSet} out of a given collection without <code>null</code> elements. The
    * returned {@link LinkedHashSet} is modifiable and never null.
-   * 
+   *
    * @param c
    * @return an {@link LinkedHashSet} containing the given collection's elements without <code>null</code> elements.
    *         Never
@@ -498,7 +546,8 @@ public final class CollectionUtility {
   }
 
   /**
-   * @deprecated Will be removed in Scout 5.0. Use {@link #copyMap(Map)} if required.
+   * @deprecated Will be removed in Scout 5.0. Use {@link #emptyHashMap()} to obtain an empty map, or
+   *             {@link #copyMap(Map)} to create a copy of an existing map.
    */
   @Deprecated
   public static <T, U> Map<T, U> getEmptyMap(Map<T, U> m) {
@@ -575,6 +624,17 @@ public final class CollectionUtility {
     return new TreeMap<T, U>();
   }
 
+  /**
+   * Returns a new empty {@link HashMap}.<br>
+   * This method differs to {@link Collections#emptyMap()} in that way that the {@link HashMap} returned by this
+   * method can be modified hence is no shared instance.
+   *
+   * @return An empty but modifiable {@link HashMap} with an initial capacity of <code>0</code>.
+   */
+  public static <T, U> HashMap<T, U> emptyHashMap() {
+    return new HashMap<T, U>(0);
+  }
+
   public static <T, U> U lastElement(SortedMap<T, U> m) {
     if (m == null || m.isEmpty()) {
       return null;
@@ -615,7 +675,7 @@ public final class CollectionUtility {
    * Returns a new empty {@link HashSet}.<br>
    * This method differs to {@link Collections#emptyList()} in that way that the {@link HashSet} returned by this
    * method can be modified hence is no shared instance.
-   * 
+   *
    * @return An empty but modifiable {@link HashSet} with an initial capacity of <code>0</code>.
    */
   public static <T> HashSet<T> emptyHashSet() {
@@ -669,7 +729,7 @@ public final class CollectionUtility {
         Object o;
         // remove escaped ','
         s = s.replaceAll("%2C", ",");
-        if (s.equalsIgnoreCase("null")) {
+        if ("null".equalsIgnoreCase(s)) {
           o = null;
         }
         else if (s.length() >= 2 && s.startsWith("'") && s.endsWith("'")) {
@@ -727,7 +787,7 @@ public final class CollectionUtility {
 
   /**
    * To get a string representation of a collection.
-   * 
+   *
    * @param list
    *          input list
    * @param delimiter

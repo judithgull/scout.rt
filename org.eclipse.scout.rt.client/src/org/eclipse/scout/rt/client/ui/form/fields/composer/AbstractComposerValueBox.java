@@ -16,7 +16,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -31,7 +30,11 @@ import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.IFormFieldExtension;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.composer.ComposerValueBoxChains.ComposerValueBoxChangedValueChain;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.composer.IComposerValueBoxExtension;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
+import org.eclipse.scout.rt.client.ui.form.fields.AbstractFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.IValueField;
 import org.eclipse.scout.rt.client.ui.form.fields.datefield.AbstractDateField;
@@ -58,8 +61,9 @@ import org.eclipse.scout.rt.shared.services.lookup.ILookupCall;
  * Template box containing all composer values.
  * <p>
  */
+@SuppressWarnings("deprecation")
 @ClassId("2d8065cf-eeb3-4d64-8753-adb36cf852b8")
-public abstract class AbstractComposerValueBox extends AbstractGroupBox {
+public abstract class AbstractComposerValueBox extends AbstractGroupBox implements IComposerValueBox {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractComposerValueBox.class);
 
   private Map<Integer/*operator*/, Map<Integer/*dataType*/, IComposerValueField>> m_opTypeToFieldMap;
@@ -151,7 +155,7 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
       public void propertyChange(PropertyChangeEvent e) {
         if (IValueField.PROP_VALUE.equals(e.getPropertyName())) {
           try {
-            execChangedValue();
+            interceptChangedValue();
           }
           catch (Throwable t) {
             LOG.error("fire value change on " + e.getSource(), t);
@@ -360,6 +364,7 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public void setSelectionContext(IDataModelAttribute attribute, int dataType, IDataModelAttributeOp op, List<?> values0) {
       setFilterActiveNodesValue(TriState.TRUE);
       setFilterActiveNodes(attribute.isActiveFilterEnabled());
@@ -376,9 +381,12 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
         }
       }
       try {
-        if (CollectionUtility.hasElements(values0)) {
-          Set<Object> values = new HashSet<Object>(values0);
-          setValue(values);
+        Object firstElement = CollectionUtility.firstElement(values0);
+        if (firstElement instanceof Collection) {
+          setValue(CollectionUtility.hashSet((Collection) firstElement));
+        }
+        else if (firstElement instanceof Object[]) {
+          setValue(CollectionUtility.hashSet((Object[]) firstElement));
         }
         else {
           setValue(null);
@@ -401,7 +409,7 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
       if (value == null) {
         return null;
       }
-      return CollectionUtility.arrayList(value);
+      return CollectionUtility.arrayList((Object) value);
     }
 
     @Override
@@ -1301,6 +1309,29 @@ public abstract class AbstractComposerValueBox extends AbstractGroupBox {
       String b = getFieldByClass(BetweenDoubleField.DoubleToField.class).getDisplayText();
       return CollectionUtility.arrayList(a, b);
     }
+  }
+
+  protected final void interceptChangedValue() throws ProcessingException {
+    List<? extends IFormFieldExtension<? extends AbstractFormField>> extensions = getAllExtensions();
+    ComposerValueBoxChangedValueChain chain = new ComposerValueBoxChangedValueChain(extensions);
+    chain.execChangedValue();
+  }
+
+  protected static class LocalComposerValueBoxExtension<OWNER extends AbstractComposerValueBox> extends LocalGroupBoxExtension<OWNER> implements IComposerValueBoxExtension<OWNER> {
+
+    public LocalComposerValueBoxExtension(OWNER owner) {
+      super(owner);
+    }
+
+    @Override
+    public void execChangedValue(ComposerValueBoxChangedValueChain chain) throws ProcessingException {
+      getOwner().execChangedValue();
+    }
+  }
+
+  @Override
+  protected IComposerValueBoxExtension<? extends AbstractComposerValueBox> createLocalExtension() {
+    return new LocalComposerValueBoxExtension<AbstractComposerValueBox>(this);
   }
 
 }

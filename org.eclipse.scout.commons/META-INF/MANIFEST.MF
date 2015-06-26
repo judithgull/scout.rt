@@ -2,7 +2,7 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: Scout Commons
 Bundle-SymbolicName: org.eclipse.scout.commons;singleton:=true
-Bundle-Version: 4.0.0.qualifier
+Bundle-Version: 5.0.0.qualifier
 Bundle-Activator: org.eclipse.scout.commons.internal.Activator
 Bundle-Vendor: Eclipse Scout Project
 Require-Bundle: org.eclipse.core.runtime;bundle-version="[3.4.0,4.0.0)",
@@ -21,6 +21,7 @@ Export-Package: org.eclipse.scout.commons,
  org.eclipse.scout.commons.job,
  org.eclipse.scout.commons.logger,
  org.eclipse.scout.commons.logger.analysis,
+ org.eclipse.scout.commons.mail,
  org.eclipse.scout.commons.nls,
  org.eclipse.scout.commons.osgi,
  org.eclipse.scout.commons.parsers,
@@ -31,5 +32,5 @@ Export-Package: org.eclipse.scout.commons,
  org.eclipse.scout.commons.security,
  org.eclipse.scout.commons.serialization,
  org.eclipse.scout.commons.xmlparser
-Bundle-RequiredExecutionEnvironment: JavaSE-1.6
+Bundle-RequiredExecutionEnvironment: JavaSE-1.7
 Bundle-ActivationPolicy: lazy

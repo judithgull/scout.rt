@@ -15,11 +15,9 @@ import static org.junit.Assert.assertTrue;
 
 import org.eclipse.scout.rt.client.ui.form.fields.labelfield.AbstractLabelField;
 import org.eclipse.scout.rt.client.ui.form.fields.labelfield.ILabelField;
-import org.eclipse.scout.rt.ui.swt.AbstractSwtEnvironment;
-import org.eclipse.scout.rt.ui.swt.keystroke.ISwtKeyStrokeFilter;
+import org.eclipse.scout.rt.ui.swt.test.SwtTestingUtility;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Shell;
-import org.eclipse.swt.widgets.Widget;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -27,55 +25,46 @@ import org.junit.Test;
  * Test for {@link SwtScoutLabelField}
  */
 public class SWTScoutLabelFieldUiTest {
-  TestSwtScoutLabelField testLabelField;
+  private TestSwtScoutLabelField m_testLabelField;
 
   @Before
   public void setup() {
-    testLabelField = new TestSwtScoutLabelField();
-    testLabelField.setScoutObjectAndSwtEnvironment();
-    testLabelField.initializeSwt(new Shell(Display.getDefault()));
+    m_testLabelField = new TestSwtScoutLabelField();
+    m_testLabelField.setScoutObjectAndSwtEnvironment();
+    m_testLabelField.initializeSwt(new Shell(Display.getDefault()));
   }
 
   @Test
   public void testSwtFieldInitiallyEnabled() {
-    assertTrue(testLabelField.getSwtField().isEnabled());
+    assertTrue(m_testLabelField.getSwtField().isEnabled());
   }
 
   @Test
   public void testSwtFieldDisabledWhenNotSelecteable() {
     setModelSelectable(false);
-    assertFalse(testLabelField.getSwtField().isEnabled());
+    assertFalse(m_testLabelField.getSwtField().isEnabled());
   }
 
   @Test
   public void testSwtFieldEnabledWhenSelecteable() {
     setModelSelectable(false);
     setModelSelectable(true);
-    assertTrue(testLabelField.getSwtField().isEnabled());
+    assertTrue(m_testLabelField.getSwtField().isEnabled());
   }
 
   private void setModelSelectable(boolean selectable) {
-    testLabelField.getScoutObject().setSelectable(selectable);
-    testLabelField.handleScoutPropertyChange(ILabelField.PROP_SELECTABLE, testLabelField.getScoutObject());
+    m_testLabelField.getScoutObject().setSelectable(selectable);
+    m_testLabelField.handleScoutPropertyChange(ILabelField.PROP_SELECTABLE, m_testLabelField.getScoutObject());
   }
 
   class TestSwtScoutLabelField extends SwtScoutLabelField {
 
     public void setScoutObjectAndSwtEnvironment() {
-      super.setScoutObjectAndSwtEnvironment(createTestScoutField(), createTestSwtEnvironment());
+      super.setScoutObjectAndSwtEnvironment(createTestScoutField(), SwtTestingUtility.createTestSwtEnvironment());
     }
 
     private AbstractLabelField createTestScoutField() {
       return new AbstractLabelField() {
-      };
-    }
-
-    private AbstractSwtEnvironment createTestSwtEnvironment() {
-      return new AbstractSwtEnvironment(null, null, null) {
-        @Override
-        public void addKeyStrokeFilter(Widget c, ISwtKeyStrokeFilter filter) {
-          //ignore key strokes in test
-        }
       };
     }
   }

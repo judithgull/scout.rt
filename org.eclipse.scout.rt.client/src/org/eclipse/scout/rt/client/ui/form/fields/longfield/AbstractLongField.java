@@ -18,6 +18,7 @@ import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.longfield.ILongFieldExtension;
 import org.eclipse.scout.rt.client.ui.form.fields.numberfield.AbstractNumberField;
 import org.eclipse.scout.rt.shared.data.form.ValidationRule;
 
@@ -36,25 +37,6 @@ public abstract class AbstractLongField extends AbstractNumberField<Long> implem
   /*
    * Configuration
    */
-  /**
-   * @deprecated Will be removed with scout 5.0, use {@link #getConfiguredMinValue()}.<br>
-   *             As long as this deprecated version is overridden in subclasses. This setting wins over
-   *             {@link #getConfiguredMinValue()} in {@link #initConfig()}.
-   */
-  @Deprecated
-  protected Long getConfiguredMinimumValue() {
-    return getConfiguredMinValue();
-  }
-
-  /**
-   * @deprecated Will be removed with scout 5.0, use {@link #getConfiguredMaxValue()}.<br>
-   *             As long as this deprecated version is overridden in subclasses. This setting wins over
-   *             {@link #getConfiguredMaxValue()} in {@link #initConfig()}.
-   */
-  @Deprecated
-  protected Long getConfiguredMaximumValue() {
-    return getConfiguredMaxValue();
-  }
 
   @Override
   @ConfigProperty(ConfigProperty.LONG)
@@ -80,26 +62,13 @@ public abstract class AbstractLongField extends AbstractNumberField<Long> implem
   }
 
   @Override
-  protected void initConfig() {
-    super.initConfig();
-    setMinValue(getConfiguredMinimumValue());
-    setMaxValue(getConfiguredMaximumValue());
+  protected Long getMinPossibleValue() {
+    return Long.MIN_VALUE;
   }
 
-  /**
-   * Set the minimum value for this field. If value is <code>null</code>, it is replaced by Long.MIN_VALUE.
-   */
   @Override
-  public void setMinValue(Long value) {
-    super.setMinValue(value == null ? Long.MIN_VALUE : value);
-  }
-
-  /**
-   * Set the maximum value for this field. If value is <code>null</code>, it is replaced by Long.MAX_VALUE.
-   */
-  @Override
-  public void setMaxValue(Long value) {
-    super.setMaxValue(value == null ? Long.MAX_VALUE : value);
+  protected Long getMaxPossibleValue() {
+    return Long.MAX_VALUE;
   }
 
   /**
@@ -113,6 +82,18 @@ public abstract class AbstractLongField extends AbstractNumberField<Long> implem
       retVal = Long.valueOf(parsedVal.longValueExact());
     }
     return retVal;
+  }
+
+  protected static class LocalLongFieldExtension<OWNER extends AbstractLongField> extends LocalNumberFieldExtension<Long, OWNER> implements ILongFieldExtension<OWNER> {
+
+    public LocalLongFieldExtension(OWNER owner) {
+      super(owner);
+    }
+  }
+
+  @Override
+  protected ILongFieldExtension<? extends AbstractLongField> createLocalExtension() {
+    return new LocalLongFieldExtension<AbstractLongField>(this);
   }
 
 }

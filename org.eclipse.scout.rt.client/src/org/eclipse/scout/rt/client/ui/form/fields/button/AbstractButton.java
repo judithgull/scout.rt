@@ -10,7 +10,6 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.ui.form.fields.button;
 
-import java.util.ArrayList;
 import java.util.EventListener;
 import java.util.List;
 
@@ -21,9 +20,15 @@ import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
 import org.eclipse.scout.commons.annotations.Order;
+import org.eclipse.scout.commons.annotations.OrderedCollection;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.extension.ui.action.tree.MoveActionNodesHandler;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.IFormFieldExtension;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.button.ButtonChains.ButtonClickActionChain;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.button.ButtonChains.ButtonSelectionChangedChain;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.button.IButtonExtension;
 import org.eclipse.scout.rt.client.services.common.icon.IIconProviderService;
 import org.eclipse.scout.rt.client.ui.action.ActionUtility;
 import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
@@ -69,7 +74,7 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
    * System buttons are buttons with pre-defined behavior (such as an 'Ok' button or a 'Cancel' button).
    * <p>
    * Subclasses can override this method. Default is {@code IButton.SYSTEM_TYPE_NONE}.
-   * 
+   *
    * @return the system type for a system button, or {@code IButton.SYSTEM_TYPE_NONE} for a non-system button
    * @see IButton
    */
@@ -84,7 +89,7 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
    * dedicated button bar at the bottom of a form. Non-process buttons can be placed anywhere on a form.
    * <p>
    * Subclasses can override this method. Default is {@code true}.
-   * 
+   *
    * @return {@code true} if this button is a process button, {@code false} otherwise
    * @see IButton
    */
@@ -98,7 +103,7 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
    * Configures the display style of this button. See {@code IButton.DISPLAY_STYLE_* } constants for valid values.
    * <p>
    * Subclasses can override this method. Default is {@code IButton.DISPLAY_STYLE_DEFAULT}.
-   * 
+   *
    * @return the display style of this button
    * @see IButton
    */
@@ -149,7 +154,7 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
    * mouse-over etc.
    * <p>
    * Subclasses can override this method. Default is {@code null}.
-   * 
+   *
    * @return the ID (name) of the icon
    * @see IIconGroup
    * @see IIconProviderService
@@ -165,7 +170,7 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
    * until this method returns.
    * <p>
    * Subclasses can override this method. The default does nothing.
-   * 
+   *
    * @throws ProcessingException
    */
   @ConfigOperation
@@ -174,24 +179,34 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
   }
 
   /**
-   * Called whenever the state of a toggle button or radio button changes.
-   * <p>
+   * Called whenever the state of a toggle button or radio button changes.</br>
    * Subclasses can override this method. The default does nothing.
-   * 
+   *
    * @param selected
    *          new state of the button
    * @throws ProcessingException
+   * @deprecated will be removed in release 5.0; use {@link AbstractButton#interceptSelectionChanged(boolean)} instead.
+   */
+  @Deprecated
+  protected void execToggleAction(boolean selected) throws ProcessingException {
+  }
+
+  /**
+   * Called whenever the selection (of toggle-button) is changed.
+   *
+   * @param selection
+   *          the new selection state
+   * @throws ProcessingException
    */
   @ConfigOperation
-  @Order(200)
-  protected void execToggleAction(boolean selected) throws ProcessingException {
+  @Order(210)
+  protected void execSelectionChanged(boolean selection) throws ProcessingException {
   }
 
   protected List<Class<? extends IMenu>> getDeclaredMenus() {
     Class[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
     List<Class<IMenu>> menuClasses = ConfigurationUtility.filterClasses(dca, IMenu.class);
-    List<Class<? extends IMenu>> filteredMenuClasses = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(menuClasses, IMenu.class);
-    List<Class<? extends IMenu>> a = ConfigurationUtility.removeReplacedClasses(filteredMenuClasses);
+    List<Class<? extends IMenu>> a = ConfigurationUtility.removeReplacedClasses(menuClasses);
     return a;
   }
 
@@ -208,24 +223,30 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
     setProcessButton(getConfiguredProcessButton());
     setIconId(getConfiguredIconId());
     // menus
-    List<IMenu> menuList = new ArrayList<IMenu>();
-    for (Class<? extends IMenu> menuClazz : getDeclaredMenus()) {
+    List<Class<? extends IMenu>> declaredMenus = getDeclaredMenus();
+    List<IMenu> contributedMenus = m_contributionHolder.getContributionsByClass(IMenu.class);
+    OrderedCollection<IMenu> menus = new OrderedCollection<IMenu>();
+    for (Class<? extends IMenu> menuClazz : declaredMenus) {
       IMenu menu;
       try {
         menu = ConfigurationUtility.newInnerInstance(this, menuClazz);
-        menuList.add(menu);
+        menus.addOrdered(menu);
       }
       catch (Throwable t) {
         SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + menuClazz.getName() + "'.", t));
       }
     }
+
+    menus.addAllOrdered(contributedMenus);
+
     try {
-      injectMenusInternal(menuList);
+      injectMenusInternal(menus);
     }
     catch (Exception e) {
       LOG.error("error occured while dynamically contributing menus.", e);
     }
-    IContextMenu contextMenu = new FormFieldContextMenu<IButton>(this, menuList);
+    new MoveActionNodesHandler<IMenu>(menus).moveModelObjects();
+    IContextMenu contextMenu = new FormFieldContextMenu<IButton>(this, menus.getOrderedList());
     contextMenu.setContainerInternal(this);
     setContextMenu(contextMenu);
   }
@@ -239,12 +260,13 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
 
   /**
    * Override this internal method only in order to make use of dynamic menus<br>
-   * Used to manage menu list and add/remove menus
-   * 
-   * @param menuList
-   *          live and mutable list of configured menus
+   * Used to add and/or remove menus<br>
+   * To change the order or specify the insert position use {@link IMenu#setOrder(double)}.
+   *
+   * @param menus
+   *          live and mutable collection of configured menus
    */
-  protected void injectMenusInternal(List<IMenu> menuList) {
+  protected void injectMenusInternal(OrderedCollection<IMenu> menus) {
   }
 
   /*
@@ -311,7 +333,7 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
         setEnabledProcessingButton(false);
 
         fireButtonClicked();
-        execClickAction();
+        interceptClickAction();
       }
       finally {
         setEnabledProcessingButton(true);
@@ -336,6 +358,7 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
     // single observer for config
     if (changed) {
       try {
+        interceptSelectionChanged(b);
         execToggleAction(b);
       }
       catch (ProcessingException e) {
@@ -437,5 +460,39 @@ public abstract class AbstractButton extends AbstractFormField implements IButto
         m_uiFacadeSetSelectedLock.release();
       }
     }
+  }
+
+  protected final void interceptSelectionChanged(boolean selection) throws ProcessingException {
+    List<? extends IFormFieldExtension<? extends AbstractFormField>> extensions = getAllExtensions();
+    ButtonSelectionChangedChain chain = new ButtonSelectionChangedChain(extensions);
+    chain.execSelectionChanged(selection);
+  }
+
+  protected final void interceptClickAction() throws ProcessingException {
+    List<? extends IFormFieldExtension<? extends AbstractFormField>> extensions = getAllExtensions();
+    ButtonClickActionChain chain = new ButtonClickActionChain(extensions);
+    chain.execClickAction();
+  }
+
+  protected static class LocalButtonExtension<OWNER extends AbstractButton> extends LocalFormFieldExtension<OWNER> implements IButtonExtension<OWNER> {
+
+    public LocalButtonExtension(OWNER owner) {
+      super(owner);
+    }
+
+    @Override
+    public void execSelectionChanged(ButtonSelectionChangedChain chain, boolean selection) throws ProcessingException {
+      getOwner().execSelectionChanged(selection);
+    }
+
+    @Override
+    public void execClickAction(ButtonClickActionChain chain) throws ProcessingException {
+      getOwner().execClickAction();
+    }
+  }
+
+  @Override
+  protected IButtonExtension<? extends AbstractButton> createLocalExtension() {
+    return new LocalButtonExtension<AbstractButton>(this);
   }
 }

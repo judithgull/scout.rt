@@ -13,7 +13,6 @@ package org.eclipse.scout.rt.client.ui.desktop.outline.pages;
 import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
@@ -71,7 +70,7 @@ public class PageWithTable3Test {
     for (IColumn<?> c : table.getColumns()) {
       System.out.println("col " + c.getClass().getSimpleName() + ": " + c.isSortActive() + ", " + c.isSortExplicit() + ", " + c.getSortIndex() + " " + c.isSortAscending());
     }
-    */
+     */
     List<Integer> actualExplicitSortIndices = new ArrayList<Integer>();
     for (IColumn<?> c : table.getColumns()) {
       if (c.isSortActive() && c.isSortExplicit()) {
@@ -84,7 +83,7 @@ public class PageWithTable3Test {
 
   public static class PageWithTableOutline extends AbstractOutline {
     @Override
-    protected void execCreateChildPages(Collection<IPage> pageList) throws ProcessingException {
+    protected void execCreateChildPages(List<IPage> pageList) throws ProcessingException {
       pageList.add(new PageWithTable());
     }
   }
@@ -92,8 +91,8 @@ public class PageWithTable3Test {
   public static class PageWithTable extends AbstractPageWithTable<PageWithTable.Table> {
 
     @Override
-    protected Object[][] execLoadTableData(SearchFilter filter) throws ProcessingException {
-      return new Object[][]{
+    protected void execLoadData(SearchFilter filter) throws ProcessingException {
+      importTableData(new Object[][]{
           new Object[]{1, 0, 0, 1},
           new Object[]{3, 0, 1, 1},
           new Object[]{5, 1, 0, 1},
@@ -102,7 +101,7 @@ public class PageWithTable3Test {
           new Object[]{2, 0, 1, 0},
           new Object[]{4, 1, 0, 0},
           new Object[]{6, 1, 1, 0}
-      };
+      });
     }
 
     public class Table extends AbstractTable {

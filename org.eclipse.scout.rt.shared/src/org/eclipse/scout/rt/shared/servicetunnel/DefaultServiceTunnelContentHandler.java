@@ -44,14 +44,14 @@ import org.eclipse.scout.rt.shared.Activator;
 import org.osgi.framework.Bundle;
 
 /**
- * Creates SOAP envelopes for {@link ServiceTunnelRequest} and {@link ServiceTunnelResponse} objects.<br>
+ * Creates SOAP envelopes for {@link IServiceTunnelRequest} and {@link IServiceTunnelResponse} objects.<br>
  * Use config.ini property org.eclipse.scout.rt.shared.servicetunnel.debug=true
  * to activate debug info
  * <p>
  * This fast hi-speed encoder/decoder ignores xml structure and reads content of first &lt;data&gt; tag directly.
  * <p>
  * Example request:
- * 
+ *
  * <pre>
  * @code
  * <?xml version="1.0" encoding="UTF-8"?>
@@ -64,9 +64,9 @@ import org.osgi.framework.Bundle;
  * </soapenv:Envelope>
  * }
  * </pre>
- * 
+ *
  * Example response (success):
- * 
+ *
  * <pre>
  * @code
  * <?xml version="1.0" encoding="UTF-8"?>
@@ -79,9 +79,9 @@ import org.osgi.framework.Bundle;
  * </soapenv:Envelope>
  * }
  * </pre>
- * 
+ *
  * Example response (error):
- * 
+ *
  * <pre>
  * @code
  * <?xml version="1.0" encoding="UTF-8"?>
@@ -96,7 +96,7 @@ import org.osgi.framework.Bundle;
  * </soapenv:Envelope>
  * }
  * </pre>
- * 
+ *
  * In order to enable/disable content compression, use the system property or config.ini property:
  * <code>org.eclipse.scout.serviceTunnel.compress=true</code>
  * <p>
@@ -147,8 +147,18 @@ public class DefaultServiceTunnelContentHandler implements IServiceTunnelContent
     m_listeners = new EventListenerList();
   }
 
+  /**
+   * @deprecated use {@link #initialize()} instead. Will be removed in the N release.
+   */
+  @SuppressWarnings("deprecation")
+  @Deprecated
   @Override
   public void initialize(Bundle[] classResolveBundles, ClassLoader rawClassLoader) {
+    initialize();
+  }
+
+  @Override
+  public void initialize() {
     try {
       m_originAddress = InetAddress.getLocalHost().getHostAddress();
     }
@@ -168,7 +178,7 @@ public class DefaultServiceTunnelContentHandler implements IServiceTunnelContent
   }
 
   @Override
-  public void writeRequest(OutputStream out, ServiceTunnelRequest msg) throws Exception {
+  public void writeRequest(OutputStream out, IServiceTunnelRequest msg) throws Exception {
     // build soap message without sax (hi-speed)
     boolean compressed = isUseCompression();
     StringBuilder buf = new StringBuilder();
@@ -223,7 +233,7 @@ public class DefaultServiceTunnelContentHandler implements IServiceTunnelContent
   }
 
   @Override
-  public void writeResponse(OutputStream out, ServiceTunnelResponse msg) throws Exception {
+  public void writeResponse(OutputStream out, IServiceTunnelResponse msg) throws Exception {
     // build soap message without sax (hi-speed)
     boolean compressed = isUseCompression();
     StringBuilder buf = new StringBuilder();
@@ -306,13 +316,13 @@ public class DefaultServiceTunnelContentHandler implements IServiceTunnelContent
   }
 
   @Override
-  public ServiceTunnelRequest readRequest(InputStream in) throws Exception {
-    return (ServiceTunnelRequest) read(in);
+  public IServiceTunnelRequest readRequest(InputStream in) throws Exception {
+    return (IServiceTunnelRequest) read(in);
   }
 
   @Override
-  public ServiceTunnelResponse readResponse(InputStream in) throws Exception {
-    return (ServiceTunnelResponse) read(in);
+  public IServiceTunnelResponse readResponse(InputStream in) throws Exception {
+    return (IServiceTunnelResponse) read(in);
   }
 
   protected Object/* msg */read(InputStream in) throws Exception {
@@ -406,7 +416,7 @@ public class DefaultServiceTunnelContentHandler implements IServiceTunnelContent
    * @return the wsse:Security tag. The subject may be null and may contain no principals
    *         <p>
    *         Example WS-Security element for user/pass
-   * 
+   *
    *         <pre>
    * <wsse:Security soapenv:mustUnderstand="1">
    *   <wsse:UsernameToken>
@@ -417,9 +427,9 @@ public class DefaultServiceTunnelContentHandler implements IServiceTunnelContent
    * </pre>
    *         <p>
    *         The default calls
-   *         {@link DefaultServiceTunnelContentHandler#createDefaultWsSecurityElement(ServiceTunnelRequest)}
+   *         {@link DefaultServiceTunnelContentHandler#createDefaultWsSecurityElement(IServiceTunnelRequest)}
    */
-  protected String createWsSecurityElement(ServiceTunnelRequest req) {
+  protected String createWsSecurityElement(IServiceTunnelRequest req) {
     return DefaultServiceTunnelContentHandler.createDefaultWsSecurityElement(req);
   }
 
@@ -447,7 +457,7 @@ public class DefaultServiceTunnelContentHandler implements IServiceTunnelContent
    *         the password is the triple-des encoding of "${timestamp}:${username}" using the config.ini parameter
    *         <code>scout.ajax.token.key</code>
    */
-  public static final String createDefaultWsSecurityElement(ServiceTunnelRequest req) {
+  public static final String createDefaultWsSecurityElement(IServiceTunnelRequest req) {
     if (tripleDesKey == null) {
       return null;
     }
@@ -457,12 +467,8 @@ public class DefaultServiceTunnelContentHandler implements IServiceTunnelContent
     }
     ArrayList<Principal> list = new ArrayList<Principal>(subject.getPrincipals());
     String user = (list.size() > 0 ? list.get(0).getName() : null);
-    String pass = (list.size() > 1 ? list.get(1).getName() : null);
     if (user == null) {
       user = "";
-    }
-    if (pass == null) {
-      pass = "";
     }
     String msg = "" + System.currentTimeMillis() + ":" + user;
     try {

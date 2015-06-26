@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.eclipse.scout.commons.ITypeWithClassId;
+import org.eclipse.scout.commons.annotations.IOrdered;
 import org.eclipse.scout.commons.beans.IPropertyObserver;
 import org.eclipse.scout.commons.exception.IProcessingStatus;
 import org.eclipse.scout.commons.exception.ProcessingException;
@@ -58,10 +59,11 @@ import org.eclipse.scout.rt.shared.services.common.jdbc.SearchFilter;
  * </ul>
  * </li>
  * </ul>
- * 
+ *
  * @see IForm
  */
-public interface IFormField extends IPropertyObserver, ITypeWithClassId {
+@SuppressWarnings("deprecation")
+public interface IFormField extends IPropertyObserver, ITypeWithClassId, IOrdered {
   /*
    * Properties
    */
@@ -72,6 +74,7 @@ public interface IFormField extends IPropertyObserver, ITypeWithClassId {
   String PROP_VISIBLE = "visible";
   String PROP_ENABLED = "enabled";
   String PROP_MANDATORY = "mandatory";
+  String PROP_VIEW_ORDER = "viewOrder";
   String PROP_ERROR_STATUS = "errorStatus";
   String PROP_TOOLTIP_TEXT = "tooltipText";
   String PROP_FOREGROUND_COLOR = "foregroundColor";
@@ -85,12 +88,7 @@ public interface IFormField extends IPropertyObserver, ITypeWithClassId {
   String PROP_LABEL = "label";
   String PROP_LABEL_VISIBLE = "labelVisible";
   String PROP_KEY_STROKES = "keyStrokes";
-  /**
-   * @deprecated since 3.8, sent via {@link org.eclipse.scout.rt.client.ui.form.FormEvent#TYPE_REQUEST_FOCUS
-   *             FormEvent#TYPE_REQUEST_FOCUS}. Will be removed in the 5.0 Release.
-   */
-  @Deprecated
-  String PROP_FOCUS_REQUESTED = "focusRequested";
+
   /**
    * if the field is focusable or not, value is of type {@link Boolean}
    */
@@ -423,7 +421,7 @@ public interface IFormField extends IPropertyObserver, ITypeWithClassId {
 
   /**
    * This property is used by buttons. Buttons set the property to false while in work.
-   * 
+   *
    * @return true if process button is not in
    *         {@link org.eclipse.scout.rt.client.ui.form.fields.button.IButton#doClick() IButton#doClick()} action
    */
@@ -581,7 +579,7 @@ public interface IFormField extends IPropertyObserver, ITypeWithClassId {
   void markSaved();
 
   /**
-   * true if the field contains data (semantics)
+   * true if the field does not contain data (semantics)
    */
   boolean isEmpty();
 
@@ -593,12 +591,6 @@ public interface IFormField extends IPropertyObserver, ITypeWithClassId {
    * Convenience for {@link IForm#requestFocus(IFormField)}
    */
   void requestFocus();
-
-  /**
-   * @deprecated since 3.8. Use {@link IForm#requestFocus(IFormField)} instead. Will be removed in the 5.0 Release.
-   */
-  @Deprecated
-  boolean fetchFocusRequested();
 
   /**
    * MasterSlave

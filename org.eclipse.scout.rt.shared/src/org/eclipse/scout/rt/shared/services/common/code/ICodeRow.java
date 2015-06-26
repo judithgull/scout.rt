@@ -13,11 +13,13 @@ package org.eclipse.scout.rt.shared.services.common.code;
 import org.eclipse.scout.rt.shared.services.lookup.ILookupRow;
 
 /**
- *
+ * @since Scout 4.0.0
  */
 public interface ICodeRow<KEY_TYPE> extends ILookupRow<KEY_TYPE> {
 
   long getPartitionId();
+
+  void setPartitionId(long partitionId);
 
   Number getValue();
 
@@ -26,5 +28,15 @@ public interface ICodeRow<KEY_TYPE> extends ILookupRow<KEY_TYPE> {
   String getExtKey();
 
   void setExtKey(String extKey);
+
+  /**
+   * @return
+   */
+  double getOrder();
+
+  /**
+   * @param order
+   */
+  void setOrder(double order);
 
 }

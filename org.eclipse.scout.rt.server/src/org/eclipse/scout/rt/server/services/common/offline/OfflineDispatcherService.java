@@ -26,7 +26,10 @@ import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.holders.Holder;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.server.IServerJobFactory;
+import org.eclipse.scout.rt.server.IServerJobService;
 import org.eclipse.scout.rt.server.IServerSession;
+import org.eclipse.scout.rt.server.ITransactionRunnable;
 import org.eclipse.scout.rt.server.ServerJob;
 import org.eclipse.scout.rt.server.ThreadContext;
 import org.eclipse.scout.rt.server.services.common.clientnotification.IClientNotificationService;
@@ -34,7 +37,7 @@ import org.eclipse.scout.rt.server.services.common.session.IServerSessionRegistr
 import org.eclipse.scout.rt.server.transaction.ITransaction;
 import org.eclipse.scout.rt.shared.OfflineState;
 import org.eclipse.scout.rt.shared.services.common.offline.IOfflineDispatcherService;
-import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelRequest;
+import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelRequest;
 import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelResponse;
 import org.eclipse.scout.rt.shared.ui.UserAgent;
 import org.eclipse.scout.service.AbstractService;
@@ -93,7 +96,7 @@ public class OfflineDispatcherService extends AbstractService implements IOfflin
 
   @Override
   @SuppressWarnings("unchecked")
-  public ServiceTunnelResponse dispatch(final ServiceTunnelRequest request, final IProgressMonitor monitor) {
+  public ServiceTunnelResponse dispatch(final IServiceTunnelRequest request, final IProgressMonitor monitor) {
     final Subject subject = Subject.getSubject(AccessController.getContext());
     if (m_serverSessionClass == null) {
       String className = Platform.getProduct().getDefiningBundle().getSymbolicName();
@@ -164,7 +167,7 @@ public class OfflineDispatcherService extends AbstractService implements IOfflin
     }
   }
 
-  private ServiceTunnelResponse dispatchInServerThread(final ServiceTunnelRequest request, final Subject subject) {
+  private ServiceTunnelResponse dispatchInServerThread(final IServiceTunnelRequest request, final Subject subject) {
     Map<Class, Object> backup = ThreadContext.backup();
     try {
       if (m_serverSession == null || subject == null || !subject.equals(m_subject)) {
@@ -178,13 +181,14 @@ public class OfflineDispatcherService extends AbstractService implements IOfflin
         }
       }
       final Holder<ServiceTunnelResponse> responseHolder = new Holder<ServiceTunnelResponse>(ServiceTunnelResponse.class);
-      ServerJob job = new ServerJob("Offline invokation", m_serverSession, subject) {
+      final IServerJobFactory jobFactory = SERVICES.getService(IServerJobService.class).createJobFactory(m_serverSession, subject);
+      ServerJob job = jobFactory.create("Offline invokation", new ITransactionRunnable() {
         @Override
-        protected IStatus runTransaction(IProgressMonitor monitor) throws Exception {
+        public IStatus run(IProgressMonitor monitor) throws ProcessingException {
           responseHolder.setValue(callService(request));
           return Status.OK_STATUS;
         }
-      };
+      });
       IStatus status = job.runNow(new NullProgressMonitor());
       if (!status.isOK()) {
         return new ServiceTunnelResponse(null, null, new ProcessingException(status));
@@ -196,7 +200,7 @@ public class OfflineDispatcherService extends AbstractService implements IOfflin
     }
   }
 
-  private ServiceTunnelResponse callService(ServiceTunnelRequest serviceReq) throws Exception {
+  private ServiceTunnelResponse callService(IServiceTunnelRequest serviceReq) throws ProcessingException {
     try {
       IServerSession serverSession = ThreadContext.getServerSession();
       Class<?> serviceInterfaceClass = serverSession.getBundle().loadClass(serviceReq.getServiceInterfaceClassName());

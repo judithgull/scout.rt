@@ -34,7 +34,10 @@ import org.junit.Test;
 import org.osgi.framework.ServiceRegistration;
 
 /**
- * Test {@link IBatchLookupService} and caching with {@link BatchLookupResultCache}
+ * Test {@link IBatchLookupService} and caching with {@link BatchLookupResultCache}.
+ * Test for the deprecated {@link BatchLookupService} (server).
+ * This test has been copied to the shared test fragment (for the BatchLookupService in the shared).
+ * Will be removed with the N-Release (when the BatchLookupService in the server is removed)
  */
 public class BatchNormalizerTest {
   private List<ServiceRegistration> m_reg;
@@ -137,6 +140,7 @@ public class BatchNormalizerTest {
     testInternal(batchCall, 10 + 500, 10 + 500, 0, 1000);
   }
 
+  @SuppressWarnings("deprecation")
   private void testInternal(BatchLookupCall batchCall, long expectedNormalizedSize, long expectedServerInvocations, long expectedNullArrayCount, long expectedTotalResultRowCount) throws Exception {
     m_serverInvocations = 0;
     //
@@ -210,7 +214,7 @@ public class BatchNormalizerTest {
     }
   }
 
-  public static interface IFruitLookupService extends ILookupService {
+  public interface IFruitLookupService extends ILookupService {
   }
 
   public static class FruitLookupService extends AbstractLookupService implements IFruitLookupService {

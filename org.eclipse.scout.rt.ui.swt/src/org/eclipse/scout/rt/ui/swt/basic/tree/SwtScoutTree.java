@@ -14,7 +14,6 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.jface.viewers.DoubleClickEvent;
 import org.eclipse.jface.viewers.IDoubleClickListener;
@@ -42,13 +41,14 @@ import org.eclipse.scout.rt.client.ui.action.ActionUtility;
 import org.eclipse.scout.rt.client.ui.action.IActionFilter;
 import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
 import org.eclipse.scout.rt.client.ui.action.menu.TreeMenuType;
-import org.eclipse.scout.rt.client.ui.action.menu.root.IContextMenu;
+import org.eclipse.scout.rt.client.ui.action.menu.root.ITreeContextMenu;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITree;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
 import org.eclipse.scout.rt.client.ui.basic.tree.TreeEvent;
 import org.eclipse.scout.rt.client.ui.basic.tree.TreeListener;
 import org.eclipse.scout.rt.ui.swt.ISwtEnvironment;
 import org.eclipse.scout.rt.ui.swt.SwtMenuUtility;
+import org.eclipse.scout.rt.ui.swt.action.menu.MenuPositionCorrectionListener;
 import org.eclipse.scout.rt.ui.swt.basic.SwtScoutComposite;
 import org.eclipse.scout.rt.ui.swt.ext.tree.TreeEx;
 import org.eclipse.scout.rt.ui.swt.form.fields.AbstractSwtScoutDndSupport;
@@ -73,7 +73,7 @@ import org.eclipse.swt.widgets.MenuItem;
 
 /**
  * <h3>SwtScoutTree</h3> ...
- * 
+ *
  * @since 1.0.0 23.07.2008
  * @author Andreas Hoegger
  */
@@ -97,7 +97,6 @@ public class SwtScoutTree extends SwtScoutComposite<ITree> implements ISwtScoutT
     TreeViewer viewer = createSwtTree(parent);
     setSwtTreeViewer(viewer);
 
-    initializeSwtTreeModel();
     setSwtField(viewer.getTree());
     // listeners
     viewer.addSelectionChangedListener(new P_SwtSelectionListener());
@@ -114,6 +113,9 @@ public class SwtScoutTree extends SwtScoutComposite<ITree> implements ISwtScoutT
     m_contextMenu.addMenuListener(new P_ContextMenuListener());
 
     viewer.getTree().setMenu(m_contextMenu);
+
+    // correction of menu position
+    viewer.getTree().addListener(SWT.MenuDetect, new MenuPositionCorrectionListener(viewer.getTree()));
 
   }
 
@@ -133,7 +135,6 @@ public class SwtScoutTree extends SwtScoutComposite<ITree> implements ISwtScoutT
   }
 
   protected void initializeSwtTreeModel() {
-    // model
     SwtScoutTreeModel model = createTreeModel();
     getSwtTreeViewer().setContentProvider(model);
     getSwtTreeViewer().setLabelProvider(model);
@@ -185,6 +186,7 @@ public class SwtScoutTree extends SwtScoutComposite<ITree> implements ISwtScoutT
       m_scoutTreeListener = new P_ScoutTreeListener();
       getScoutObject().addUITreeListener(m_scoutTreeListener);
     }
+    initializeSwtTreeModel();
     if (getScoutObject().isRootNodeVisible()) {
       setExpansionFromScout(getScoutObject().getRootNode());
     }
@@ -299,7 +301,7 @@ public class SwtScoutTree extends SwtScoutComposite<ITree> implements ISwtScoutT
   }
 
   protected void setSelectionFromSwt(final List<ITreeNode> nodes) {
-    if (m_ignoreSelectionEventsFromSwtToScout) {
+    if (m_ignoreSelectionEventsFromSwtToScout && CollectionUtility.isEmpty(nodes)) {
       return;
     }
     if (getUpdateSwtFromScoutLock().isAcquired()) {
@@ -486,14 +488,14 @@ public class SwtScoutTree extends SwtScoutComposite<ITree> implements ISwtScoutT
     getSwtTreeViewer().update(node, null);
   }
 
-  protected void handleSwtNodeClick(final ITreeNode node) {
+  protected void handleSwtNodeClick(final ITreeNode node, final int swtMouseButton) {
     if (getScoutObject() != null) {
       if (node != null) {
         // notify Scout
         Runnable t = new Runnable() {
           @Override
           public void run() {
-            getScoutObject().getUIFacade().fireNodeClickFromUI(node);
+            getScoutObject().getUIFacade().fireNodeClickFromUI(node, SwtUtility.swtToScoutMouseButton(swtMouseButton));
           }
         };
         getEnvironment().invokeScoutLater(t, 0);
@@ -665,11 +667,11 @@ public class SwtScoutTree extends SwtScoutComposite<ITree> implements ISwtScoutT
                 // find checkbox area
                 Rectangle imgBounds = cell.getImageBounds();
                 if (imgBounds != null && e.x >= (imgBounds.x) && e.x <= (imgBounds.x + imgBounds.width)) {
-                  handleSwtNodeClick(nodeToClick);
+                  handleSwtNodeClick(nodeToClick, e.button);
                 }
               }
               else {
-                handleSwtNodeClick(nodeToClick);
+                handleSwtNodeClick(nodeToClick, e.button);
               }
             }
           }
@@ -684,7 +686,8 @@ public class SwtScoutTree extends SwtScoutComposite<ITree> implements ISwtScoutT
                   @SuppressWarnings("unchecked")
                   ITreeNode[] nodes = (ITreeNode[]) sel.toList().toArray(new ITreeNode[sel.size()]);
                   if (nodes != null && nodes.length > 0) {
-                    handleSwtNodeClick(nodes[0]);
+                    // 99 for undefined mouse button
+                    handleSwtNodeClick(nodes[0], 99);
                   }
                   e.doit = false;
                   break;
@@ -744,7 +747,8 @@ public class SwtScoutTree extends SwtScoutComposite<ITree> implements ISwtScoutT
           else {
             handleSwtNodeAction(nodes[0]);
             if (getScoutObject().isCheckable()) {
-              handleSwtNodeClick(nodes[0]);
+              // 1 for left button always with double click
+              handleSwtNodeClick(nodes[0], 1);
             }
           }
         }
@@ -767,17 +771,19 @@ public class SwtScoutTree extends SwtScoutComposite<ITree> implements ISwtScoutT
       if (getScoutObject() == null || !isEnabledFromScout()) {
         return;
       }
+      final IActionFilter aboutToShowFilter;
+      final ITreeContextMenu contextMenu = getScoutObject().getContextMenu();
+      if ((getSwtField().getContextItem() == null)) {
+        aboutToShowFilter = ActionUtility.createMenuFilterMenuTypes(CollectionUtility.hashSet(TreeMenuType.EmptySpace), false);
+      }
+      else {
+        aboutToShowFilter = ActionUtility.createMenuFilterMenuTypes(contextMenu.getCurrentMenuTypes(), false);
+      }
 
-      final AtomicReference<IContextMenu> scoutMenusRef = new AtomicReference<IContextMenu>();
       Runnable t = new Runnable() {
-        @SuppressWarnings("deprecation")
         @Override
         public void run() {
-          IContextMenu contextMenu = getScoutObject().getContextMenu();
-          // manually call about to show
-          contextMenu.aboutToShow();
-          contextMenu.prepareAction();
-          scoutMenusRef.set(contextMenu);
+          contextMenu.callAboutToShow(aboutToShowFilter);
         }
       };
       JobEx job = getEnvironment().invokeScoutLater(t, 1200);
@@ -787,16 +793,14 @@ public class SwtScoutTree extends SwtScoutComposite<ITree> implements ISwtScoutT
       catch (InterruptedException ex) {
         //nop
       }
-      if (scoutMenusRef.get() != null) {
-        IActionFilter filter = null;
-        if ((getSwtField().getContextItem() == null)) {
-          filter = ActionUtility.createMenuFilterVisibleAndMenuTypes(TreeMenuType.EmptySpace);
-        }
-        else {
-          filter = getScoutObject().getContextMenu().getActiveFilter();
-        }
-        SwtMenuUtility.fillMenu(m_contextMenu, scoutMenusRef.get().getChildActions(), filter, getEnvironment());
+      final IActionFilter showFilter;
+      if ((getSwtField().getContextItem() == null)) {
+        showFilter = ActionUtility.createMenuFilterMenuTypes(CollectionUtility.hashSet(TreeMenuType.EmptySpace), true);
       }
+      else {
+        showFilter = ActionUtility.createMenuFilterMenuTypes(contextMenu.getCurrentMenuTypes(), true);
+      }
+      SwtMenuUtility.fillMenu(m_contextMenu, contextMenu.getChildActions(), showFilter, getEnvironment());
     }
 
     private void disposeMenuItem(MenuItem item) {

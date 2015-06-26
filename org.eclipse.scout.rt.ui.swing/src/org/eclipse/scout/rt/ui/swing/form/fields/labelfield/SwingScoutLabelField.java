@@ -14,11 +14,21 @@ import java.awt.Color;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 
+import javax.swing.SizeRequirements;
 import javax.swing.TransferHandler;
 import javax.swing.UIManager;
 import javax.swing.border.EmptyBorder;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.Element;
+import javax.swing.text.GlyphView;
 import javax.swing.text.Highlighter;
+import javax.swing.text.StyleConstants;
+import javax.swing.text.View;
+import javax.swing.text.ViewFactory;
+import javax.swing.text.html.HTML;
 import javax.swing.text.html.HTMLEditorKit;
+import javax.swing.text.html.InlineView;
+import javax.swing.text.html.ParagraphView;
 
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.rt.client.ui.form.fields.labelfield.ILabelField;
@@ -103,11 +113,115 @@ public class SwingScoutLabelField extends SwingScoutValueFieldComposite<ILabelFi
 
   /**
    * Create and return the HTMLEditorKit. Override this method to use a custom HTMLEditorKit
-   * 
+   *
    * @since 3.10.0-M5
    */
   protected HTMLEditorKit createEditorKit() {
-    return new HTMLEditorKit();
+    return new HTMLEditorKit() {
+      private static final long serialVersionUID = 1L;
+
+      @Override
+      public ViewFactory getViewFactory() {
+
+        return new HTMLFactory() {
+          @Override
+          public View create(Element element) {
+            View v = super.create(element);
+            if (v instanceof InlineView) {
+              // javax.swing.text.html.BRView (the <br> tag) is also a LabelView but
+              // our overridden class must not change it's behavior
+              Object o = element.getAttributes().getAttribute(StyleConstants.NameAttribute);
+              if ((o instanceof HTML.Tag) && o == HTML.Tag.BR) {
+                return v;
+              }
+              return new InlineView(element) {
+                @Override
+                public int getBreakWeight(int axis, float pos, float len) {
+                  // default behavior if no text wrap required
+                  if (!m_textWrap) {
+                    return super.getBreakWeight(axis, pos, len);
+                  }
+                  // --> GlyphView.getBreakWeight()
+                  if (axis == View.X_AXIS) {
+                    checkPainter();
+                    int offset = getStartOffset();
+                    int maxPos = getGlyphPainter().getBoundedPosition(this, offset, pos, len);
+                    if (maxPos == offset) {
+                      // can't even fit a single character
+                      return View.BadBreakWeight;
+                    }
+                    // <-- GlyphView.getBreakWeight()
+                    // if line break found enforce break
+                    try {
+                      int separatorIndex = getDocument().getText(offset, maxPos - offset).indexOf(System.getProperty("line.separator"));
+                      if (separatorIndex >= 0) {
+                        return View.ForcedBreakWeight;
+                      }
+                    }
+                    catch (BadLocationException ex) {
+                      //nop
+                    }
+                  }
+                  return super.getBreakWeight(axis, pos, len);
+                }
+
+                @Override
+                public View breakView(int axis, int offset, float pos, float len) {
+                  // default behavior if no text wrap required
+                  if (!m_textWrap) {
+                    return super.breakView(axis, offset, pos, len);
+                  }
+                  // --> GlyphView.breakView()
+                  if (axis == View.X_AXIS) {
+                    checkPainter();
+                    int maxPos = getGlyphPainter().getBoundedPosition(this, offset, pos, len);
+                    // <-- GlyphView.breakView()
+                    // if line break found create new text fragment to display
+                    try {
+                      int separatorIndex = getDocument().getText(offset, maxPos - offset).indexOf(System.getProperty("line.separator"));
+                      if (separatorIndex >= 0) {
+                        GlyphView glyphView = (GlyphView) createFragment(offset, offset + separatorIndex + 1);
+                        return glyphView;
+                      }
+                    }
+                    catch (BadLocationException ex) {
+                      //nop
+                    }
+                  }
+                  return super.breakView(axis, offset, pos, len);
+                }
+              };
+            }
+            else if (v instanceof ParagraphView) {
+              return new ParagraphView(element) {
+                @Override
+                protected SizeRequirements calculateMinorAxisRequirements(int axis, SizeRequirements r) {
+                  // default behavior if no text wrap required
+                  if (!m_textWrap) {
+                    return super.calculateMinorAxisRequirements(axis, r);
+                  }
+                  // enforce behavior as defined by FlowView
+                  // --> FlowView.calculateMinorAxisRequirements()
+                  if (r == null) {
+                    r = new SizeRequirements();
+                  }
+                  float pref = layoutPool.getPreferredSpan(axis);
+                  float min = layoutPool.getMinimumSpan(axis);
+                  // Don't include insets, Box.getXXXSpan will include them.
+                  r.minimum = (int) min;
+                  r.preferred = Math.max(r.minimum, (int) pref);
+                  r.maximum = Integer.MAX_VALUE;
+                  r.alignment = 0.5f;
+                  return r;
+                  // <-- FlowView.calculateMinorAxisRequirements()
+                }
+              };
+            }
+            return v;
+          }
+        };
+      }
+    };
   }
 
   /**
@@ -123,7 +237,7 @@ public class SwingScoutLabelField extends SwingScoutValueFieldComposite<ILabelFi
 
   /**
    * Creates a border to have correct alignment for customized look and feel (e.g. Rayo)
-   * 
+   *
    * @since 3.10.0-M2
    */
   protected void setTopMarginForField() {
@@ -138,9 +252,9 @@ public class SwingScoutLabelField extends SwingScoutValueFieldComposite<ILabelFi
     return (JTextPaneEx) getSwingField();
   }
 
-  /*
-   * scout properties
-   */
+/*
+ * scout properties
+ */
 
   @Override
   protected void attachScout() {
@@ -157,7 +271,7 @@ public class SwingScoutLabelField extends SwingScoutValueFieldComposite<ILabelFi
 
   /**
    * Defines if the label should be selectable or not
-   * 
+   *
    * @since 3.10.0-M6
    */
   protected void setSelectableFromScout(boolean b) {
@@ -215,12 +329,12 @@ public class SwingScoutLabelField extends SwingScoutValueFieldComposite<ILabelFi
     Color fgColor = getScoutObject().isEnabled() ? m_foregroundColor : getSwingLabelField().getDisabledTextColor();
 
     getStyledTextCreator().setText(getUnformattedText())
-        .setTextWrap(m_textWrap)
-        .setForegroundColor(fgColor)
-        .setBackgroundColor(bgColor)
-        .setHorizontalAlignment(m_horizontalAlignment)
-        .setVerticalAlignment(m_verticalAlignment)
-        .setHeight(adjustHeight(getSwingLabelField().getHeight()));
+    .setTextWrap(m_textWrap)
+    .setForegroundColor(fgColor)
+    .setBackgroundColor(bgColor)
+    .setHorizontalAlignment(m_horizontalAlignment)
+    .setVerticalAlignment(m_verticalAlignment)
+    .setHeight(adjustHeight(getSwingLabelField().getHeight()));
 
     return getStyledTextCreator().createStyledText();
   }
@@ -241,7 +355,7 @@ public class SwingScoutLabelField extends SwingScoutValueFieldComposite<ILabelFi
 
   /**
    * Update the text in the GUI
-   * 
+   *
    * @since 3.10.0-M5
    */
   protected void updateTextInGUI() {

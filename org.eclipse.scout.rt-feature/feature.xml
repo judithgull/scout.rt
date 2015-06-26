@@ -2,7 +2,7 @@
 <feature
       id="org.eclipse.scout.rt"
       label="%featureName"
-      version="4.0.0.qualifier"
+      version="5.0.0.qualifier"
       provider-name="%providerName"
       plugin="org.eclipse.scout.rt.feature.about"
       license-feature="org.eclipse.license"
@@ -21,8 +21,8 @@
    </license>
 
    <url>
-      <update label="%updateSiteName" url="http://download.eclipse.org/releases/luna"/>
-      <discovery label="%updateSiteName" url="http://download.eclipse.org/releases/luna"/>
+      <update label="%updateSiteName" url="http://download.eclipse.org/releases/mars"/>
+      <discovery label="%updateSiteName" url="http://download.eclipse.org/releases/mars"/>
    </url>
 
    <includes

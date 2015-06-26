@@ -11,11 +11,16 @@
 package org.eclipse.scout.rt.client.ui.form.fields.composer;
 
 import java.util.HashSet;
+import java.util.List;
 
 import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.IFormFieldExtension;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.composer.DataModelAggregationFieldChains.DataModelAggregationFieldAttributeChangedChain;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.composer.IDataModelAggregationFieldExtension;
+import org.eclipse.scout.rt.client.ui.form.fields.AbstractFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.smartfield.AbstractSmartField;
 import org.eclipse.scout.rt.shared.ScoutTexts;
 import org.eclipse.scout.rt.shared.data.model.DataModelConstants;
@@ -32,7 +37,7 @@ import org.eclipse.scout.rt.shared.services.lookup.ILookupRow;
  * Expects the property {@link #setAttribute(IDataModelAttribute)} to be set.
  */
 @ClassId("678308dc-6f45-4284-9295-617b28b03cea")
-public abstract class AbstractDataModelAggregationField extends AbstractSmartField<Integer> {
+public abstract class AbstractDataModelAggregationField extends AbstractSmartField<Integer> implements IDataModelAggregationField {
 
   public AbstractDataModelAggregationField() {
     this(true);
@@ -74,7 +79,7 @@ public abstract class AbstractDataModelAggregationField extends AbstractSmartFie
     else {
       setEnabled(false);
     }
-    execAttributeChanged(attribute);
+    interceptAttributeChanged(attribute);
     refreshDisplayText();
   }
 
@@ -87,7 +92,7 @@ public abstract class AbstractDataModelAggregationField extends AbstractSmartFie
    * <p>
    * The default sets the value to {@link DataModelConstants#AGGREGATION_NONE} if valid, else to
    * {@link DataModelConstants#AGGREGATION_COUNT} if valid and else to the first valid aggregation available or null.
-   * 
+   *
    * @param attribute
    *          the new attribute
    */
@@ -111,6 +116,29 @@ public abstract class AbstractDataModelAggregationField extends AbstractSmartFie
       }
     }
     setValue(newAg);
+  }
+
+  protected final void interceptAttributeChanged(IDataModelAttribute attribute) throws ProcessingException {
+    List<? extends IFormFieldExtension<? extends AbstractFormField>> extensions = getAllExtensions();
+    DataModelAggregationFieldAttributeChangedChain chain = new DataModelAggregationFieldAttributeChangedChain(extensions);
+    chain.execAttributeChanged(attribute);
+  }
+
+  protected static class LocalDataModelAggregationFieldExtension<OWNER extends AbstractDataModelAggregationField> extends LocalSmartFieldExtension<Integer, OWNER> implements IDataModelAggregationFieldExtension<OWNER> {
+
+    public LocalDataModelAggregationFieldExtension(OWNER owner) {
+      super(owner);
+    }
+
+    @Override
+    public void execAttributeChanged(DataModelAggregationFieldAttributeChangedChain chain, IDataModelAttribute attribute) throws ProcessingException {
+      getOwner().execAttributeChanged(attribute);
+    }
+  }
+
+  @Override
+  protected IDataModelAggregationFieldExtension<? extends AbstractDataModelAggregationField> createLocalExtension() {
+    return new LocalDataModelAggregationFieldExtension<AbstractDataModelAggregationField>(this);
   }
 
 }

@@ -13,7 +13,7 @@ package org.eclipse.scout.rt.client.ui.desktop.outline;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
-import java.util.Collection;
+import java.util.List;
 
 import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.annotations.Order;
@@ -48,7 +48,7 @@ public class BookmarkToInvisibleOutlineTest {
     Thread.sleep(400);
     Exception err = null;
     try {
-      desktop.activateBookmark(bm, true);
+      desktop.activateBookmark(bm);
     }
     catch (Exception e) {
       err = e;
@@ -64,7 +64,7 @@ public class BookmarkToInvisibleOutlineTest {
     }
 
     @Override
-    protected void execCreateChildPages(Collection<IPage> pageList) throws ProcessingException {
+    protected void execCreateChildPages(List<IPage> pageList) throws ProcessingException {
       pageList.add(new CockpitMainTablePage());
       pageList.add(new CockpitSecondTablePage());
     }
@@ -77,7 +77,7 @@ public class BookmarkToInvisibleOutlineTest {
     }
 
     @Override
-    protected void execCreateChildPages(Collection<IPage> pageList) throws ProcessingException {
+    protected void execCreateChildPages(List<IPage> pageList) throws ProcessingException {
       pageList.add(new AdminMainTablePage());
     }
   }
@@ -90,11 +90,11 @@ public class BookmarkToInvisibleOutlineTest {
     }
 
     @Override
-    protected Object[][] execLoadTableData(SearchFilter filter) throws ProcessingException {
-      return new Object[][]{
+    protected void execLoadData(SearchFilter filter) throws ProcessingException {
+      importTableData(new Object[][]{
           new Object[]{1L, "5 Tickets"},
           new Object[]{2L, "12 Appointments"},
-          new Object[]{3L, "3 E-Mails"},};
+          new Object[]{3L, "3 E-Mails"},});
     }
 
     public class Table extends AbstractTable {
@@ -129,11 +129,11 @@ public class BookmarkToInvisibleOutlineTest {
     }
 
     @Override
-    protected Object[][] execLoadTableData(SearchFilter filter) throws ProcessingException {
-      return new Object[][]{
+    protected void execLoadData(SearchFilter filter) throws ProcessingException {
+      importTableData(new Object[][]{
           new Object[]{1L, "Rated tickets"},
           new Object[]{2L, "Rated appointments"},
-          new Object[]{3L, "Rated E-Mails"},};
+          new Object[]{3L, "Rated E-Mails"},});
     }
 
     public class Table extends AbstractTable {
@@ -167,11 +167,11 @@ public class BookmarkToInvisibleOutlineTest {
     }
 
     @Override
-    protected Object[][] execLoadTableData(SearchFilter filter) throws ProcessingException {
-      return new Object[][]{
+    protected void execLoadData(SearchFilter filter) throws ProcessingException {
+      importTableData(new Object[][]{
           new Object[]{1L, "User Account"},
           new Object[]{2L, "Guest Account"},
-          new Object[]{3L, "Supervisor Account"},};
+          new Object[]{3L, "Supervisor Account"},});
     }
 
     public class Table extends AbstractTable {

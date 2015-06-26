@@ -16,6 +16,7 @@ import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.labelfield.ILabelFieldExtension;
 import org.eclipse.scout.rt.client.ui.form.fields.AbstractValueField;
 
 @ClassId("7e531d93-ad27-4316-9529-7766059b3886")
@@ -38,7 +39,7 @@ public abstract class AbstractLabelField extends AbstractValueField<String> impl
 
   /**
    * Defines if the label should be selectable or not. Default is <code>true</code>
-   * 
+   *
    * @since 3.10.0-M6
    */
   @ConfigProperty(ConfigProperty.BOOLEAN)
@@ -85,6 +86,25 @@ public abstract class AbstractLabelField extends AbstractValueField<String> impl
     return propertySupport.getPropertyBool(PROP_SELECTABLE);
   }
 
+  /**
+   * Configures the horizontal alignment of the fields inside this group box.<br>
+   * This property typically only has an effect if fill horizontal is set to false which can be configured by
+   * {@link #getConfiguredFillHorizontal()}.
+   * <p>
+   * Subclasses can override this method. Default alignment is left.
+   * <p>
+   * For SWT rendering this property will only have effect if also the WrapText property is set to <code>true</code>.
+   *
+   * @return -1 for left, 0 for center and 1 for right alignment
+   * @see {@link #getGridData()}, {@link #getGridDataHints()}
+   */
+  @ConfigProperty(ConfigProperty.HORIZONTAL_ALIGNMENT)
+  @Order(85)
+  @Override
+  protected int getConfiguredHorizontalAlignment() {
+    return -1;
+  }
+
   // convert string to a real string
   @Override
   protected String parseValueInternal(String text) throws ProcessingException {
@@ -92,6 +112,18 @@ public abstract class AbstractLabelField extends AbstractValueField<String> impl
       text = null;
     }
     return text;
+  }
+
+  protected static class LocalLabelFieldExtension<OWNER extends AbstractLabelField> extends LocalValueFieldExtension<String, OWNER> implements ILabelFieldExtension<OWNER> {
+
+    public LocalLabelFieldExtension(OWNER owner) {
+      super(owner);
+    }
+  }
+
+  @Override
+  protected ILabelFieldExtension<? extends AbstractLabelField> createLocalExtension() {
+    return new LocalLabelFieldExtension<AbstractLabelField>(this);
   }
 
 }

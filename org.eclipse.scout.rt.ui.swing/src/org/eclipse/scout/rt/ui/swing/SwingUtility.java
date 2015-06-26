@@ -42,6 +42,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
@@ -73,11 +75,11 @@ import org.eclipse.scout.commons.dnd.TransferObject;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ui.IDNDSupport;
+import org.eclipse.scout.rt.client.ui.MouseButton;
 import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
 import org.eclipse.scout.rt.shared.ScoutTexts;
 import org.eclipse.scout.rt.shared.data.basic.BoundsSpec;
 import org.eclipse.scout.rt.shared.data.basic.FontSpec;
-import org.eclipse.scout.rt.ui.swing.basic.ColorUtility;
 import org.eclipse.scout.rt.ui.swing.dnd.AwtImageTransferable;
 import org.eclipse.scout.rt.ui.swing.dnd.FileListTransferable;
 import org.eclipse.scout.rt.ui.swing.dnd.JVMLocalObjectTransferable;
@@ -118,7 +120,7 @@ public final class SwingUtility {
 
   public static boolean isSunDropAction() {
     AWTEvent e = EventQueue.getCurrentEvent();
-    if (e != null && e.getID() == MouseEvent.MOUSE_RELEASED && e.getClass().getName().equals("sun.awt.dnd.SunDropTargetEvent")) {
+    if (e != null && e.getID() == MouseEvent.MOUSE_RELEASED && "sun.awt.dnd.SunDropTargetEvent".equals(e.getClass().getName())) {
       return true;
     }
     return false;
@@ -202,6 +204,17 @@ public final class SwingUtility {
     dlg.getRootPane().setName("Synth.Dialog");
     dlg.pack();
     dlg.setVisible(true);
+  }
+
+  public static MouseButton swingToScoutMouseButton(int swingButton) {
+    switch (swingButton) {
+      case MouseEvent.BUTTON1:
+        return MouseButton.Left;
+      case MouseEvent.BUTTON3:
+        return MouseButton.Right;
+      default:
+        return MouseButton.Unknown;
+    }
   }
 
   /**
@@ -332,14 +345,6 @@ public final class SwingUtility {
     }
   }
 
-  /**
-   * @deprecated Use {@link ColorUtility#createColor(String)} instead. Will be removed in the 5.0 Release.
-   */
-  @Deprecated
-  public static Color createColor(String c) {
-    return ColorUtility.createColor(c);
-  }
-
   public static Font createFont(FontSpec scoutFont) {
     return createFont(scoutFont, null);
   }
@@ -394,28 +399,28 @@ public final class SwingUtility {
     String key = "";
     boolean hasMeta = false;
     for (String s : a) {
-      if (s.equalsIgnoreCase("shift")) {
+      if (IKeyStroke.SHIFT.equalsIgnoreCase(s)) {
         shift = "shift ";
         hasMeta = true;
       }
-      else if (s.equalsIgnoreCase("control")) {
+      else if (IKeyStroke.CONTROL.equalsIgnoreCase(s)) {
         ctrl = "control ";
         hasMeta = true;
       }
-      else if (s.equalsIgnoreCase("ctrl")) {
+      else if ("ctrl".equalsIgnoreCase(s)) {
         ctrl = "control ";
         hasMeta = true;
       }
-      else if (s.equalsIgnoreCase("alternate")) {
+      else if ("alternate".equalsIgnoreCase(s)) {
         alt = "alt ";
         hasMeta = true;
       }
-      else if (s.equalsIgnoreCase("alt")) {
+      else if (IKeyStroke.ALT.equalsIgnoreCase(s)) {
         alt = "alt ";
         hasMeta = true;
       }
       else {
-        if ("TAB".equalsIgnoreCase(s)) {
+        if (IKeyStroke.TAB.equalsIgnoreCase(s)) {
           kind = "pressed ";
           key = s;
         }
@@ -892,7 +897,7 @@ public final class SwingUtility {
    * will be returned. In Windows environments these circumstances (task bar on a none primary screen) will be very rare
    * and therefore ignored until the bug will be fixed in a future Java version.
    * </p>
-   * 
+   *
    * @param screenDevice
    *          a screen thats {@link GraphicsConfiguration} will be used to determine the insets
    * @return the insets of this toolkit's screen, in pixels, if the given screen device is the primary screen, otherwise
@@ -1074,7 +1079,7 @@ public final class SwingUtility {
 
   /**
    * Adjusts the window such that it fits on the screen, if necessary.
-   * 
+   *
    * @param window
    */
   public static void adjustBoundsToScreen(Window window) {
@@ -1183,7 +1188,7 @@ public final class SwingUtility {
    * lies within the specified frame.
    * <p>
    * Intended be used in custom implementations of {@link JComponent#getToolTipLocation(MouseEvent)}.
-   * 
+   *
    * @param e
    *          the event that caused the display of the tool tip
    * @param c
@@ -1258,7 +1263,7 @@ public final class SwingUtility {
   /**
    * This method is used to get a top margin for {@link SwingScoutLabelField} and {@link SwingScoutHtmlField} in order
    * to have correct alignment for customized look and feel (e.g. Rayo)
-   * 
+   *
    * @since 3.10.0-M2
    */
   public static int getTopMarginForField() {
@@ -1301,6 +1306,41 @@ public final class SwingUtility {
     for (Component c : components) {
       c.setBounds(0, 0, 0, 0);
     }
+  }
+
+  /**
+   * Replaces 3 digit CSS colors with 6 digit colors: (e.g. #fff with #ffffff)
+   *
+   * @param rawHtml
+   *          may be <code>null</code>
+   */
+  public static String replace3DigitColors(String rawHtml) {
+    if (StringUtility.isNullOrEmpty(rawHtml)) {
+      return rawHtml;
+    }
+
+    String styleRegex = "style[\\s]*=[\\s]*[\"\'][^\"^\']+?color:[\\s]*?#([a-fA-F0-9])([a-fA-F0-9])([a-fA-F0-9])[\"\']";
+    Pattern pattern = Pattern.compile(styleRegex, Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    Matcher matcher = pattern.matcher(rawHtml);
+
+    StringBuffer sb = new StringBuffer();
+    int matchEndIndex = 0;
+    while (matcher.find()) {
+      //append pre match
+      sb.append(rawHtml.substring(matchEndIndex, matcher.start(1)));
+
+      //replace digits
+      String c1 = matcher.group(1);
+      String c2 = matcher.group(2);
+      String c3 = matcher.group(3);
+      sb.append(c1 + c1 + c2 + c2 + c3 + c3);
+
+      //mark end of replaced color
+      matchEndIndex = matcher.end(3);
+    }
+    //append post match
+    sb.append(rawHtml.substring(matchEndIndex, rawHtml.length()));
+    return sb.toString();
   }
 
 }

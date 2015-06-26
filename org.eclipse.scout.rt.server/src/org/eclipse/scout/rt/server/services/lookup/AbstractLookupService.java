@@ -44,26 +44,8 @@ public abstract class AbstractLookupService<LOOKUP_ROW_KEY_TYPE> extends Abstrac
   }
 
   /**
-   * @deprecated Will be removed in Scout 5.0. Use {@link #createLookupRowArray(Object[][], ILookupCall, Class)}
-   *             instead.
-   */
-  @Deprecated
-  public static <KEY_TYPE> List<ILookupRow<KEY_TYPE>> createLookupRowArray(Object[][] data, ILookupCall<KEY_TYPE> call) throws ProcessingException {
-    return createLookupRowArray(data, data != null && data.length > 0 ? data[0].length : 0, call);
-  }
-
-  /**
-   * @deprecated Will be removed in Scout 5.0. Use {@link #createLookupRowArray(Object[][], int, ILookupCall, Class)}
-   *             instead.
-   */
-  @Deprecated
-  public static <KEY_TYPE> List<ILookupRow<KEY_TYPE>> createLookupRowArray(Object[][] data, int maxColumnIndex, ILookupCall<KEY_TYPE> call) throws ProcessingException {
-    return createLookupRowArray(data, maxColumnIndex, call, Object.class);
-  }
-
-  /**
    * Convenience function to transform Object[][] data into LookupRow[]
-   * 
+   *
    * @param maxColumnIndex
    *          the maximum column index to be used to create the code rows, all
    *          column indexes >= columnCount are ignored
@@ -79,7 +61,7 @@ public abstract class AbstractLookupService<LOOKUP_ROW_KEY_TYPE> extends Abstrac
    *          <li>String font
    *          <li>Boolean enabled
    *          <li>Object parentKey used in hierarchical structures to point to the parents primary key
-   *          <li>Boolean active (0,1) see {@link TriState#parseTriState(Object)}
+   *          <li>Boolean active (0,1) see {@link TriState#parse(Object)}
    *          </ul>
    * @param call
    * @param keyClass

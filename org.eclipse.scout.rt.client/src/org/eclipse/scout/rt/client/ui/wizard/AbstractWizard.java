@@ -23,26 +23,46 @@ import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.ConfigurationUtility;
 import org.eclipse.scout.commons.EventListenerList;
 import org.eclipse.scout.commons.OptimisticLock;
-import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
 import org.eclipse.scout.commons.annotations.Order;
+import org.eclipse.scout.commons.annotations.OrderedCollection;
 import org.eclipse.scout.commons.beans.AbstractPropertyObserver;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.BlockingCondition;
 import org.eclipse.scout.rt.client.ClientSyncJob;
+import org.eclipse.scout.rt.client.extension.ui.wizard.IWizardExtension;
+import org.eclipse.scout.rt.client.extension.ui.wizard.WizardChains.WizardActiveStepChangedChain;
+import org.eclipse.scout.rt.client.extension.ui.wizard.WizardChains.WizardAnyFieldChangedChain;
+import org.eclipse.scout.rt.client.extension.ui.wizard.WizardChains.WizardCancelChain;
+import org.eclipse.scout.rt.client.extension.ui.wizard.WizardChains.WizardCreateContainerFormChain;
+import org.eclipse.scout.rt.client.extension.ui.wizard.WizardChains.WizardFinishChain;
+import org.eclipse.scout.rt.client.extension.ui.wizard.WizardChains.WizardHyperlinkActionChain;
+import org.eclipse.scout.rt.client.extension.ui.wizard.WizardChains.WizardNextStepChain;
+import org.eclipse.scout.rt.client.extension.ui.wizard.WizardChains.WizardPreviousStepChain;
+import org.eclipse.scout.rt.client.extension.ui.wizard.WizardChains.WizardRefreshButtonPolicyChain;
+import org.eclipse.scout.rt.client.extension.ui.wizard.WizardChains.WizardResetChain;
+import org.eclipse.scout.rt.client.extension.ui.wizard.WizardChains.WizardStartChain;
+import org.eclipse.scout.rt.client.extension.ui.wizard.WizardChains.WizardSuspendChain;
 import org.eclipse.scout.rt.client.ui.desktop.IDesktop;
 import org.eclipse.scout.rt.client.ui.form.IForm;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.IValueField;
 import org.eclipse.scout.rt.client.ui.form.fields.button.IButton;
 import org.eclipse.scout.rt.shared.ScoutTexts;
+import org.eclipse.scout.rt.shared.extension.AbstractExtension;
+import org.eclipse.scout.rt.shared.extension.ContributionComposite;
+import org.eclipse.scout.rt.shared.extension.ExtensionUtility;
+import org.eclipse.scout.rt.shared.extension.IContributionOwner;
+import org.eclipse.scout.rt.shared.extension.IExtensibleObject;
+import org.eclipse.scout.rt.shared.extension.IExtension;
+import org.eclipse.scout.rt.shared.extension.ObjectExtensions;
 import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.service.SERVICES;
 
-public abstract class AbstractWizard extends AbstractPropertyObserver implements IWizard {
+public abstract class AbstractWizard extends AbstractPropertyObserver implements IWizard, IContributionOwner, IExtensibleObject {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractWizard.class);
 
   private boolean m_initialized;
@@ -53,6 +73,8 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
   // event accumulation (coalescation)
   private final OptimisticLock m_changingLock;
   private List<WizardEvent> m_accumulatedEvents;
+  private IContributionOwner m_contributionHolder;
+  private final ObjectExtensions<AbstractWizard, IWizardExtension<? extends AbstractWizard>> m_objectExtensions;
   //
   private boolean m_displayHintLocked;
   private boolean m_modal;
@@ -74,14 +96,30 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
     m_availableStepList = new ArrayList<IWizardStep<? extends IForm>>(0);
     m_stepList = new ArrayList<IWizardStep<? extends IForm>>(0);
     m_blockingCondition = new BlockingCondition(false);
+    m_objectExtensions = new ObjectExtensions<AbstractWizard, IWizardExtension<? extends AbstractWizard>>(this);
     if (callInitializer) {
       callInitializer();
     }
   }
 
+  @Override
+  public final List<Object> getAllContributions() {
+    return m_contributionHolder.getAllContributions();
+  }
+
+  @Override
+  public final <T> List<T> getContributionsByClass(Class<T> type) {
+    return m_contributionHolder.getContributionsByClass(type);
+  }
+
+  @Override
+  public final <T> T getContribution(Class<T> contribution) {
+    return m_contributionHolder.getContribution(contribution);
+  }
+
   protected void callInitializer() {
     if (!m_initialized) {
-      initConfig();
+      interceptInitConfig();
       m_initialized = true;
     }
   }
@@ -126,15 +164,6 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
     return null;
   }
 
-  /**
-   * @deprecated: Use a {@link ClassId} annotation as key for Doc-Text. Will be removed in the 5.0 Release.
-   */
-  @Deprecated
-  @Order(40)
-  protected String getConfiguredDoc() {
-    return null;
-  }
-
   @ConfigProperty(ConfigProperty.ICON_ID)
   @Order(20)
   protected String getConfiguredIconId() {
@@ -151,9 +180,9 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
   private List<Class<? extends IWizardStep<? extends IForm>>> getConfiguredAvailableSteps() {
     Class<?>[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
     List<Class<IWizardStep>> filtered = ConfigurationUtility.filterClasses(dca, IWizardStep.class);
-    List<Class<? extends IWizardStep>> wizardSteps = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(filtered, IWizardStep.class);
-    List<Class<? extends IWizardStep<? extends IForm>>> result = new ArrayList<Class<? extends IWizardStep<? extends IForm>>>();
-    for (Class<? extends IWizardStep> wizardStep : wizardSteps) {
+
+    List<Class<? extends IWizardStep<? extends IForm>>> result = new ArrayList<Class<? extends IWizardStep<? extends IForm>>>(filtered.size());
+    for (Class<? extends IWizardStep> wizardStep : filtered) {
       result.add((Class<? extends IWizardStep<? extends IForm>>) wizardStep);
     }
     return result;
@@ -163,7 +192,7 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
    * create and eventually open a form containing the wizard.<br>
    * this method may be overwritten to provide an own wizard representation
    * form.
-   * 
+   *
    * @return
    * @throws ProcessingException
    */
@@ -182,7 +211,7 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
    * used for example to decorate the step
    * labels and description depending on the current state or to decorate the
    * current wizard form in {@link #getWizardForm()}
-   * 
+   *
    * @throws ProcessingException
    */
   @ConfigOperation
@@ -307,7 +336,7 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
    * This is a delegate methode that is normally called by the wizard status
    * field (html field) in the {@link IWizardContainerForm} whenever a link is
    * clicked.
-   * 
+   *
    * @param url
    * @param path
    *          {@link URL#getPath()}
@@ -321,7 +350,16 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
     LOG.info("execHyperlinkAction " + url + " (in " + getClass().getName() + ")");
   }
 
-  @SuppressWarnings("boxing")
+  protected final void interceptInitConfig() {
+    m_objectExtensions.initConfig(createLocalExtension(), new Runnable() {
+      @Override
+      public void run() {
+        initConfig();
+      }
+    });
+  }
+
+  @SuppressWarnings({"boxing", "unchecked"})
   protected void initConfig() {
     setDisplayHint(getConfiguredDisplayHint());
     setDisplayViewId(getConfiguredDisplayViewId());
@@ -333,27 +371,35 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
     setWizardNo(getConfiguredWizardNo());
     // initially the wizard is in state "closed"
     propertySupport.setPropertyBool(PROP_CLOSED, true);
+    m_contributionHolder = new ContributionComposite(this);
     setCloseTypeInternal(CloseType.Unknown);
+
     // steps
-    ArrayList<IWizardStep<? extends IForm>> list = new ArrayList<IWizardStep<? extends IForm>>();
-    for (Class<? extends IWizardStep<? extends IForm>> element : getConfiguredAvailableSteps()) {
+    List<Class<? extends IWizardStep<? extends IForm>>> configuredAvailableSteps = getConfiguredAvailableSteps();
+    List<IWizardStep> contributedSteps = m_contributionHolder.getContributionsByClass(IWizardStep.class);
+    OrderedCollection<IWizardStep<? extends IForm>> steps = new OrderedCollection<IWizardStep<? extends IForm>>();
+    for (Class<? extends IWizardStep<? extends IForm>> element : configuredAvailableSteps) {
       try {
         IWizardStep<? extends IForm> step = ConfigurationUtility.newInnerInstance(this, element);
-        list.add(step);
+        steps.addOrdered(step);
       }
       catch (Exception e) {
         SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + element.getName() + "'.", e));
       }
     }
-    injectStepsInternal(list);
+    for (IWizardStep step : contributedSteps) {
+      steps.addOrdered(step);
+    }
+    injectStepsInternal(steps);
+    ExtensionUtility.moveModelObjects(steps);
+    setAvailableSteps(steps.getOrderedList());
 
-    setAvailableSteps(list);
     // add listener to listen on any field in active form
     m_anyFieldChangeListener = new PropertyChangeListener() {
       @Override
       public void propertyChange(PropertyChangeEvent e) {
         try {
-          execAnyFieldChanged((IFormField) e.getSource());
+          interceptAnyFieldChanged((IFormField) e.getSource());
         }
         catch (Throwable t) {
           LOG.error("" + e.getSource() + " " + e.getPropertyName() + "=" + e.getNewValue(), t);
@@ -375,14 +421,29 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
     });
   }
 
+  protected IWizardExtension<? extends AbstractWizard> createLocalExtension() {
+    return new LocalWizardExtension<AbstractWizard>(this);
+  }
+
+  @Override
+  public final List<? extends IWizardExtension<? extends AbstractWizard>> getAllExtensions() {
+    return m_objectExtensions.getAllExtensions();
+  }
+
+  @Override
+  public <T extends IExtension<?>> T getExtension(Class<T> c) {
+    return m_objectExtensions.getExtension(c);
+  }
+
   /**
-   * Used to manage wizard steps i.e. to add/remove wizard steps
-   * 
+   * Override this internal method only in order to make use of dynamic wizard steps<br>
+   * Used to add and/or remove steps<br>
+   * To change the order or specify the insert position use {@link IWizardStep#setOrder(double)}.
+   *
    * @param steps
-   *          live and mutable list of configured steps, not yet initialized
-   *          and added to the step list
+   *          live and mutable collection of configured steps, yet not initialized
    */
-  protected void injectStepsInternal(List<IWizardStep<? extends IForm>> steps) {
+  protected void injectStepsInternal(OrderedCollection<IWizardStep<? extends IForm>> steps) {
   }
 
   /*
@@ -618,7 +679,7 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
       return -1;
     }
     for (int i = 0; i < m_stepList.size(); i++) {
-      if (m_stepList.get(i) == step) {
+      if (m_stepList.get(i).equals(step)) {
         return i;
       }
     }
@@ -726,7 +787,7 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
         }
         // notify callback
         try {
-          execActiveStepChanged();
+          interceptActiveStepChanged();
         }
         catch (ProcessingException e) {
           SERVICES.getService(IExceptionHandlerService.class).handleException(e);
@@ -745,7 +806,7 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
   @Override
   public void refreshButtonPolicy() {
     try {
-      execRefreshButtonPolicy();
+      interceptRefreshButtonPolicy();
     }
     catch (ProcessingException e) {
       SERVICES.getService(IExceptionHandlerService.class).handleException(e);
@@ -944,7 +1005,7 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
     propertySupport.setPropertyBool(PROP_CLOSED, false);
     setCloseTypeInternal(CloseType.Unknown);
     createContainerForm();
-    execStart();
+    interceptStart();
     if (m_containerForm != null && !m_containerForm.isFormOpen()) {
       m_containerForm.startWizard();
     }
@@ -1020,13 +1081,13 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
   }
 
   /**
-   * next step The default implementation calls {@link #execNextStep()}
+   * next step The default implementation calls {@link #interceptNextStep()}
    */
   @Override
   public void doNextStep() throws ProcessingException {
     if (isOpen()) {
       try {
-        execNextStep();
+        interceptNextStep();
       }
       catch (ProcessingException pe) {
         throw pe;
@@ -1038,13 +1099,13 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
   }
 
   /**
-   * previous step The default implementation calls {@link #execPreviousStep()}
+   * previous step The default implementation calls {@link #interceptPreviousStep()}
    */
   @Override
   public void doPreviousStep() throws ProcessingException {
     if (isOpen()) {
       try {
-        execPreviousStep();
+        interceptPreviousStep();
       }
       catch (ProcessingException pe) {
         throw pe;
@@ -1056,7 +1117,7 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
   }
 
   /**
-   * finish The default implementation calls {@link #execFinish()}
+   * finish The default implementation calls {@link #interceptFinish()}
    */
   @Override
   public void doFinish() throws ProcessingException {
@@ -1064,7 +1125,7 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
       CloseType oldType = getCloseType();
       try {
         setCloseTypeInternal(CloseType.Finished);
-        execFinish();
+        interceptFinish();
       }
       catch (ProcessingException pe) {
         setCloseTypeInternal(oldType);
@@ -1078,7 +1139,7 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
   }
 
   /**
-   * cancel The default implementation calls {@link #execCancel()}
+   * cancel The default implementation calls {@link #interceptCancel()}
    */
   @Override
   public void doCancel() throws ProcessingException {
@@ -1086,7 +1147,7 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
       CloseType oldType = getCloseType();
       try {
         setCloseTypeInternal(CloseType.Cancelled);
-        execCancel();
+        interceptCancel();
       }
       catch (ProcessingException pe) {
         setCloseTypeInternal(oldType);
@@ -1100,7 +1161,7 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
   }
 
   /**
-   * suspend The default implementation calls {@link #execSuspend()}
+   * suspend The default implementation calls {@link #interceptSuspend()}
    */
   @Override
   public void doSuspend() throws ProcessingException {
@@ -1108,7 +1169,7 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
       CloseType oldType = getCloseType();
       try {
         setCloseTypeInternal(CloseType.Suspended);
-        execSuspend();
+        interceptSuspend();
       }
       catch (ProcessingException pe) {
         setCloseTypeInternal(oldType);
@@ -1122,12 +1183,12 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
   }
 
   /**
-   * reset The default implementation calls {@link #execReset()}
+   * reset The default implementation calls {@link #interceptReset()}
    */
   @Override
   public void doReset() throws ProcessingException {
     try {
-      execReset();
+      interceptReset();
     }
     catch (ProcessingException pe) {
       throw pe;
@@ -1141,18 +1202,19 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
    * This is a delegate methode that is normally called by the wizard status
    * field (html field) in the {@link IWizardContainerForm} whenever a link is
    * clicked.
-   * 
+   *
    * @param url
    * @param path
    *          {@link URL#getPath()}
    * @param local
    *          true if the url is not a valid external url but a local model url
-   *          (http://local/...) The default implementation calls {@link #execHyperlinkAction(URL, String, boolean)}
+   *          (http://local/...) The default implementation calls
+   *          {@link #interceptHyperlinkAction(URL, String, boolean)}
    */
   @Override
   public void doHyperlinkAction(URL url, String path, boolean local) throws ProcessingException {
     if (isOpen()) {
-      execHyperlinkAction(url, path, local);
+      interceptHyperlinkAction(url, path, local);
     }
   }
 
@@ -1181,7 +1243,7 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
   @Override
   public IWizardContainerForm createContainerForm() throws ProcessingException {
     if (m_containerForm == null) {
-      m_containerForm = execCreateContainerForm();
+      m_containerForm = interceptCreateContainerForm();
     }
     return m_containerForm;
   }
@@ -1196,4 +1258,147 @@ public abstract class AbstractWizard extends AbstractPropertyObserver implements
     return ConfigurationUtility.getAnnotatedClassIdWithFallback(getClass());
   }
 
+  /**
+   * The extension delegating to the local methods. This Extension is always at the end of the chain and will not call
+   * any further chain elements.
+   */
+  protected static class LocalWizardExtension<OWNER extends AbstractWizard> extends AbstractExtension<OWNER> implements IWizardExtension<OWNER> {
+
+    public LocalWizardExtension(OWNER owner) {
+      super(owner);
+    }
+
+    @Override
+    public void execActiveStepChanged(WizardActiveStepChangedChain chain) throws ProcessingException {
+      getOwner().execActiveStepChanged();
+    }
+
+    @Override
+    public void execSuspend(WizardSuspendChain chain) throws ProcessingException {
+      getOwner().execSuspend();
+    }
+
+    @Override
+    public void execRefreshButtonPolicy(WizardRefreshButtonPolicyChain chain) throws ProcessingException {
+      getOwner().execRefreshButtonPolicy();
+    }
+
+    @Override
+    public void execCancel(WizardCancelChain chain) throws ProcessingException {
+      getOwner().execCancel();
+    }
+
+    @Override
+    public void execStart(WizardStartChain chain) throws ProcessingException {
+      getOwner().execStart();
+    }
+
+    @Override
+    public IWizardContainerForm execCreateContainerForm(WizardCreateContainerFormChain chain) throws ProcessingException {
+      return getOwner().execCreateContainerForm();
+    }
+
+    @Override
+    public void execAnyFieldChanged(WizardAnyFieldChangedChain chain, IFormField source) throws ProcessingException {
+      getOwner().execAnyFieldChanged(source);
+    }
+
+    @Override
+    public void execReset(WizardResetChain chain) throws ProcessingException {
+      getOwner().execReset();
+    }
+
+    @Override
+    public void execHyperlinkAction(WizardHyperlinkActionChain chain, URL url, String path, boolean local) throws ProcessingException {
+      getOwner().execHyperlinkAction(url, path, local);
+    }
+
+    @Override
+    public void execPreviousStep(WizardPreviousStepChain chain) throws ProcessingException {
+      getOwner().execPreviousStep();
+    }
+
+    @Override
+    public void execNextStep(WizardNextStepChain chain) throws ProcessingException {
+      getOwner().execNextStep();
+    }
+
+    @Override
+    public void execFinish(WizardFinishChain chain) throws ProcessingException {
+      getOwner().execFinish();
+    }
+
+  }
+
+  protected final void interceptActiveStepChanged() throws ProcessingException {
+    List<? extends IWizardExtension<? extends AbstractWizard>> extensions = getAllExtensions();
+    WizardActiveStepChangedChain chain = new WizardActiveStepChangedChain(extensions);
+    chain.execActiveStepChanged();
+  }
+
+  protected final void interceptSuspend() throws ProcessingException {
+    List<? extends IWizardExtension<? extends AbstractWizard>> extensions = getAllExtensions();
+    WizardSuspendChain chain = new WizardSuspendChain(extensions);
+    chain.execSuspend();
+  }
+
+  protected final void interceptRefreshButtonPolicy() throws ProcessingException {
+    List<? extends IWizardExtension<? extends AbstractWizard>> extensions = getAllExtensions();
+    WizardRefreshButtonPolicyChain chain = new WizardRefreshButtonPolicyChain(extensions);
+    chain.execRefreshButtonPolicy();
+  }
+
+  protected final void interceptCancel() throws ProcessingException {
+    List<? extends IWizardExtension<? extends AbstractWizard>> extensions = getAllExtensions();
+    WizardCancelChain chain = new WizardCancelChain(extensions);
+    chain.execCancel();
+  }
+
+  protected final void interceptStart() throws ProcessingException {
+    List<? extends IWizardExtension<? extends AbstractWizard>> extensions = getAllExtensions();
+    WizardStartChain chain = new WizardStartChain(extensions);
+    chain.execStart();
+  }
+
+  protected final IWizardContainerForm interceptCreateContainerForm() throws ProcessingException {
+    List<? extends IWizardExtension<? extends AbstractWizard>> extensions = getAllExtensions();
+    WizardCreateContainerFormChain chain = new WizardCreateContainerFormChain(extensions);
+    return chain.execCreateContainerForm();
+  }
+
+  protected final void interceptAnyFieldChanged(IFormField source) throws ProcessingException {
+    List<? extends IWizardExtension<? extends AbstractWizard>> extensions = getAllExtensions();
+    WizardAnyFieldChangedChain chain = new WizardAnyFieldChangedChain(extensions);
+    chain.execAnyFieldChanged(source);
+  }
+
+  protected final void interceptReset() throws ProcessingException {
+    List<? extends IWizardExtension<? extends AbstractWizard>> extensions = getAllExtensions();
+    WizardResetChain chain = new WizardResetChain(extensions);
+    chain.execReset();
+  }
+
+  protected final void interceptHyperlinkAction(URL url, String path, boolean local) throws ProcessingException {
+    List<? extends IWizardExtension<? extends AbstractWizard>> extensions = getAllExtensions();
+    WizardHyperlinkActionChain chain = new WizardHyperlinkActionChain(extensions);
+    chain.execHyperlinkAction(url, path, local);
+  }
+
+  protected final void interceptPreviousStep() throws ProcessingException {
+    List<? extends IWizardExtension<? extends AbstractWizard>> extensions = getAllExtensions();
+    WizardPreviousStepChain chain = new WizardPreviousStepChain(extensions);
+    chain.execPreviousStep();
+  }
+
+  protected final void interceptNextStep() throws ProcessingException {
+    List<? extends IWizardExtension<? extends AbstractWizard>> extensions = getAllExtensions();
+    WizardNextStepChain chain = new WizardNextStepChain(extensions);
+    chain.execNextStep();
+  }
+
+  protected final void interceptFinish() throws ProcessingException {
+    List<? extends IWizardExtension<? extends AbstractWizard>> extensions = getAllExtensions();
+    WizardFinishChain chain = new WizardFinishChain(extensions);
+    chain.execFinish();
+  }
 }

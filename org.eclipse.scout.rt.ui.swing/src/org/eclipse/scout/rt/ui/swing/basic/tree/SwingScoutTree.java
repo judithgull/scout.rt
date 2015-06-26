@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.TooManyListenersException;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -57,11 +58,11 @@ import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.ClientJob;
 import org.eclipse.scout.rt.client.ui.IEventHistory;
-import org.eclipse.scout.rt.client.ui.action.ActionUtility;
 import org.eclipse.scout.rt.client.ui.action.IAction;
-import org.eclipse.scout.rt.client.ui.action.IActionFilter;
 import org.eclipse.scout.rt.client.ui.action.keystroke.IKeyStroke;
+import org.eclipse.scout.rt.client.ui.action.menu.IMenuType;
 import org.eclipse.scout.rt.client.ui.action.menu.TreeMenuType;
+import org.eclipse.scout.rt.client.ui.action.menu.root.ITreeContextMenu;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITree;
 import org.eclipse.scout.rt.client.ui.basic.tree.ITreeNode;
 import org.eclipse.scout.rt.client.ui.basic.tree.TreeEvent;
@@ -99,10 +100,7 @@ public class SwingScoutTree extends SwingScoutComposite<ITree> implements ISwing
     // swing properties
     tree.setDragEnabled(true);
     // models
-    tree.setModel(new SwingTreeModel(this));
     tree.setSelectionModel(new DefaultTreeSelectionModel());
-    // renderers
-    tree.setCellRenderer(new SwingTreeCellRenderer(getSwingEnvironment(), tree.getCellRenderer(), this));
     // listeners
     tree.addMouseMotionListener(new SwingLinkDetectorMouseMotionListener<JTree>(new TreeHtmlLinkDetector()));
     tree.addMouseListener(new P_SwingMouseListener());
@@ -212,6 +210,10 @@ public class SwingScoutTree extends SwingScoutComposite<ITree> implements ISwing
       m_scoutTreeListener = new P_ScoutTreeListener();
       getScoutObject().addUITreeListener(m_scoutTreeListener);
     }
+
+    getSwingTree().setModel(new SwingTreeModel(this));
+    getSwingTree().setCellRenderer(new SwingTreeCellRenderer(getSwingEnvironment(), getSwingTree().getCellRenderer(), this));
+
     setMultiSelectFromScout(getScoutObject().isMultiSelect());
     setRootNodeVisibleFromScout();
     setRootHandlesVisibleFromScout();
@@ -226,7 +228,8 @@ public class SwingScoutTree extends SwingScoutComposite<ITree> implements ISwing
 
         @Override
         public void actionPerformed(ActionEvent e) {
-          handleSwingNodeClick(getSwingTree().getSelectionPath());
+          // 99 for undefined mouse button
+          handleSwingNodeClick(getSwingTree().getSelectionPath(), 99);
         }
       });
     }
@@ -834,21 +837,25 @@ public class SwingScoutTree extends SwingScoutComposite<ITree> implements ISwing
     if (getScoutObject() != null) {
       TreePath path = getPathForLocation(e.getX(), e.getY());
       ensurePathSelected(path);
-
       final ITreeNode node = path != null ? (ITreeNode) path.getLastPathComponent() : null;
+
       // notify Scout
       Runnable t = new Runnable() {
         @Override
         public void run() {
-          IActionFilter filter;
+          Set<? extends IMenuType> menuTypes;
+          ITreeContextMenu contextMenu = getScoutObject().getContextMenu();
           if (node == null) {
-            filter = ActionUtility.createMenuFilterVisibleAndMenuTypes(TreeMenuType.EmptySpace);
+            menuTypes = CollectionUtility.hashSet(TreeMenuType.EmptySpace);
           }
           else {
-            filter = getScoutObject().getContextMenu().getActiveFilter();
+            menuTypes = contextMenu.getCurrentMenuTypes();
           }
+
           // call swing menu
-          new SwingPopupWorker(getSwingEnvironment(), e.getComponent(), null, e.getPoint(), getScoutObject().getContextMenu(), filter, false).enqueue();
+          SwingPopupWorker popupWorker = new SwingPopupWorker(getSwingEnvironment(), e.getComponent(), e.getPoint(), contextMenu, menuTypes);
+          popupWorker.setLightWeightPopup(false);
+          popupWorker.enqueue();
         }
       };
       getSwingEnvironment().invokeScoutLater(t, 5678);
@@ -856,7 +863,7 @@ public class SwingScoutTree extends SwingScoutComposite<ITree> implements ISwing
     }
   }
 
-  protected void handleSwingNodeClick(TreePath path) {
+  protected void handleSwingNodeClick(TreePath path, final int swingMouseButton) {
     if (getUpdateSwingFromScoutLock().isAcquired()) {
       return;
     }
@@ -870,7 +877,7 @@ public class SwingScoutTree extends SwingScoutComposite<ITree> implements ISwing
         Runnable t = new Runnable() {
           @Override
           public void run() {
-            getScoutObject().getUIFacade().fireNodeClickFromUI(scoutNode);
+            getScoutObject().getUIFacade().fireNodeClickFromUI(scoutNode, SwingUtility.swingToScoutMouseButton(swingMouseButton));
           }
         };
 
@@ -1215,7 +1222,7 @@ public class SwingScoutTree extends SwingScoutComposite<ITree> implements ISwing
           if (path != null) {
             // no click on +/- icon
             if (e.getPoint().x >= getSwingTree().getPathBounds(path).x) {
-              handleSwingNodeClick(path);
+              handleSwingNodeClick(path, e.getButton());
             }
           }
         }

@@ -22,7 +22,11 @@ import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.IFormFieldExtension;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.tabbox.ITabBoxExtension;
+import org.eclipse.scout.rt.client.extension.ui.form.fields.tabbox.TabBoxChains.TabBoxTabSelectedChain;
 import org.eclipse.scout.rt.client.ui.form.fields.AbstractCompositeField;
+import org.eclipse.scout.rt.client.ui.form.fields.AbstractFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
 import org.eclipse.scout.rt.client.ui.form.fields.groupbox.IGroupBox;
 import org.eclipse.scout.rt.client.ui.form.fields.tabbox.internal.TabBoxGrid;
@@ -90,7 +94,7 @@ public abstract class AbstractTabBox extends AbstractCompositeField implements I
       public void propertyChange(PropertyChangeEvent e) {
         // single observer exec
         try {
-          execTabSelected(getSelectedTab());
+          interceptTabSelected(getSelectedTab());
         }
         catch (ProcessingException ex) {
           SERVICES.getService(IExceptionHandlerService.class).handleException(ex);
@@ -202,5 +206,28 @@ public abstract class AbstractTabBox extends AbstractCompositeField implements I
     public void setSelectedTabFromUI(IGroupBox box) {
       setSelectedTab(box);
     }
+  }
+
+  protected final void interceptTabSelected(IGroupBox selectedBox) throws ProcessingException {
+    List<? extends IFormFieldExtension<? extends AbstractFormField>> extensions = getAllExtensions();
+    TabBoxTabSelectedChain chain = new TabBoxTabSelectedChain(extensions);
+    chain.execTabSelected(selectedBox);
+  }
+
+  protected static class LocalTabBoxExtension<OWNER extends AbstractTabBox> extends LocalCompositeFieldExtension<OWNER> implements ITabBoxExtension<OWNER> {
+
+    public LocalTabBoxExtension(OWNER owner) {
+      super(owner);
+    }
+
+    @Override
+    public void execTabSelected(TabBoxTabSelectedChain chain, IGroupBox selectedBox) throws ProcessingException {
+      getOwner().execTabSelected(selectedBox);
+    }
+  }
+
+  @Override
+  protected ITabBoxExtension<? extends AbstractTabBox> createLocalExtension() {
+    return new LocalTabBoxExtension<AbstractTabBox>(this);
   }
 }

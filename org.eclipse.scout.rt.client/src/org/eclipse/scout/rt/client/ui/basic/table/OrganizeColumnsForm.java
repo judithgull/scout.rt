@@ -15,6 +15,7 @@ import org.eclipse.scout.commons.exception.VetoException;
 import org.eclipse.scout.rt.client.services.common.bookmark.internal.BookmarkUtility;
 import org.eclipse.scout.rt.client.ui.ClientUIPreferences;
 import org.eclipse.scout.rt.client.ui.IDNDSupport;
+import org.eclipse.scout.rt.client.ui.MouseButton;
 import org.eclipse.scout.rt.client.ui.action.keystroke.AbstractKeyStroke;
 import org.eclipse.scout.rt.client.ui.action.menu.IMenu;
 import org.eclipse.scout.rt.client.ui.basic.table.OrganizeColumnsForm.MainBox.CancelButton;
@@ -274,7 +275,7 @@ public class OrganizeColumnsForm extends AbstractForm {
 
                 // Sorting
                 getTable().getSortingColumn().setValue(row, col);
-                if (col.isSortActive()) {
+                if (col.isSortActive() && col.isSortExplicit()) {
                   row.getCellForUpdate(getTable().getSortingColumn().getColumnIndex()).setIconId(col.isSortAscending() ? AbstractIcons.TableSortAsc : AbstractIcons.TableSortDesc);
                 }
 
@@ -317,7 +318,7 @@ public class OrganizeColumnsForm extends AbstractForm {
 
           @Override
           protected void execDrop(ITableRow row, TransferObject transfer) throws ProcessingException {
-            if (transfer != null && transfer instanceof JavaTransferObject) {
+            if (row != null && transfer != null && transfer instanceof JavaTransferObject) {
               List<ITableRow> draggedRows = ((JavaTransferObject) transfer).getLocalObjectAsList(ITableRow.class);
               if (CollectionUtility.hasElements(draggedRows)) {
                 ITableRow draggedRow = CollectionUtility.firstElement(draggedRows);
@@ -382,7 +383,7 @@ public class OrganizeColumnsForm extends AbstractForm {
           }
 
           @Override
-          protected void execRowClick(ITableRow row) throws ProcessingException {
+          protected void execRowClick(ITableRow row, MouseButton mouseButton) throws ProcessingException {
             if (row != null && getContextColumn() == getVisibleColumn() && getKeyColumn().getValue(row) != null) {
               Boolean oldValue = getVisibleColumn().getValue(row);
               setColumnVisible(row, !oldValue);

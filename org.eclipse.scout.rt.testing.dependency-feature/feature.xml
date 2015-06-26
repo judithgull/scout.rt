@@ -2,7 +2,7 @@
 <feature
       id="org.eclipse.scout.rt.testing.dependency"
       label="%featureName"
-      version="4.0.0.qualifier"
+      version="5.0.0.qualifier"
       provider-name="%providerName"
       plugin="org.eclipse.scout.rt.feature.about"
       license-feature="org.eclipse.license"
@@ -29,12 +29,12 @@ BSI Business Systems Integration AG - initial API and implementation
    </license>
 
    <url>
-      <update label="Luna" url="http://download.eclipse.org/releases/luna"/>
-      <discovery label="Luna" url="http://download.eclipse.org/releases/luna"/>
+      <update label="Luna" url="http://download.eclipse.org/releases/mars"/>
+      <discovery label="Luna" url="http://download.eclipse.org/releases/mars"/>
    </url>
 
    <requires>
-      <import feature="org.eclipse.scout.rt" version="4.0.0" match="compatible"/>
+      <import feature="org.eclipse.scout.rt" version="5.0.0" match="compatible"/>
       <import plugin="org.junit" version="4.9.0" match="compatible"/>
    </requires>
 

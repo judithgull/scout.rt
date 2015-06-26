@@ -11,7 +11,7 @@
   <parent>
     <groupId>org.eclipse.scout</groupId>
     <artifactId>org.eclipse.scout.rt</artifactId>
-    <version>4.0.0-SNAPSHOT</version>
+    <version>5.0.0-SNAPSHOT</version>
   </parent>
 
   <groupId>org.eclipse.scout.rt</groupId>
@@ -26,6 +26,8 @@
     <module>../org.eclipse.scout.service</module>
     <module>../org.eclipse.scout.rt.server.commons</module>
     <module>../org.eclipse.scout.jaxws216</module>
+    <module>../org.eclipse.scout.jaxws216.jre17.fragment</module>
+    <module>../org.eclipse.scout.jaxws216.jre18.fragment</module>
     <module>../org.eclipse.scout.net</module>
 
     <module>../org.eclipse.scout.rt.servicetunnel</module>
@@ -38,6 +40,8 @@
     <module>../org.eclipse.scout.rt.client-feature</module>
 
     <module>../org.eclipse.scout.rt.server</module>
+    <module>../org.eclipse.scout.rt.server.jms</module>
+
     <module>../org.eclipse.scout.rt.jdbc.derby10</module>
 
     <module>../org.eclipse.scout.rt.ui.swing</module>
@@ -103,7 +107,6 @@
       </activation>
       <modules>
         <module>../org.eclipse.scout.rt.ui.rap</module>
-        <module>../org.eclipse.scout.rt.ui.rap.workbench</module>
         <module>../org.eclipse.scout.rt.ui.rap.mobile</module>
         <module>../org.eclipse.scout.rt.ui.rap.theme.rayo</module>
         <module>../org.eclipse.scout.rt.ui.rap.theme.rayo.mobile</module>

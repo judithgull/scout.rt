@@ -22,21 +22,32 @@ import java.util.Map;
 
 import org.eclipse.scout.commons.CompareUtility;
 import org.eclipse.scout.commons.ConfigurationUtility;
-import org.eclipse.scout.commons.MatrixUtility;
 import org.eclipse.scout.commons.TypeCastUtility;
-import org.eclipse.scout.commons.annotations.ClassId;
 import org.eclipse.scout.commons.annotations.ConfigOperation;
 import org.eclipse.scout.commons.annotations.ConfigProperty;
 import org.eclipse.scout.commons.annotations.Order;
+import org.eclipse.scout.commons.annotations.OrderedCollection;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.holders.IntegerHolder;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.shared.ScoutTexts;
+import org.eclipse.scout.rt.shared.extension.AbstractSerializableExtension;
+import org.eclipse.scout.rt.shared.extension.ContributionComposite;
+import org.eclipse.scout.rt.shared.extension.IContributionOwner;
+import org.eclipse.scout.rt.shared.extension.IExtensibleObject;
+import org.eclipse.scout.rt.shared.extension.IExtension;
+import org.eclipse.scout.rt.shared.extension.ObjectExtensions;
+import org.eclipse.scout.rt.shared.extension.services.common.code.CodeTypeWithGenericChains.CodeTypeWithGenericCreateCodeChain;
+import org.eclipse.scout.rt.shared.extension.services.common.code.CodeTypeWithGenericChains.CodeTypeWithGenericCreateCodesChain;
+import org.eclipse.scout.rt.shared.extension.services.common.code.CodeTypeWithGenericChains.CodeTypeWithGenericLoadCodesChain;
+import org.eclipse.scout.rt.shared.extension.services.common.code.CodeTypeWithGenericChains.CodeTypeWithGenericOverwriteCodeChain;
+import org.eclipse.scout.rt.shared.extension.services.common.code.ICodeTypeExtension;
+import org.eclipse.scout.rt.shared.extension.services.common.code.MoveCodesHandler;
 import org.eclipse.scout.rt.shared.services.common.exceptionhandler.IExceptionHandlerService;
 import org.eclipse.scout.service.SERVICES;
 
-public abstract class AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE extends ICode<CODE_ID>> implements ICodeType<CODE_TYPE_ID, CODE_ID>, Serializable {
+public abstract class AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE extends ICode<CODE_ID>> implements ICodeType<CODE_TYPE_ID, CODE_ID>, IContributionOwner, IExtensibleObject, Serializable {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractCodeTypeWithGeneric.class);
   private static final long serialVersionUID = 1L;
 
@@ -47,39 +58,51 @@ public abstract class AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE ex
   private int m_maxLevel;
   private transient Map<CODE_ID, CODE> m_rootCodeMap = new HashMap<CODE_ID, CODE>();
   private List<CODE> m_rootCodeList = new ArrayList<CODE>();
+  protected IContributionOwner m_contributionHolder;
+  private final ObjectExtensions<AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE>, ICodeTypeExtension<CODE_TYPE_ID, CODE_ID, ? extends AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE>>> m_objectExtensions;
 
   public AbstractCodeTypeWithGeneric() {
     this(true);
   }
 
   public AbstractCodeTypeWithGeneric(boolean callInitializer) {
+    m_objectExtensions = new ObjectExtensions<AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE>, ICodeTypeExtension<CODE_TYPE_ID, CODE_ID, ? extends AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE>>>(this);
     if (callInitializer) {
       callInitializer();
     }
   }
 
+  @Override
+  public final List<Object> getAllContributions() {
+    return m_contributionHolder.getAllContributions();
+  }
+
+  @Override
+  public final <T> List<T> getContributionsByClass(Class<T> type) {
+    return m_contributionHolder.getContributionsByClass(type);
+  }
+
+  @Override
+  public final <T> T getContribution(Class<T> contribution) {
+    return m_contributionHolder.getContribution(contribution);
+  }
+
   protected void callInitializer() {
     if (!m_initialized) {
-      initConfig();
+      interceptInitConfig();
       m_initialized = true;
     }
   }
 
   public AbstractCodeTypeWithGeneric(String label, boolean hierarchy) {
+    m_objectExtensions = new ObjectExtensions<AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE>, ICodeTypeExtension<CODE_TYPE_ID, CODE_ID, ? extends AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE>>>(this);
     m_text = label;
     m_hierarchy = hierarchy;
   }
 
-  @SuppressWarnings("unchecked")
-  protected final List<Class<? extends CODE>> getConfiguredCodes() {
+  protected final List<Class<ICode>> getConfiguredCodes() {
     Class[] dca = ConfigurationUtility.getDeclaredPublicClasses(getClass());
-    List<Class<ICode>> filtered = ConfigurationUtility.filterClasses(dca, ICode.class);
-    List<Class<? extends ICode>> sortFilteredClassesByOrderAnnotation = ConfigurationUtility.sortFilteredClassesByOrderAnnotation(filtered, ICode.class);
-    List<Class<? extends CODE>> result = new ArrayList<Class<? extends CODE>>();
-    for (Class<? extends ICode> codeClazz : sortFilteredClassesByOrderAnnotation) {
-      result.add((Class<? extends CODE>) codeClazz);
-    }
-    return result;
+    return ConfigurationUtility.filterClasses(dca, ICode.class);
   }
 
   @ConfigProperty(ConfigProperty.BOOLEAN)
@@ -106,15 +129,6 @@ public abstract class AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE ex
     return null;
   }
 
-  /**
-   * @deprecated: Use a {@link ClassId} annotation as key for Doc-Text. Will be removed in the 5.0 Release.
-   */
-  @Deprecated
-  @Order(110)
-  protected String getConfiguredDoc() {
-    return null;
-  }
-
   @SuppressWarnings("unchecked")
   @ConfigProperty(ConfigProperty.CODE_ROW)
   @Order(120)
@@ -125,27 +139,34 @@ public abstract class AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE ex
   /**
    * This method is called on server side to create basic code set
    */
+  @SuppressWarnings("unchecked")
   @ConfigOperation
   @Order(1)
   protected List<? extends CODE> execCreateCodes() throws ProcessingException {
-    List<CODE> list = new ArrayList<CODE>();
-    for (Class<? extends ICode> codeClazz : getConfiguredCodes()) {
+    List<Class<ICode>> configuredCodes = getConfiguredCodes();
+    List<ICode> contributedCodes = m_contributionHolder.getContributionsByClass(ICode.class);
+    OrderedCollection<CODE> codes = new OrderedCollection<CODE>();
+    for (Class<? extends ICode> codeClazz : configuredCodes) {
       try {
-        @SuppressWarnings("unchecked")
         CODE code = (CODE) ConfigurationUtility.newInnerInstance(this, codeClazz);
-        list.add(code);
+        codes.addOrdered(code);
       }
       catch (Exception e) {
         SERVICES.getService(IExceptionHandlerService.class).handleException(new ProcessingException("error creating instance of class '" + codeClazz.getName() + "'.", e));
       }
     }
-    return list;
+    for (ICode c : contributedCodes) {
+      codes.addOrdered((CODE) c);
+    }
+
+    new MoveCodesHandler<CODE_ID, CODE>(codes).moveModelObjects();
+    return codes.getOrderedList();
   }
 
   /**
    * This method is called on server side to create a specific code for a code row. This method is called when loading
    * codes, in particular by
-   * 
+   *
    * @return a {@link ICode} to accept that row, return null to ignore that row
    */
   @SuppressWarnings("unchecked")
@@ -173,9 +194,9 @@ public abstract class AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE ex
   }
 
   /**
-   * This method is called on server side to load additional dynamic codes to the {@link #execCreateCodes()} list<br>
+   * This method is called on server side to load additional dynamic codes to the {@link #interceptCreateCodes()} list<br>
    * Sample for sql call:
-   * 
+   *
    * <pre>
    * String sql =
    *     &quot;SELECT key,text,iconId,tooltipText,backgroundColor,foregroundColor,font,active,parentKey,extKey,calcValue,enabled,partitionId &quot; +
@@ -192,7 +213,8 @@ public abstract class AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE ex
   }
 
   /**
-   * When there are configured codes (inner classes) that are overwritten by {@link #execLoadCodes()} then this method
+   * When there are configured codes (inner classes) that are overwritten by {@link #execLoadCodes(Class)} then this
+   * method
    * is
    * called to give a chance to merge attributes of the old configured code to the new dynamic code.
    * <p>
@@ -206,7 +228,7 @@ public abstract class AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE ex
    * <li>value</li>
    * </ul>
    * <p>
-   * 
+   *
    * @param oldCode
    *          is the old (configured) code that is dumped after this call
    * @param newCode
@@ -215,27 +237,33 @@ public abstract class AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE ex
   @ConfigOperation
   @Order(20)
   protected void execOverwriteCode(ICodeRow<CODE_ID> oldCode, ICodeRow<CODE_ID> newCode) throws ProcessingException {
-    if (newCode instanceof CodeRow) {
-      CodeRow editableRow = (CodeRow) newCode;
-      if (editableRow.getBackgroundColor() == null) {
-        editableRow.setBackgroundColor(oldCode.getBackgroundColor());
-      }
-      if (editableRow.getFont() == null) {
-        editableRow.setFont(oldCode.getFont());
-      }
-      if (editableRow.getForegroundColor() == null) {
-        editableRow.setForegroundColor(oldCode.getForegroundColor());
-      }
-      if (editableRow.getIconId() == null) {
-        editableRow.setIconId(oldCode.getIconId());
-      }
-      if (editableRow.getExtKey() == null) {
-        editableRow.setExtKey(oldCode.getExtKey());
-      }
-      if (editableRow.getValue() == null) {
-        editableRow.setValue(oldCode.getValue());
-      }
+    if (newCode.getBackgroundColor() == null) {
+      newCode.setBackgroundColor(oldCode.getBackgroundColor());
     }
+    if (newCode.getFont() == null) {
+      newCode.setFont(oldCode.getFont());
+    }
+    if (newCode.getForegroundColor() == null) {
+      newCode.setForegroundColor(oldCode.getForegroundColor());
+    }
+    if (newCode.getIconId() == null) {
+      newCode.setIconId(oldCode.getIconId());
+    }
+    if (newCode.getExtKey() == null) {
+      newCode.setExtKey(oldCode.getExtKey());
+    }
+    if (newCode.getValue() == null) {
+      newCode.setValue(oldCode.getValue());
+    }
+  }
+
+  protected final void interceptInitConfig() {
+    m_objectExtensions.initConfig(createLocalExtension(), new Runnable() {
+      @Override
+      public void run() {
+        initConfig();
+      }
+    });
   }
 
   protected void initConfig() {
@@ -243,6 +271,7 @@ public abstract class AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE ex
     m_iconId = getConfiguredIconId();
     m_hierarchy = getConfiguredIsHierarchy();
     m_maxLevel = getConfiguredMaxLevel();
+    m_contributionHolder = new ContributionComposite(this);
     try {
       loadCodes();
     }
@@ -252,68 +281,66 @@ public abstract class AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE ex
     }
   }
 
-  /**
-   * Convenience function to sort data for later call to {@link #createCodeRowArray(Object[][])} <br>
-   * The sort indices are 0-based.
-   * 
-   * @deprecated use {@link MatrixUtility} directly. Will be removed with M-Release.
-   */
-  @Deprecated
-  public static void sortData(Object[][] data, int... sortColumns) {
-    MatrixUtility.sort(data, sortColumns);
+  protected ICodeTypeExtension<CODE_TYPE_ID, CODE_ID, ? extends AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE>> createLocalExtension() {
+    return new LocalCodeTypeWithGenericExtension<CODE_TYPE_ID, CODE_ID, CODE, AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE>>(this);
+  }
+
+  @Override
+  public final List<? extends ICodeTypeExtension<CODE_TYPE_ID, CODE_ID, ? extends AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE>>> getAllExtensions() {
+    return m_objectExtensions.getAllExtensions();
+  }
+
+  @Override
+  public <E extends IExtension<?>> E getExtension(Class<E> c) {
+    return m_objectExtensions.getExtension(c);
   }
 
   /**
-   * see {@link #createCodeRowArray(Object[][], int)}
-   * 
-   * @deprecated use {@link CodeRow#CodeRow(Object[], int)} instead. Will be removed with the M-Release.
+   * The extension support for {@link AbstractCodeTypeWithGeneric#execCreateCodes()} method.
+   *
+   * @return
+   * @throws ProcessingException
    */
-  @Deprecated
-  public static CodeRow[] createCodeRowArray(Object[][] data) {
-    return createCodeRowArray(data, data != null && data.length > 0 ? data[0].length : 0);
+  protected final List<? extends CODE> interceptCreateCodes() throws ProcessingException {
+    List<? extends ICodeTypeExtension<CODE_TYPE_ID, CODE_ID, ? extends AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE>>> extensions = getAllExtensions();
+    CodeTypeWithGenericCreateCodesChain<CODE_TYPE_ID, CODE_ID, CODE> chain = new CodeTypeWithGenericCreateCodesChain<CODE_TYPE_ID, CODE_ID, CODE>(extensions);
+    return chain.execCreateCodes();
   }
 
   /**
-   * Convenience function to transform Object[][] data into CodeRow[]
-   * 
-   * @param data
-   *          The Object[][] must contain rows with the elements in the
-   *          following order: <br>
-   *          Object key <br>
-   *          String text <br>
-   *          String iconId <br>
-   *          String tooltipText <br>
-   *          String backgroundColor <br>
-   *          String foregroundColor <br>
-   *          String font <br>
-   *          Long active (0 or 1) <br>
-   *          Object parentKey <br>
-   *          String extKey <br>
-   *          Double calcValue <br>
-   *          Long enabled (0 or 1) <br>
-   *          Long partitionId
-   * @param maxColumnIndex
-   *          the maximum column index to be used to create the code rows, all
-   *          column indexes >= columnCount are ignored
-   * @deprecated use {@link CodeRow#CodeRow(Object[], int)} instead. Will be removed with the M-Release.
+   * The extension support for {@link AbstractCodeTypeWithGeneric#execCreateCode(ICodeRow)} method.
+   *
+   * @return
+   * @throws ProcessingException
    */
-  @Deprecated
-  public static CodeRow[] createCodeRowArray(Object[][] data, int maxColumnIndex) {
-    if (data == null || data.length == 0) {
-      return new CodeRow[0];
-    }
-    else {
-      CodeRow[] a = new CodeRow[data.length];
-      for (int i = 0; i < data.length; i++) {
-        a[i] = new CodeRow(data[i], maxColumnIndex);
-      }
-      return a;
-    }
+  protected final CODE interceptCreateCode(ICodeRow<CODE_ID> newRow) throws ProcessingException {
+    List<? extends ICodeTypeExtension<CODE_TYPE_ID, CODE_ID, ? extends AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE>>> extensions = getAllExtensions();
+    CodeTypeWithGenericCreateCodeChain<CODE_TYPE_ID, CODE_ID, CODE> chain = new CodeTypeWithGenericCreateCodeChain<CODE_TYPE_ID, CODE_ID, CODE>(extensions);
+    return chain.execCreateCode(newRow);
+  }
+
+  /**
+   * The extension support for {@link AbstractCodeTypeWithGeneric#execLoadCodes(Class)} method.
+   *
+   * @param codeRowType
+   * @return
+   * @throws ProcessingException
+   */
+  protected List<? extends ICodeRow<CODE_ID>> interceptLoadCodes(Class<? extends ICodeRow<CODE_ID>> codeRowType) throws ProcessingException {
+    List<? extends ICodeTypeExtension<CODE_TYPE_ID, CODE_ID, ? extends AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE>>> extensions = getAllExtensions();
+    CodeTypeWithGenericLoadCodesChain<CODE_TYPE_ID, CODE_ID, CODE> chain = new CodeTypeWithGenericLoadCodesChain<CODE_TYPE_ID, CODE_ID, CODE>(extensions);
+    return chain.execLoadCodes(codeRowType);
+  }
+
+  protected void interceptOverwriteCode(ICodeRow<CODE_ID> oldCode, ICodeRow<CODE_ID> newCode) throws ProcessingException {
+    List<? extends ICodeTypeExtension<CODE_TYPE_ID, CODE_ID, ? extends AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE>>> extensions = getAllExtensions();
+    CodeTypeWithGenericOverwriteCodeChain<CODE_TYPE_ID, CODE_ID, CODE> chain = new CodeTypeWithGenericOverwriteCodeChain<CODE_TYPE_ID, CODE_ID, CODE>(extensions);
+    chain.execOverwriteCode(oldCode, newCode);
   }
 
   /**
    * default implementations add a field:
-   * 
+   *
    * <pre>
    * public static final long ID=123;
    * and create a getter:
@@ -448,7 +475,7 @@ public abstract class AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE ex
     Map<CODE, CODE> codeToParentCodeMap = new HashMap<CODE, CODE>();
     Map<CODE_ID, CODE> idToCodeMap = new HashMap<CODE_ID, CODE>();
     // 1a add configured codes
-    List<? extends CODE> createdList = execCreateCodes();
+    List<? extends CODE> createdList = interceptCreateCodes();
     if (createdList != null) {
       for (CODE code : createdList) {
         allCodesOrdered.add(code);
@@ -457,7 +484,7 @@ public abstract class AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE ex
       }
     }
     // 1b add dynamic codes
-    List<? extends ICodeRow<CODE_ID>> result = execLoadCodes(getConfiguredCodeRowType());
+    List<? extends ICodeRow<CODE_ID>> result = interceptLoadCodes(getConfiguredCodeRowType());
     if (result != null && result.size() > 0) {
       HashMap<CODE, CODE_ID> codeToParentIdMap = new HashMap<CODE, CODE_ID>();
       // create unconnected codes and assign to type
@@ -465,9 +492,9 @@ public abstract class AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE ex
         CODE existingCode = idToCodeMap.get(newRow.getKey());
         if (existingCode != null) {
           // There is already a static code with same id.
-          execOverwriteCode(existingCode.toCodeRow(), newRow);
+          interceptOverwriteCode(existingCode.toCodeRow(), newRow);
         }
-        CODE newCode = execCreateCode(newRow);
+        CODE newCode = interceptCreateCode(newRow);
         if (newCode != null) {
           if (existingCode != null) {
             // remove old (and then re-add) to preserve dynamic ordering.
@@ -532,7 +559,7 @@ public abstract class AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE ex
    * {@link ICodeType}
    * <p>
    * Add a new root code, owerwrite (drop) existing root code
-   * 
+   *
    * @since 4.0
    * @param index
    *          if index is -1 and the codeId existed before, then it is replaced at the same position. If index is -1
@@ -562,7 +589,7 @@ public abstract class AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE ex
    * {@link ICodeType}
    * <p>
    * Remove a root code
-   * 
+   *
    * @since 4.0
    * @return the index the code had in the list or -1
    */
@@ -629,5 +656,38 @@ public abstract class AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE ex
   @Override
   public String classId() {
     return ConfigurationUtility.getAnnotatedClassIdWithFallback(getClass());
+  }
+
+  /**
+   * The extension delegating to the local methods. This Extension is always at the end of the chain and will not call
+   * any further chain elements.
+   */
+  protected static class LocalCodeTypeWithGenericExtension<CODE_TYPE_ID, CODE_ID, CODE extends ICode<CODE_ID>, OWNER extends AbstractCodeTypeWithGeneric<CODE_TYPE_ID, CODE_ID, CODE>> extends AbstractSerializableExtension<OWNER> implements ICodeTypeExtension<CODE_TYPE_ID, CODE_ID, OWNER> {
+    private static final long serialVersionUID = 1L;
+
+    public LocalCodeTypeWithGenericExtension(OWNER owner) {
+      super(owner);
+    }
+
+    @Override
+    public List<? extends CODE> execCreateCodes(CodeTypeWithGenericCreateCodesChain chain) throws ProcessingException {
+      return getOwner().execCreateCodes();
+    }
+
+    @Override
+    public ICode<CODE_ID> execCreateCode(CodeTypeWithGenericCreateCodeChain chain, ICodeRow<CODE_ID> newRow) throws ProcessingException {
+      return getOwner().execCreateCode(newRow);
+    }
+
+    @Override
+    public List<? extends ICodeRow<CODE_ID>> execLoadCodes(CodeTypeWithGenericLoadCodesChain chain, Class<? extends ICodeRow<CODE_ID>> codeRowType) throws ProcessingException {
+      return getOwner().execLoadCodes(codeRowType);
+    }
+
+    @Override
+    public void execOverwriteCode(CodeTypeWithGenericOverwriteCodeChain chain, ICodeRow<CODE_ID> oldCode, ICodeRow<CODE_ID> newCode) throws ProcessingException {
+      getOwner().execOverwriteCode(oldCode, newCode);
+    }
+
   }
 }
