@@ -55,19 +55,25 @@ public class NotificationClientService implements INotificationClientService {
 
   @PostConstruct
   protected void startSmartPollJob() {
-    try {
-      RunContexts.empty().subject(NOTIFICATION_SUBJECT).run(new IRunnable() {
-        @Override
-        public void run() throws Exception {
-          BEANS.get(INotificationServerService.class).registerNotificationNode(NOTIFICATION_NODE_ID);
-        }
-      });
+    final INotificationServerService remoteService = BEANS.opt(INotificationServerService.class);
+    if (remoteService != null) {
+      try {
+        RunContexts.empty().subject(NOTIFICATION_SUBJECT).run(new IRunnable() {
+          @Override
+          public void run() throws Exception {
+            remoteService.registerNotificationNode(NOTIFICATION_NODE_ID);
+          }
+        });
+      }
+      catch (ProcessingException e) {
+        LOG.warn(String.format("Could not register notification node[%s].", NOTIFICATION_NODE_ID), e);
+      }
+      P_NotificationPollJob pollJob = new P_NotificationPollJob();
+      Jobs.schedule(pollJob, Jobs.newInput(ClientRunContexts.copyCurrent().subject(NOTIFICATION_SUBJECT).session(null)));
     }
-    catch (ProcessingException e) {
-      LOG.warn(String.format("Could not register notification node[%s].", NOTIFICATION_NODE_ID), e);
+    else {
+      LOG.debug("Starting without notifications due to no proxy service is available");
     }
-    P_NotificationPollJob pollJob = new P_NotificationPollJob();
-    Jobs.schedule(pollJob, Jobs.newInput(ClientRunContexts.copyCurrent().subject(NOTIFICATION_SUBJECT).session(null)));
   }
 
   @Override

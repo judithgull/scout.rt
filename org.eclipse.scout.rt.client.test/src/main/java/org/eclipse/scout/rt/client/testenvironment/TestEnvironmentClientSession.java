@@ -10,6 +10,7 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.testenvironment;
 
+import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.AbstractClientSession;
 import org.eclipse.scout.rt.client.IClientSession;
@@ -43,6 +44,15 @@ public class TestEnvironmentClientSession extends AbstractClientSession {
     final TestEnvironmentDesktop d = new TestEnvironmentDesktop();
     setDesktop(d);
     simulateDesktopOpened(d);
+  }
+
+  @Override
+  public String getUserId() {
+    String userId = super.getUserId();
+    if (StringUtility.isNullOrEmpty(userId)) {
+      userId = System.getProperty("user.name");
+    }
+    return userId;
   }
 
   @Override
