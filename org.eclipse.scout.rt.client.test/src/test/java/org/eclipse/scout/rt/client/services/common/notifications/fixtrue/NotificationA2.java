@@ -8,12 +8,12 @@
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
-package org.eclipse.scout.rt.client.services.common.notification.fixture;
+package org.eclipse.scout.rt.client.services.common.notifications.fixtrue;
 
 /**
  *
  */
-public class NotificationA1 implements INotificationA {
+public class NotificationA2 implements INotificationA {
 
   private static final long serialVersionUID = 1L;
 

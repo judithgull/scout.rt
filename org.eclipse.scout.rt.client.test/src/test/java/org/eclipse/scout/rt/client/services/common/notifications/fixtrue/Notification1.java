@@ -8,20 +8,13 @@
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
-package org.eclipse.scout.rt.client.services.common.notification.fixture;
+package org.eclipse.scout.rt.client.services.common.notifications.fixtrue;
 
-import org.eclipse.scout.rt.client.services.common.notification.INotificationHandler;
-import org.eclipse.scout.rt.platform.IgnoreBean;
+import java.io.Serializable;
 
 /**
  *
  */
-@IgnoreBean
-public class NotificationHandlerA implements INotificationHandler<INotificationA> {
-
-  @Override
-  public void handleNotification(INotificationA notification) {
-    System.out.println(String.format("Dispatcher %s called", getClass().getName()));
-  }
+public class Notification1 implements Serializable {
 
 }

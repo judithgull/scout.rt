@@ -22,6 +22,8 @@ import org.eclipse.scout.rt.platform.config.AbstractBooleanConfigProperty;
 import org.eclipse.scout.rt.platform.config.AbstractConfigProperty;
 import org.eclipse.scout.rt.platform.config.AbstractPositiveLongConfigProperty;
 import org.eclipse.scout.rt.platform.config.AbstractStringConfigProperty;
+import org.eclipse.scout.rt.platform.config.AbstractSubjectConfigProperty;
+import org.eclipse.scout.rt.platform.config.CONFIG;
 import org.eclipse.scout.rt.shared.TierState.Tier;
 
 /**
@@ -180,7 +182,7 @@ public final class SharedConfigProperties {
     }
 
     @Override
-    public Subject getDefaultValue() {
+    protected Subject getDefaultValue() {
       return convertToSubject("notification-authenticator");
     }
   }

@@ -24,7 +24,6 @@ import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.context.ClientRunContext;
 import org.eclipse.scout.rt.client.context.ClientRunContexts;
 import org.eclipse.scout.rt.client.fixture.MockServerProcessingCancelService;
-import org.eclipse.scout.rt.client.fixture.MockServiceTunnel;
 import org.eclipse.scout.rt.client.testenvironment.TestEnvironmentClientSession;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.BeanMetaData;
@@ -61,8 +60,8 @@ public class ClientJobCancelTest {
 
     m_serviceReg = TestingUtility.registerBeans(
         new BeanMetaData(MockServerProcessingCancelService.class).
-            initialInstance(new MockServerProcessingCancelService(tunnel)).
-            applicationScoped(true).order(-1)
+        initialInstance(new MockServerProcessingCancelService()).
+        applicationScoped(true).order(-1)
         );
 
   }

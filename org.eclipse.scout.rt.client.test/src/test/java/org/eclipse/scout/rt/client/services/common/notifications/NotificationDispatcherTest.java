@@ -8,13 +8,14 @@
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
-package org.eclipse.scout.rt.client.services.common.notification;
+package org.eclipse.scout.rt.client.services.common.notifications;
 
 import java.util.List;
 
 import org.eclipse.scout.rt.client.IClientSession;
-import org.eclipse.scout.rt.client.services.common.notification.fixture.NotificationA1;
-import org.eclipse.scout.rt.client.services.common.notification.fixture.NotificationHandlerA;
+import org.eclipse.scout.rt.client.services.common.notification.NotificationDispatcher;
+import org.eclipse.scout.rt.client.services.common.notifications.fixtrue.NotificationA1;
+import org.eclipse.scout.rt.client.services.common.notifications.fixtrue.NotificationHandlerA;
 import org.eclipse.scout.rt.client.testenvironment.TestEnvironmentClientSession;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.BeanMetaData;
