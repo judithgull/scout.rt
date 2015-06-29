@@ -24,3 +24,5 @@ target/
 
 # Sonar settings potentially change after every build
 org.sonar.ide.eclipse.core.prefs
+
+/.project
