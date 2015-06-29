@@ -53,15 +53,17 @@ public class NotificationClientService implements INotificationClientService {
 
   private final ISessionListener m_clientSessionStateListener = new P_ClientSessionStateListener();
 
+  private boolean m_offline = false;
+
   @PostConstruct
   protected void startSmartPollJob() {
-    final INotificationServerService remoteService = BEANS.opt(INotificationServerService.class);
-    if (remoteService != null) {
+    if (BEANS.opt(INotificationServerService.class) != null) {
+      m_offline = false;
       try {
         RunContexts.empty().subject(NOTIFICATION_SUBJECT).run(new IRunnable() {
           @Override
           public void run() throws Exception {
-            remoteService.registerNotificationNode(NOTIFICATION_NODE_ID);
+            BEANS.get(INotificationServerService.class).registerNotificationNode(NOTIFICATION_NODE_ID);
           }
         });
       }
@@ -72,16 +74,19 @@ public class NotificationClientService implements INotificationClientService {
       Jobs.schedule(pollJob, Jobs.newInput(ClientRunContexts.copyCurrent().subject(NOTIFICATION_SUBJECT).session(null)));
     }
     else {
+      m_offline = true;
       LOG.debug("Starting without notifications due to no proxy service is available");
     }
   }
 
   @Override
   public void register(IClientSession clientSession) {
-    clientSession.addListener(m_clientSessionStateListener);
-    // if the client session is already started, otherwise the listener will invoke the clientSessionStated method.
-    if (clientSession.isActive()) {
-      clientSessionStarted(clientSession);
+    if (!m_offline) {
+      clientSession.addListener(m_clientSessionStateListener);
+      // if the client session is already started, otherwise the listener will invoke the clientSessionStated method.
+      if (clientSession.isActive()) {
+        clientSessionStarted(clientSession);
+      }
     }
   }
 
