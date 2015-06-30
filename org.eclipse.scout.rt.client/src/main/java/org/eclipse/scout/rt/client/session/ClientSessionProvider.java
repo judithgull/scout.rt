@@ -69,11 +69,15 @@ public class ClientSessionProvider {
           }
         }, ModelJobs.newInput(ClientRunContexts.copyCurrent().session(clientSession, true)).name("initialize ClientSession [user=%s]", runContext.subject()).logOnError(false)).awaitDoneAndGet();
 
-        // register client session for notifications
-        BEANS.get(INotificationClientService.class).register(clientSession);
+        registerClientSessionForNotifications(clientSession);
         return clientSession;
       }
     });
+  }
+
+  protected void registerClientSessionForNotifications(IClientSession session) {
+    // register client session for notifications
+    BEANS.get(INotificationClientService.class).register(session);
   }
 
   /**

@@ -35,6 +35,7 @@ import org.eclipse.scout.rt.platform.job.Jobs;
 import org.eclipse.scout.rt.shared.SharedConfigProperties.NotificationSubjectProperty;
 import org.eclipse.scout.rt.shared.services.common.notification.INotificationServerService;
 import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
+import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnel;
 import org.eclipse.scout.rt.shared.session.ISessionListener;
 import org.eclipse.scout.rt.shared.session.SessionEvent;
 import org.eclipse.scout.rt.shared.ui.UserAgent;
@@ -53,12 +54,9 @@ public class NotificationClientService implements INotificationClientService {
 
   private final ISessionListener m_clientSessionStateListener = new P_ClientSessionStateListener();
 
-  private boolean m_offline = false;
-
   @PostConstruct
   protected void startSmartPollJob() {
-    if (BEANS.opt(INotificationServerService.class) != null) {
-      m_offline = false;
+    if (BEANS.get(IServiceTunnel.class).isActive()) {
       try {
         RunContexts.empty().subject(NOTIFICATION_SUBJECT).run(new IRunnable() {
           @Override
@@ -74,14 +72,13 @@ public class NotificationClientService implements INotificationClientService {
       Jobs.schedule(pollJob, Jobs.newInput(ClientRunContexts.copyCurrent().subject(NOTIFICATION_SUBJECT).session(null)));
     }
     else {
-      m_offline = true;
       LOG.debug("Starting without notifications due to no proxy service is available");
     }
   }
 
   @Override
   public void register(IClientSession clientSession) {
-    if (!m_offline) {
+    if (BEANS.get(IServiceTunnel.class).isActive()) {
       clientSession.addListener(m_clientSessionStateListener);
       // if the client session is already started, otherwise the listener will invoke the clientSessionStated method.
       if (clientSession.isActive()) {

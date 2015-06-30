@@ -13,15 +13,19 @@ package org.eclipse.scout.rt.client.services.common.notification;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import javax.annotation.PostConstruct;
 
 import org.eclipse.scout.commons.IRunnable;
 import org.eclipse.scout.commons.TypeCastUtility;
+import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.IClientSession;
@@ -30,6 +34,10 @@ import org.eclipse.scout.rt.client.context.ClientRunContexts;
 import org.eclipse.scout.rt.client.job.ModelJobs;
 import org.eclipse.scout.rt.platform.ApplicationScoped;
 import org.eclipse.scout.rt.platform.BEANS;
+import org.eclipse.scout.rt.platform.job.DoneEvent;
+import org.eclipse.scout.rt.platform.job.IDoneCallback;
+import org.eclipse.scout.rt.platform.job.IFuture;
+import org.eclipse.scout.rt.platform.job.Jobs;
 
 /**
  *
@@ -41,6 +49,7 @@ public class NotificationDispatcher {
   private final Map<Class<? extends Serializable> /*notification class*/, List<INotificationHandler<? extends Serializable>>> m_notificationClassToNotifcationHandler = new HashMap<>();
   private final Map<Class<? extends Serializable> /*notification class*/, List<INotificationHandler<? extends Serializable>>> m_cachedNotificationHandlers = new HashMap<>();
   private final Object m_cacheLock = new Object();
+  private final Set<IFuture<Void>> m_notificationFutures = new HashSet<>();
   // TODO[aho] make configurable
   private boolean m_useCachedNotificationHandlerLookup = true;
 
@@ -72,7 +81,19 @@ public class NotificationDispatcher {
    *          the notification to process.
    */
   public void dispatch(IClientSession session, Serializable notification) {
-    ModelJobs.schedule(new P_DispatchClientJob(notification), ModelJobs.newInput(ClientRunContexts.empty().session(session)));
+    IFuture<Void> future = ModelJobs.schedule(new P_DispatchClientJob(notification), ModelJobs.newInput(ClientRunContexts.empty().session(session)).name("Blubbi"));
+    synchronized (m_notificationFutures) {
+      m_notificationFutures.add(future);
+      future.whenDone(new P_NotificationFutureCallback(future));
+    }
+  }
+
+  public void waitForPendingNotifications() throws ProcessingException {
+    final Set<IFuture<?>> futures = new HashSet<>();
+    synchronized (m_notificationFutures) {
+      futures.addAll(m_notificationFutures);
+    }
+    Jobs.getJobManager().awaitDone(Jobs.newFutureFilter().andMatchFutures(futures).andMatchNotCurrentFuture(), Integer.MAX_VALUE, TimeUnit.SECONDS);
   }
 
   protected List<INotificationHandler<? extends Serializable>> getNotificationHandlers(Class<? extends Serializable> notificationClass) {
@@ -126,6 +147,24 @@ public class NotificationDispatcher {
         catch (Exception e) {
           LOG.error(String.format("Handler '%s' notification with notification '%s' failed.", handler, m_notification), e);
         }
+      }
+    }
+  }
+
+  private class P_NotificationFutureCallback implements IDoneCallback<Void> {
+    private IFuture<Void> m_furture;
+
+    /**
+     *
+     */
+    public P_NotificationFutureCallback(IFuture<Void> furture) {
+      m_furture = furture;
+    }
+
+    @Override
+    public void onDone(DoneEvent<Void> event) {
+      synchronized (m_notificationFutures) {
+        m_notificationFutures.remove(m_furture);
       }
     }
   }

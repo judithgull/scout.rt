@@ -21,6 +21,8 @@ import org.eclipse.scout.commons.CompositeObject;
 import org.eclipse.scout.commons.LRUCache;
 import org.eclipse.scout.commons.annotations.Internal;
 import org.eclipse.scout.commons.exception.ProcessingException;
+import org.eclipse.scout.commons.logger.IScoutLogger;
+import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.IClientSession;
 import org.eclipse.scout.rt.client.context.ClientRunContext;
 import org.eclipse.scout.rt.client.session.ClientSessionProvider;
@@ -29,13 +31,14 @@ import org.eclipse.scout.rt.client.ui.desktop.DesktopListener;
 import org.eclipse.scout.rt.client.ui.messagebox.IMessageBox;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.config.CONFIG;
+import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnel;
 import org.eclipse.scout.rt.testing.client.TestingClientConfigProperties.ClientSessionCacheExpirationProperty;
 
 /**
  * Provider for client sessions. A client session is only created if not contained in the session cache.
  */
 public class ClientSessionProviderWithCache extends ClientSessionProvider {
-
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(ClientSessionProviderWithCache.class);
   private final LRUCache<CompositeObject, IClientSession> m_cache;
 
   public ClientSessionProviderWithCache() {
@@ -54,6 +57,7 @@ public class ClientSessionProviderWithCache extends ClientSessionProvider {
     }
     else {
       // create and initialize a new session; use optimistic locking because initializing the session is a long-running operation.
+
       final SESSION newClientSession = super.provide(runContext, sessionId);
 
       synchronized (m_cache) {
@@ -65,6 +69,16 @@ public class ClientSessionProviderWithCache extends ClientSessionProvider {
           return putToCache(principals, newClientSession);
         }
       }
+    }
+  }
+
+  @Override
+  protected void registerClientSessionForNotifications(IClientSession session) {
+    if (BEANS.get(IServiceTunnel.class).isActive()) {
+      super.registerClientSessionForNotifications(session);
+    }
+    else {
+      LOG.warn("Error during session registration for notifications.");
     }
   }
 

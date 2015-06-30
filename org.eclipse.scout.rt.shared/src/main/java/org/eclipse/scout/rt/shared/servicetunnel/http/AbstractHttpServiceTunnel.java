@@ -25,6 +25,8 @@ import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.StringUtility;
 import org.eclipse.scout.commons.UriUtility;
 import org.eclipse.scout.commons.exception.ProcessingException;
+import org.eclipse.scout.commons.logger.IScoutLogger;
+import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.config.IConfigProperty;
 import org.eclipse.scout.rt.platform.context.ICancellable;
@@ -47,33 +49,44 @@ import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelResponse;
  */
 public abstract class AbstractHttpServiceTunnel extends AbstractServiceTunnel {
 
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractHttpServiceTunnel.class);
+
   public static final String TOKEN_AUTH_HTTP_HEADER = "X-ScoutAccessToken";
 
   private IServiceTunnelContentHandler m_contentHandler;
   private final URL m_serverUrl;
+  private final boolean m_active;
 
   public AbstractHttpServiceTunnel() {
     this(getConfiguredServerUrl());
   }
 
   public AbstractHttpServiceTunnel(URL url) {
-//    super(session);
     m_serverUrl = url;
+    m_active = url != null;
+    if (url == null) {
+      LOG.warn(String.format("No target url configured. Please specify a target URL in the config.properties using property '%s'.", CONFIG.getProperty(ServiceTunnelTargetUrlProperty.class).getKey()));
+    }
   }
 
   protected static URL getConfiguredServerUrl() {
     IConfigProperty<String> targetUrlProperty = BEANS.get(ServiceTunnelTargetUrlProperty.class);
     String url = targetUrlProperty.getValue();
-    try {
-      URL targetUrl = UriUtility.toUrl(url);
-      if (targetUrl == null) {
-        throw new IllegalArgumentException("No target url configured. Please specify a target URL in the config.properties using property '" + targetUrlProperty.getKey() + "'.");
+    if (StringUtility.hasText(url)) {
+      try {
+        URL targetUrl = UriUtility.toUrl(url);
+        return targetUrl;
       }
-      return targetUrl;
+      catch (ProcessingException e) {
+        throw new IllegalArgumentException("targetUrl: " + url, e);
+      }
     }
-    catch (ProcessingException e) {
-      throw new IllegalArgumentException("targetUrl: " + url, e);
-    }
+    return null;
+  }
+
+  @Override
+  public boolean isActive() {
+    return m_active;
   }
 
   public URL getServerUrl() {

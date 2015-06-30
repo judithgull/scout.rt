@@ -106,7 +106,11 @@ public final class SharedConfigProperties {
 
     @Override
     protected String getDefaultValue() {
-      return BEANS.get(BackendUrlProperty.class).getValue() + "/process";
+      String backendUrl = BEANS.get(BackendUrlProperty.class).getValue();
+      if (StringUtility.hasText(backendUrl)) {
+        return backendUrl + "/process";
+      }
+      return null;
     }
 
     @Override
