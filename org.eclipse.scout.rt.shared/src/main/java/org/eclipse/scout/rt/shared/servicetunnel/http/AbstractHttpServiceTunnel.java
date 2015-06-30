@@ -65,7 +65,7 @@ public abstract class AbstractHttpServiceTunnel extends AbstractServiceTunnel {
     m_serverUrl = url;
     m_active = url != null;
     if (url == null) {
-      LOG.warn(String.format("No target url configured. Please specify a target URL in the config.properties using property '%s'.", CONFIG.getProperty(ServiceTunnelTargetUrlProperty.class).getKey()));
+      LOG.warn(String.format("No target url configured. Please specify a target URL in the config.properties using property '%s'.", BEANS.get(ServiceTunnelTargetUrlProperty.class).getKey()));
     }
   }
 

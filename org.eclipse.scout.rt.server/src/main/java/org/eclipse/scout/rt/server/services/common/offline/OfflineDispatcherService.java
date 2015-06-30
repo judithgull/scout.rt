@@ -75,7 +75,7 @@ public class OfflineDispatcherService extends AbstractService implements IOfflin
   /**
    * Method invoked to delegate the request to the 'process service'.
    */
-  protected IServiceTunnelResponse invokeService(final ServerRunContext serverRunContext, final IServiceTunnelRequest serviceTunnelRequest) throws Exception {
+  protected IServiceTunnelResponse invokeService(final ServerRunContext serverRunContext, final ServiceTunnelRequest serviceTunnelRequest) throws Exception {
     return serverRunContext.call(new Callable<IServiceTunnelResponse>() {
 
       @Override
