@@ -189,6 +189,7 @@ public class DefaultTransactionDelegate {
       }
       serviceRes = new ServiceTunnelResponse(data, outParameters, null);
 
+      // TODO[aho] write cliet notificaitons to response.
       ITransaction.CURRENT.get().registerMember(new P_ClientNotificationTransactionMember(serviceRes));
       return serviceRes;
     }

@@ -16,6 +16,7 @@ import java.util.List;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.server.transaction.AbstractTransactionMember;
 import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
+import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelResponse;
 
 /**
  *
@@ -34,9 +35,20 @@ public class NotificationTransactionMember extends AbstractTransactionMember {
     m_notifications.add(message);
   }
 
+  public void decorateResponse(ServiceTunnelResponse response) {
+
+  }
+
   @Override
   public void commitPhase2() {
+    // piggy back
+    // notify others
     BEANS.get(NotificationRegistry.class).put(m_notifications);
+  }
+
+  @Override
+  public void rollback() {
+    m_notifications.clear();
   }
 
 }

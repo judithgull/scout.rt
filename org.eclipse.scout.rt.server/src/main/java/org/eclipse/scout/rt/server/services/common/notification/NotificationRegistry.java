@@ -156,15 +156,19 @@ public class NotificationRegistry {
 
   public void putTransactional(NotificationMessage message) {
     ITransaction transaction = Assertions.assertNotNull(ITransaction.CURRENT.get(), "No transaction found in curren run context for processing notification %s", message);
-    NotificationTransactionMember tMember = (NotificationTransactionMember) transaction.getMember(NotificationTransactionMember.TRANSACTION_MEMBER_ID);
-    if (tMember == null) {
-      tMember = new NotificationTransactionMember();
-      try {
+    try {
+      NotificationTransactionMember tMember = (NotificationTransactionMember) transaction.getMember(NotificationTransactionMember.TRANSACTION_MEMBER_ID);
+      if (tMember == null) {
+        tMember = new NotificationTransactionMember();
         transaction.registerMember(tMember);
       }
-      catch (ProcessingException e) {
-        LOG.warn("Could not register transaction memeber.", e);
-      }
+      //TODO[aho] remove current
+      tMember.addNotification(message);
+    }
+    catch (ProcessingException e) {
+      LOG.warn("Could not register transaction member. The notification will be processed immediately", e);
+      put(message);
+
     }
   }
 
