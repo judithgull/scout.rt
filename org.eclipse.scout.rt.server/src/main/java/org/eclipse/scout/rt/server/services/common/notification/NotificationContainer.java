@@ -10,26 +10,47 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.server.services.common.notification;
 
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Set;
 
 import org.eclipse.scout.rt.server.context.ServerRunContext;
+import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
 
 /**
  * The container of all transactional notifications during a server request. Is kept on the {@link ServerRunContext}.
+ *
+ * @see NotificationTransactionMember
  */
 public class NotificationContainer {
+
   /**
    * The {@link Locale} which is currently associated with the current thread.
    */
-  public static final ThreadLocal<String> CURRENT = new ThreadLocal<>();
+  public static final ThreadLocal<NotificationContainer> CURRENT = new ThreadLocal<>();
 
-  private NotificationContainer() {
+  private final Set<NotificationMessage> m_notifications = new HashSet<>();
+
+  public NotificationContainer() {
   }
 
   /**
    */
-  public static String get() {
+  public static NotificationContainer get() {
     return CURRENT.get();
+  }
+
+  public boolean add(NotificationMessage message) {
+    return m_notifications.add(message);
+  }
+
+  public void addAll(Collection<NotificationMessage> messages) {
+    m_notifications.addAll(messages);
+  }
+
+  public Set<NotificationMessage> getNotifications() {
+    return new HashSet<NotificationMessage>(m_notifications);
   }
 
 }

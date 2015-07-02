@@ -10,35 +10,30 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.services.common.notification;
 
+import java.io.Serializable;
 import java.lang.ref.WeakReference;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
-import javax.annotation.PostConstruct;
 import javax.security.auth.Subject;
 
-import org.eclipse.scout.commons.CollectionUtility;
-import org.eclipse.scout.commons.CompareUtility;
 import org.eclipse.scout.commons.IRunnable;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.IClientSession;
-import org.eclipse.scout.rt.client.context.ClientRunContexts;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.config.CONFIG;
 import org.eclipse.scout.rt.platform.context.RunContexts;
-import org.eclipse.scout.rt.platform.job.Jobs;
 import org.eclipse.scout.rt.shared.SharedConfigProperties.NotificationSubjectProperty;
 import org.eclipse.scout.rt.shared.services.common.notification.INotificationServerService;
-import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
 import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnel;
 import org.eclipse.scout.rt.shared.session.ISessionListener;
 import org.eclipse.scout.rt.shared.session.SessionEvent;
-import org.eclipse.scout.rt.shared.ui.UserAgent;
 
 /**
  *
@@ -46,7 +41,7 @@ import org.eclipse.scout.rt.shared.ui.UserAgent;
 public class NotificationClientService implements INotificationClientService {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(NotificationClientService.class);
 
-  private final Subject NOTIFICATION_SUBJECT = CONFIG.getPropertyValue(NotificationSubjectProperty.class);
+  protected final Subject NOTIFICATION_SUBJECT = CONFIG.getPropertyValue(NotificationSubjectProperty.class);
 
   private Object m_cacheLock = new Object();
   private final Map<String /*sessionId*/, WeakReference<IClientSession>> m_sessionIdToSession = new HashMap<>();
@@ -54,30 +49,8 @@ public class NotificationClientService implements INotificationClientService {
 
   private final ISessionListener m_clientSessionStateListener = new P_ClientSessionStateListener();
 
-  @PostConstruct
-  protected void startSmartPollJob() {
-    if (BEANS.get(IServiceTunnel.class).isActive()) {
-      try {
-        RunContexts.empty().subject(NOTIFICATION_SUBJECT).run(new IRunnable() {
-          @Override
-          public void run() throws Exception {
-            BEANS.get(INotificationServerService.class).registerNotificationNode(NOTIFICATION_NODE_ID);
-          }
-        });
-      }
-      catch (ProcessingException e) {
-        LOG.warn(String.format("Could not register notification node[%s].", NOTIFICATION_NODE_ID), e);
-      }
-      P_NotificationPollJob pollJob = new P_NotificationPollJob();
-      Jobs.schedule(pollJob, Jobs.newInput(ClientRunContexts.copyCurrent().subject(NOTIFICATION_SUBJECT).session(null)));
-    }
-    else {
-      LOG.debug("Starting without notifications due to no proxy service is available");
-    }
-  }
-
   @Override
-  public void register(IClientSession clientSession) {
+  public void registerClientSession(IClientSession clientSession) {
     if (BEANS.get(IServiceTunnel.class).isActive()) {
       clientSession.addListener(m_clientSessionStateListener);
       // if the client session is already started, otherwise the listener will invoke the clientSessionStated method.
@@ -166,6 +139,117 @@ public class NotificationClientService implements INotificationClientService {
     }
   }
 
+  @Override
+  public IClientSession getClientSession(String sessionid) {
+    synchronized (m_cacheLock) {
+      WeakReference<IClientSession> sessionRef = m_sessionIdToSession.get(sessionid);
+      if (sessionRef.get() != null) {
+        return sessionRef.get();
+      }
+      else {
+        m_sessionIdToSession.remove(sessionid);
+      }
+    }
+    return null;
+  }
+
+  @Override
+  public List<IClientSession> getClientSessionsForUser(String userId) {
+    List<IClientSession> result = new LinkedList<>();
+    synchronized (m_cacheLock) {
+      List<WeakReference<IClientSession>> userSessions = m_userToSessions.get(userId);
+      Iterator<WeakReference<IClientSession>> refIt = userSessions.iterator();
+      while (refIt.hasNext()) {
+        WeakReference<IClientSession> sessionRef = refIt.next();
+        if (sessionRef.get() != null) {
+          result.add(sessionRef.get());
+        }
+        else {
+          refIt.remove();
+        }
+      }
+    }
+    return result;
+  }
+
+  @Override
+  public List<IClientSession> getAllClientSessions() {
+    List<IClientSession> result = new LinkedList<IClientSession>();
+    synchronized (m_cacheLock) {
+      for (Entry<String, WeakReference<IClientSession>> e : m_sessionIdToSession.entrySet()) {
+        if (e.getValue().get() != null) {
+          result.add(e.getValue().get());
+        }
+        else {
+          m_sessionIdToSession.remove(e.getKey());
+        }
+      }
+    }
+    return result;
+  }
+
+//  @Override
+//  public void dispatchNotifications(Collection<NotificationMessage> notifications) {
+//    dispatchNotifications(notifications, ACCEPT_ALL_FILTER);
+//  }
+
+//  /**
+//   * @param notifications
+//   */
+//  @Override
+//  public void dispatchNotifications(Collection<NotificationMessage> notifications, IFilter<NotificationMessage> filter) {
+//    NotificationDispatcher dispatcher = BEANS.get(NotificationDispatcher.class);
+//    for (NotificationMessage message : notifications) {
+//      if (!filter.accept(message)) {
+//        continue;
+//      }
+//      if (message.isNotifyAll()) {
+//        // notify all sessions
+//        synchronized (m_cacheLock) {
+//          for (WeakReference<IClientSession> sessionRef : m_sessionIdToSession.values()) {
+//            if (sessionRef.get() != null) {
+//              dispatch(dispatcher, sessionRef.get(), message.getNotification());
+//            }
+//          }
+//        }
+//      }
+//      else {
+//        if (CollectionUtility.hasElements(message.getSessionIds())) {
+//          for (String sessionId : message.getSessionIds()) {
+//            WeakReference<IClientSession> sessionRef = m_sessionIdToSession.get(sessionId);
+//            if (sessionRef.get() != null) {
+//              dispatch(dispatcher, sessionRef.get(), message.getNotification());
+//            }
+//          }
+//          if (CollectionUtility.hasElements(message.getUserIds())) {
+//            for (String userId : message.getUserIds()) {
+//              List<WeakReference<IClientSession>> sessionRefs = m_userToSessions.get(userId);
+//              Iterator<WeakReference<IClientSession>> sessionRefIt = sessionRefs.iterator();
+//              while (sessionRefIt.hasNext()) {
+//                WeakReference<IClientSession> sessionRef = sessionRefIt.next();
+//                if (sessionRef.get() == null) {
+//                  sessionRefIt.remove();
+//                }
+//                else {
+//                  dispatch(dispatcher, sessionRef.get(), message.getNotification());
+//                }
+//              }
+//            }
+//          }
+//        }
+//      }
+//    }
+//  }
+
+  protected void dispatch(NotificationDispatcher dispatcher, IClientSession session, Serializable notification) {
+    try {
+      dispatcher.dispatch(session, notification);
+    }
+    catch (Exception e) {
+      LOG.error(String.format("Error during dispatching notificaiton '%s'", notification));
+    }
+  }
+
   private class P_ClientSessionStateListener implements ISessionListener {
 
     @Override
@@ -179,66 +263,6 @@ public class NotificationClientService implements INotificationClientService {
         default:
           break;
       }
-    }
-  }
-
-  /**
-   * @param notifications
-   */
-  public void dispatchNotifications(List<NotificationMessage> notifications) {
-    NotificationDispatcher dispatcher = BEANS.get(NotificationDispatcher.class);
-    for (NotificationMessage message : notifications) {
-      if (CompareUtility.equals(message.getExcludeNodeId(), NOTIFICATION_NODE_ID)) {
-        continue;
-      }
-      if (message.isNotifyAll()) {
-        // notify all sessions
-        synchronized (m_cacheLock) {
-          for (WeakReference<IClientSession> sessionRef : m_sessionIdToSession.values()) {
-            if (sessionRef.get() != null) {
-              dispatcher.dispatch(sessionRef.get(), message.getNotification());
-            }
-          }
-        }
-      }
-      else {
-        if (CollectionUtility.hasElements(message.getSessionIds())) {
-          for (String sessionId : message.getSessionIds()) {
-            WeakReference<IClientSession> sessionRef = m_sessionIdToSession.get(sessionId);
-            if (sessionRef.get() != null) {
-              dispatcher.dispatch(sessionRef.get(), message.getNotification());
-            }
-          }
-          if (CollectionUtility.hasElements(message.getUserIds())) {
-            for (String userId : message.getUserIds()) {
-              List<WeakReference<IClientSession>> sessionRefs = m_userToSessions.get(userId);
-              Iterator<WeakReference<IClientSession>> sessionRefIt = sessionRefs.iterator();
-              while (sessionRefIt.hasNext()) {
-                WeakReference<IClientSession> sessionRef = sessionRefIt.next();
-                if (sessionRef.get() == null) {
-                  sessionRefIt.remove();
-                }
-                else {
-                  dispatcher.dispatch(sessionRef.get(), message.getNotification());
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  private class P_NotificationPollJob implements IRunnable {
-    @Override
-    public void run() {
-      List<NotificationMessage> notifications = BEANS.get(INotificationServerService.class).getNotifications(NOTIFICATION_NODE_ID);
-      System.out.println(String.format("CLIENT NOTIFICATION returned with %s notifications (%s).", notifications.size(), notifications));
-      // process notifications
-      if (!notifications.isEmpty()) {
-        dispatchNotifications(notifications);
-      }
-      Jobs.schedule(this, Jobs.newInput(ClientRunContexts.empty().subject(NOTIFICATION_SUBJECT).userAgent(UserAgent.createDefault())));
     }
   }
 

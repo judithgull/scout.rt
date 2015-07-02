@@ -10,15 +10,16 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.server.services.common.notification;
 
-import java.util.Locale;
+import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelRequest;
 
 /**
- *
+ * Every client node opens a connection to a server node to access notifications. This connection is addressed by the
+ * {@link NotificationNodeId}. The node id is provided on every {@link ServiceTunnelRequest#getNotificationNodeId()}.
  */
 public class NotificationNodeId {
 
   /**
-   * The {@link Locale} which is currently associated with the current thread.
+   * The notification node id which is currently associated with the current thread.
    */
   public static final ThreadLocal<String> CURRENT = new ThreadLocal<>();
 
@@ -26,8 +27,7 @@ public class NotificationNodeId {
   }
 
   /**
-   * Returns the {@link Locale} which is currently associated with the current thread or {@link Locale#getDefault()} if
-   * not set.
+   * Returns the notification node id which is currently associated with the current thread.
    */
   public static String get() {
     return CURRENT.get();

@@ -12,6 +12,7 @@ package org.eclipse.scout.rt.client.services.common.notification;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -23,21 +24,26 @@ import java.util.concurrent.TimeUnit;
 
 import javax.annotation.PostConstruct;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.IRunnable;
 import org.eclipse.scout.commons.TypeCastUtility;
 import org.eclipse.scout.commons.exception.ProcessingException;
+import org.eclipse.scout.commons.filter.IFilter;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.client.IClientSession;
 import org.eclipse.scout.rt.client.context.ClientRunContext;
 import org.eclipse.scout.rt.client.context.ClientRunContexts;
-import org.eclipse.scout.rt.client.job.ModelJobs;
+import org.eclipse.scout.rt.client.job.ClientJobs;
 import org.eclipse.scout.rt.platform.ApplicationScoped;
 import org.eclipse.scout.rt.platform.BEANS;
+import org.eclipse.scout.rt.platform.exception.RuntimeExceptionTranslator;
 import org.eclipse.scout.rt.platform.job.DoneEvent;
 import org.eclipse.scout.rt.platform.job.IDoneCallback;
 import org.eclipse.scout.rt.platform.job.IFuture;
 import org.eclipse.scout.rt.platform.job.Jobs;
+import org.eclipse.scout.rt.shared.ISession;
+import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
 
 /**
  *
@@ -45,6 +51,13 @@ import org.eclipse.scout.rt.platform.job.Jobs;
 @ApplicationScoped
 public class NotificationDispatcher {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(NotificationDispatcher.class);
+
+  private final IFilter<NotificationMessage> ACCEPT_ALL_FILTER = new IFilter<NotificationMessage>() {
+    @Override
+    public boolean accept(NotificationMessage element) {
+      return true;
+    }
+  };
 
   private final Map<Class<? extends Serializable> /*notification class*/, List<INotificationHandler<? extends Serializable>>> m_notificationClassToNotifcationHandler = new HashMap<>();
   private final Map<Class<? extends Serializable> /*notification class*/, List<INotificationHandler<? extends Serializable>>> m_cachedNotificationHandlers = new HashMap<>();
@@ -72,8 +85,50 @@ public class NotificationDispatcher {
     }
   }
 
+  public void dispatchNotifications(Collection<NotificationMessage> notifications) {
+    dispatchNotifications(notifications, ACCEPT_ALL_FILTER);
+  }
+
   /**
-   * Called of the {@link NotificationClientService} to schedule a specific notification into a model thread.
+   * @param notifications
+   */
+  public void dispatchNotifications(Collection<NotificationMessage> notifications, IFilter<NotificationMessage> filter) {
+    INotificationClientService notificationService = BEANS.get(INotificationClientService.class);
+    for (NotificationMessage message : notifications) {
+      if (!filter.accept(message)) {
+        continue;
+      }
+      if (message.isNotifyAll()) {
+        // notify all sessions
+        for (IClientSession session : notificationService.getAllClientSessions()) {
+          dispatch(session, message.getNotification());
+        }
+      }
+      else {
+        if (CollectionUtility.hasElements(message.getSessionIds())) {
+          for (String sessionId : message.getSessionIds()) {
+            IClientSession session = notificationService.getClientSession(sessionId);
+            if (session == null) {
+              LOG.warn(String.format("received notification for invalid session '%s'.", sessionId));
+            }
+            else {
+              dispatch(session, message.getNotification());
+            }
+          }
+          if (CollectionUtility.hasElements(message.getUserIds())) {
+            for (String userId : message.getUserIds()) {
+              for (IClientSession session : notificationService.getClientSessionsForUser(userId)) {
+                dispatch(session, message.getNotification());
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Called of the {@link NotificationClientService} to schedule a specific notification into a client thread.
    *
    * @param session
    *          the session describes the runcontext in which the notification should be processed.
@@ -81,10 +136,18 @@ public class NotificationDispatcher {
    *          the notification to process.
    */
   public void dispatch(IClientSession session, Serializable notification) {
-    IFuture<Void> future = ModelJobs.schedule(new P_DispatchClientJob(notification), ModelJobs.newInput(ClientRunContexts.empty().session(session)).name("Blubbi"));
-    synchronized (m_notificationFutures) {
-      m_notificationFutures.add(future);
-      future.whenDone(new P_NotificationFutureCallback(future));
+    P_DispatchRunnable dispatchJob = new P_DispatchRunnable(notification);
+    // sync dispatch if session is equal
+    ISession currentSession = ISession.CURRENT.get();
+    if (session == currentSession) {
+      ClientRunContexts.copyCurrent().run(dispatchJob, BEANS.get(RuntimeExceptionTranslator.class));
+    }
+    else {
+      IFuture<Void> future = ClientJobs.schedule(dispatchJob, ClientJobs.newInput(ClientRunContexts.empty().session(session, true)));
+      synchronized (m_notificationFutures) {
+        m_notificationFutures.add(future);
+        future.whenDone(new P_NotificationFutureCallback(future));
+      }
     }
   }
 
@@ -128,11 +191,11 @@ public class NotificationDispatcher {
    * The runnable is executed in a {@link ClientRunContext} running under a user session. All handlers with a message
    * type assignable from the notification type will be called to process the notification.
    */
-  private class P_DispatchClientJob implements IRunnable {
+  private class P_DispatchRunnable implements IRunnable {
 
     private Serializable m_notification;
 
-    public P_DispatchClientJob(Serializable notification) {
+    public P_DispatchRunnable(Serializable notification) {
       m_notification = notification;
     }
 

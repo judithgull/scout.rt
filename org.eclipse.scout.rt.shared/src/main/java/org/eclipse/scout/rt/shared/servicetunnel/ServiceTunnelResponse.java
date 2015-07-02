@@ -16,6 +16,7 @@ import java.util.Set;
 
 import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.rt.shared.services.common.clientnotification.IClientNotification;
+import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
 
 public class ServiceTunnelResponse implements IServiceTunnelResponse {
   private static final long serialVersionUID = 0L;
@@ -26,6 +27,8 @@ public class ServiceTunnelResponse implements IServiceTunnelResponse {
   private Set<IClientNotification> m_clientNotifications;
   // added in 3.1.17
   private volatile Long m_processingDuration;
+
+  private Set<NotificationMessage> m_notifications;
 
   public ServiceTunnelResponse(Object data, Object[] outVars, Throwable t) {
     m_data = data;
@@ -71,6 +74,22 @@ public class ServiceTunnelResponse implements IServiceTunnelResponse {
     StringBuilder buf = new StringBuilder();
     buf.append("Response[data=" + m_data + ", vars=" + ((m_outVars == null) ? "" : Arrays.asList(m_outVars)) + ", exception=" + m_exception + "]");
     return buf.toString();
+  }
+
+  /**
+   * Piggyback notifications. Transactional notifications are piggybacked to the client with the corresponding
+   * {@link ServiceTunnelResponse}.
+   *
+   * @param notifications
+   */
+  @Override
+  public void setNotifications(Set<NotificationMessage> notifications) {
+    m_notifications = notifications;
+  }
+
+  @Override
+  public Set<NotificationMessage> getNotifications() {
+    return m_notifications;
   }
 
   /*

@@ -21,7 +21,7 @@ public interface INotificationServerService {
 
   /**
    * must be called in a session scope
-   * 
+   *
    * @return
    */
   String getUserIdOfCurrentSession();
@@ -31,15 +31,5 @@ public interface INotificationServerService {
   void unregisterSession(String notificationNodeId);
 
   List<NotificationMessage> getNotifications(String notificationNodeId);
-
-  /**
-   * @param notificationNodeId
-   */
-  void registerNotificationNode(String notificationNodeId);
-
-  /**
-   * @param notificationNodeId
-   */
-  void unregisterNotificationNode(String notificationNodeId);
 
 }

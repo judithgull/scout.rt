@@ -28,15 +28,8 @@ public abstract class AbstractServiceTunnel implements IServiceTunnel {
 
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractServiceTunnel.class);
 
-//  private final T m_session;
-
   public AbstractServiceTunnel() {
-//    m_session = session;
   }
-
-//  protected T getSession() {
-//    return m_session;
-//  }
 
   @Override
   public Object invokeService(Class serviceInterfaceClass, Method operation, Object[] callerArgs) throws ProcessingException {

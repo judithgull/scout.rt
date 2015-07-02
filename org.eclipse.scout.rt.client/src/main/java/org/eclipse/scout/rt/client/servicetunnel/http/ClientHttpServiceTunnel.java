@@ -18,6 +18,7 @@ import javax.security.auth.Subject;
 import org.eclipse.scout.rt.client.IClientSession;
 import org.eclipse.scout.rt.client.context.ClientRunContexts;
 import org.eclipse.scout.rt.client.services.common.notification.INotificationClientService;
+import org.eclipse.scout.rt.client.services.common.notification.NotificationDispatcher;
 import org.eclipse.scout.rt.client.services.common.perf.IPerformanceAnalyzerService;
 import org.eclipse.scout.rt.client.session.ClientSessionProvider;
 import org.eclipse.scout.rt.platform.BEANS;
@@ -103,7 +104,9 @@ public class ClientHttpServiceTunnel extends AbstractHttpServiceTunnel implement
       }
     }
 
-    // TODO piggyback notifications
+    // TODO [aho] piggyback notifications
+    NotificationDispatcher notificationDispatcher = BEANS.get(NotificationDispatcher.class);
+    notificationDispatcher.dispatchNotifications(serviceResponse.getNotifications());
 //    // client notification handler
 //    IClientNotificationConsumerService cns = BEANS.get(IClientNotificationConsumerService.class);
 //    if (cns != null) {

@@ -14,12 +14,16 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.eclipse.scout.rt.platform.BEANS;
+import org.eclipse.scout.rt.server.context.ServerRunContext;
 import org.eclipse.scout.rt.server.transaction.AbstractTransactionMember;
 import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
 import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelResponse;
 
 /**
- *
+ * This transaction member is used to collect all notifications during a transaction. On successful commit the
+ * notifications will be added to the {@link ServerRunContext#txNotificationContainer()}. Further all notifications in
+ * the txNotificationContainer will be added to the {@link ServiceTunnelResponse} and piggy backed to the client.
+ * The reason to do so is to provide an immediate client side processing of transactional notifications.
  */
 public class NotificationTransactionMember extends AbstractTransactionMember {
 
@@ -31,24 +35,21 @@ public class NotificationTransactionMember extends AbstractTransactionMember {
     super(TRANSACTION_MEMBER_ID);
   }
 
-  public void addNotification(NotificationMessage message) {
-    m_notifications.add(message);
+  @Override
+  public boolean needsCommit() {
+    return true;
   }
 
-  public void decorateResponse(ServiceTunnelResponse response) {
-
+  public void addNotification(NotificationMessage message) {
+    m_notifications.add(message);
   }
 
   @Override
   public void commitPhase2() {
     // piggy back
+    NotificationContainer.get().addAll(m_notifications);
     // notify others
     BEANS.get(NotificationRegistry.class).put(m_notifications);
-  }
-
-  @Override
-  public void rollback() {
-    m_notifications.clear();
   }
 
 }

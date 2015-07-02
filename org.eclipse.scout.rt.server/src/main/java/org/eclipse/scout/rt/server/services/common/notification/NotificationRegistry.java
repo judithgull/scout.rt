@@ -89,10 +89,24 @@ public class NotificationRegistry {
    * @return
    */
   List<NotificationMessage> consume(String notificationNodeId, int maxAmount, int amount, TimeUnit unit) {
-    NotificationNodeQueue queue = m_notificationQueues.get(notificationNodeId);
-    return Assertions.assertNotNull(queue).consume(maxAmount, amount, unit);
+    NotificationNodeQueue queue;
+    synchronized (m_notificationQueues) {
+      queue = m_notificationQueues.get(notificationNodeId);
+      if (queue == null) {
+        // create new
+        // TODO[aho] make configurable
+        queue = new NotificationNodeQueue(notificationNodeId, 200);
+        m_notificationQueues.put(notificationNodeId, queue);
+      }
+    }
+    return queue.consume(maxAmount, amount, unit);
   }
 
+  /**
+   * To access all session id's having to whom notifications will be providen by this server node.
+   *
+   * @return
+   */
   public Set<String> getAllSessionIds() {
     Set<String> allSessionIds = new HashSet<>();
     synchronized (m_notificationQueues) {
@@ -104,16 +118,34 @@ public class NotificationRegistry {
   }
 
   // put methods
+  /**
+   * The notification will be distributed to all sessions of the given userId.
+   *
+   * @param userId
+   * @param notification
+   */
   public void putForUser(String userId, Serializable notification) {
     NotificationMessage message = new NotificationMessage(null, CollectionUtility.hashSet(userId), false, notification);
     put(message);
   }
 
+  /**
+   * The notification will be distributed to the session addressed with the unique sessionId.
+   *
+   * @param sessionId
+   *          the addressed session
+   * @param notification
+   */
   public void putForSession(String sessionId, Serializable notification) {
     NotificationMessage message = new NotificationMessage(CollectionUtility.hashSet(sessionId), null, false, notification);
     put(message);
   }
 
+  /**
+   * This notification will be distributed to all sessions.
+   *
+   * @param notification
+   */
   public void putForAll(Serializable notification) {
     NotificationMessage message = new NotificationMessage(null, null, true, notification);
     put(message);
@@ -135,6 +167,15 @@ public class NotificationRegistry {
     }
   }
 
+  /**
+   * To put a notifications with transactional behavior. The notification will be processed on successful commit of the
+   * {@link ITransaction} surrounding the server call.
+   * The notification will be distributed to all sessions of the given userId.
+   *
+   * @param userId
+   *          the addressed user
+   * @param notification
+   */
   public void putTransactionalForUser(String userId, Serializable notification) {
     // exclude the node the request comes from
     NotificationMessage message = new NotificationMessage(null, CollectionUtility.hashSet(userId), false,
@@ -142,12 +183,28 @@ public class NotificationRegistry {
     putTransactional(message);
   }
 
+  /**
+   * To put a notifications with transactional behavior. The notification will be processed on successful commit of the
+   * {@link ITransaction} surrounding the server call.
+   * The notification will be distributed to the session addressed with the unique sessionId.
+   *
+   * @param sessionId
+   *          the addressed session
+   * @param notification
+   */
   public void putTransactionalForSession(String sessionId, Serializable notification) {
     NotificationMessage message = new NotificationMessage(CollectionUtility.hashSet(sessionId), null, false,
         Assertions.assertNotNull(NotificationNodeId.CURRENT.get(), "No notification node id found on the thread context."), notification);
     putTransactional(message);
   }
 
+  /**
+   * To put a notifications with transactional behavior. The notification will be processed on successful commit of the
+   * {@link ITransaction} surrounding the server call.
+   * This notification will be distributed to all sessions.
+   *
+   * @param notification
+   */
   public void putTransactionalForAll(Serializable notification) {
     NotificationMessage message = new NotificationMessage(null, null, true,
         Assertions.assertNotNull(NotificationNodeId.CURRENT.get(), "No notification node id found on the thread context."), notification);
@@ -162,7 +219,6 @@ public class NotificationRegistry {
         tMember = new NotificationTransactionMember();
         transaction.registerMember(tMember);
       }
-      //TODO[aho] remove current
       tMember.addNotification(message);
     }
     catch (ProcessingException e) {

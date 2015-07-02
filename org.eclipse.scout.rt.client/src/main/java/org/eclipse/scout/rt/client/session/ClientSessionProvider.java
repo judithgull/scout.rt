@@ -77,7 +77,7 @@ public class ClientSessionProvider {
 
   protected void registerClientSessionForNotifications(IClientSession session) {
     // register client session for notifications
-    BEANS.get(INotificationClientService.class).register(session);
+    BEANS.get(INotificationClientService.class).registerClientSession(session);
   }
 
   /**

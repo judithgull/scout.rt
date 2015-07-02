@@ -41,16 +41,6 @@ public class NotificationServerService implements INotificationServerService {
   }
 
   @Override
-  public void registerNotificationNode(String notificationNodeId) {
-    m_notificationRegistry.registerNotificationNode(notificationNodeId);
-  }
-
-  @Override
-  public void unregisterNotificationNode(String notificationNodeId) {
-    m_notificationRegistry.unregisterNode(notificationNodeId);
-  }
-
-  @Override
   public void registerSession(String notificationNodeId, String sessionId, String userId) {
     m_notificationRegistry.registerSession(notificationNodeId, sessionId, userId);
   }

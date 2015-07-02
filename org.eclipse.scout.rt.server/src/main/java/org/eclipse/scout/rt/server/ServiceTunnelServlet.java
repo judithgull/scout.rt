@@ -42,6 +42,7 @@ import org.eclipse.scout.rt.server.commons.servlet.IHttpServletRoundtrip;
 import org.eclipse.scout.rt.server.context.RunMonitorCancelRegistry;
 import org.eclipse.scout.rt.server.context.ServerRunContext;
 import org.eclipse.scout.rt.server.context.ServerRunContexts;
+import org.eclipse.scout.rt.server.services.common.notification.NotificationContainer;
 import org.eclipse.scout.rt.server.session.ServerSessionProvider;
 import org.eclipse.scout.rt.shared.servicetunnel.DefaultServiceTunnelContentHandler;
 import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelContentHandler;
@@ -111,8 +112,10 @@ public class ServiceTunnelServlet extends HttpServlet {
 
         @Override
         public void run() throws Exception {
+
           ServiceTunnelRequest serviceRequest = deserializeServiceRequest();
 
+          NotificationContainer txNotificationContainer = new NotificationContainer();
           // Enable global cancellation of the service request.
           RunMonitor runMonitor = BEANS.get(RunMonitor.class);
 
@@ -120,6 +123,8 @@ public class ServiceTunnelServlet extends HttpServlet {
           serverRunContext.locale(serviceRequest.getLocale());
           serverRunContext.userAgent(UserAgent.createByIdentifier(serviceRequest.getUserAgent()));
           serverRunContext.runMonitor(runMonitor);
+          serverRunContext.txNotificationContainer(txNotificationContainer);
+          serverRunContext.notificationNodeId(serviceRequest.getNotificationNodeId());
           serverRunContext.propertyMap().put(SESSION_ID, serviceRequest.getSessionId());
           serverRunContext.session(lookupServerSessionOnHttpSession(serverRunContext.copy()), true);
 
@@ -129,6 +134,9 @@ public class ServiceTunnelServlet extends HttpServlet {
           BEANS.get(RunMonitorCancelRegistry.class).register(session, requestSequence, runMonitor); // enable global cancellation
           try {
             IServiceTunnelResponse serviceResponse = invokeService(serverRunContext, serviceRequest);
+            // piggyback notifications
+            // TODO[aho] write cliet notificaitons to response.
+            serviceResponse.setNotifications(txNotificationContainer.getNotifications());
             serializeServiceResponse(serviceResponse);
           }
           finally {
