@@ -10,6 +10,7 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.server.services.common.security;
 
+import java.io.Serializable;
 import java.security.Permissions;
 import java.util.Collection;
 
@@ -25,6 +26,7 @@ import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificat
 import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificationListenerService;
 import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificationMessage;
 import org.eclipse.scout.rt.server.services.common.clustersync.IClusterSynchronizationService;
+import org.eclipse.scout.rt.server.transaction.ITransaction;
 import org.eclipse.scout.rt.shared.services.common.security.AbstractSharedAccessControlService;
 import org.eclipse.scout.rt.shared.services.common.security.AccessControlChangedNotification;
 import org.eclipse.scout.rt.shared.services.common.security.IAccessControlService;
@@ -49,38 +51,35 @@ public abstract class AbstractAccessControlService extends AbstractSharedAccessC
 
     //notify clients with a filter, that will be accepted nowhere:
     BEANS.get(IClientNotificationService.class).putNotification(new ResetAccessControlChangedNotification(), new SingleUserFilter(null, 0L));
-
-    //notify clusters:
-    try {
-      IClusterSynchronizationService s = BEANS.opt(IClusterSynchronizationService.class);
-      if (s != null) {
-        s.publishNotification(new AccessControlCacheChangedClusterNotification());
-      }
-    }
-    catch (ProcessingException e) {
-      LOG.error("failed notifying cluster for permission changes", e);
-    }
+    distributeCluster(new AccessControlCacheChangedClusterNotification());
   }
 
   @Override
   public void clearCacheOfUserIds(Collection<String> userIds) {
     clearCacheOfUserIdsNoFire(userIds);
-
-    //notify clusters:
-    try {
-      IClusterSynchronizationService s = BEANS.opt(IClusterSynchronizationService.class);
-      if (s != null) {
-        s.publishNotification(new AccessControlCacheChangedClusterNotification(userIds));
-      }
-    }
-    catch (ProcessingException e) {
-      LOG.error("failed notifying cluster for permission changes", e);
-    }
+    distributeCluster(new AccessControlCacheChangedClusterNotification(userIds));
 
     //notify clients:
     for (String userId : userIds) {
       if (userId != null) {
         BEANS.get(IClientNotificationService.class).putNotification(new AccessControlChangedNotification(null), new SingleUserFilter(userId, 120000L));
+      }
+    }
+  }
+
+  protected void distributeCluster(IClusterNotification notification) {
+    IClusterSynchronizationService s = BEANS.opt(IClusterSynchronizationService.class);
+    if (s != null) {
+      try {
+        if (ITransaction.CURRENT.get() != null) {
+          s.publishTransactional(notification);
+        }
+        else {
+          s.publish(notification);
+        }
+      }
+      catch (ProcessingException e) {
+        LOG.error("failed notifying cluster for permission changes", e);
       }
     }
   }
@@ -96,7 +95,7 @@ public abstract class AbstractAccessControlService extends AbstractSharedAccessC
 
       @Override
       public void onNotification(IClusterNotificationMessage message) throws ProcessingException {
-        IClusterNotification clusterNotification = message.getNotification();
+        Serializable clusterNotification = message.getNotification();
         if ((clusterNotification instanceof AccessControlCacheChangedClusterNotification)) {
           AccessControlCacheChangedClusterNotification n = (AccessControlCacheChangedClusterNotification) clusterNotification;
           if (n.getUserIds().isEmpty()) {

@@ -10,12 +10,13 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.server.services.common.clustersync;
 
+import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -24,6 +25,7 @@ import java.util.UUID;
 import javax.security.auth.Subject;
 
 import org.eclipse.scout.commons.Assertions;
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.ConfigUtility;
 import org.eclipse.scout.commons.EventListenerList;
 import org.eclipse.scout.commons.IRunnable;
@@ -235,10 +237,35 @@ public class ClusterSynchronizationService extends AbstractService implements IC
   }
 
   @Override
-  public void publishNotification(IClusterNotification notification) throws ProcessingException {
+  public void publishTransactional(Serializable notification) throws ProcessingException {
     if (isEnabled()) {
       ClusterNotificationMessage message = new ClusterNotificationMessage(notification, getNotificationProperties());
       getTransaction().addMessage(message);
+    }
+  }
+
+  @Override
+  public void publish(Serializable notification) throws ProcessingException {
+    publish(CollectionUtility.arrayList(notification));
+  }
+
+  private void publish(Collection<IClusterNotification> notifications) {
+    if (isEnabled()) {
+      List<IClusterNotificationMessage> internalMessages = new ArrayList<IClusterNotificationMessage>();
+      for (IClusterNotification n : notifications) {
+        internalMessages.add(new ClusterNotificationMessage(n, getNotificationProperties()));
+      }
+      publishInternal(internalMessages);
+    }
+  }
+
+  /**
+   * Publish and update status.
+   */
+  private void publishInternal(List<IClusterNotificationMessage> messages) {
+    m_messageService.publishNotifications(messages);
+    for (IClusterNotificationMessage im : messages) {
+      getStatusInfoInternal().updateSentStatus(im);
     }
   }
 
@@ -285,11 +312,11 @@ public class ClusterSynchronizationService extends AbstractService implements IC
     disable();
   }
 
-  protected ClusterSynchronizationTransaction getTransaction() throws ProcessingException {
+  protected ClusterSynchTransactionMember getTransaction() throws ProcessingException {
     ITransaction tx = Assertions.assertNotNull(ITransaction.CURRENT.get(), "Transaction required");
-    ClusterSynchronizationTransaction m = (ClusterSynchronizationTransaction) tx.getMember(TRANSACTION_MEMBER_ID);
+    ClusterSynchTransactionMember m = (ClusterSynchTransactionMember) tx.getMember(TRANSACTION_MEMBER_ID);
     if (m == null) {
-      m = new ClusterSynchronizationTransaction(TRANSACTION_MEMBER_ID, getMessageService(), m_statusInfo);
+      m = new ClusterSynchTransactionMember(TRANSACTION_MEMBER_ID, m_statusInfo);
       tx.registerMember(m);
     }
     return m;
@@ -299,15 +326,13 @@ public class ClusterSynchronizationService extends AbstractService implements IC
    * Transaction member that notifies other cluster nodes after the causing Scout transaction has been committed. This
    * ensures that other cluster nodes are not informed too early.
    */
-  protected static class ClusterSynchronizationTransaction extends AbstractTransactionMember {
+  protected class ClusterSynchTransactionMember extends AbstractTransactionMember {
     private final List<IClusterNotificationMessage> m_messageQueue;
-    private final IPublishSubscribeMessageService m_messageService;
     private final ClusterNodeStatusInfo m_statusInfo;
 
-    public ClusterSynchronizationTransaction(String transactionId, IPublishSubscribeMessageService messageService, ClusterNodeStatusInfo statusInfo) throws ProcessingException {
+    public ClusterSynchTransactionMember(String transactionId, ClusterNodeStatusInfo statusInfo) throws ProcessingException {
       super(transactionId);
       m_messageQueue = new LinkedList<IClusterNotificationMessage>();
-      m_messageService = messageService;
       m_statusInfo = statusInfo;
     }
 
@@ -316,13 +341,14 @@ public class ClusterSynchronizationService extends AbstractService implements IC
     }
 
     public synchronized void addMessage(IClusterNotificationMessage m) {
+      //TODO coalesce
       // check if new message can be merged with existing or if it is replacing a new one
-      for (Iterator<IClusterNotificationMessage> it = m_messageQueue.iterator(); it.hasNext();) {
-        IClusterNotificationMessage existingElem = it.next();
-        if (existingElem.coalesce(m)) {
-          it.remove();
-        }
-      }
+//      for (Iterator<IClusterNotificationMessage> it = m_messageQueue.iterator(); it.hasNext();) {
+//        IClusterNotificationMessage existingElem = it.next();
+//        if (existingElem.coalesce(m)) {
+//          it.remove();
+//        }
+//      }
       m_messageQueue.add(m);
     }
 
@@ -333,10 +359,7 @@ public class ClusterSynchronizationService extends AbstractService implements IC
 
     @Override
     public synchronized void commitPhase2() {
-      m_messageService.publishNotifications(new ArrayList<IClusterNotificationMessage>(m_messageQueue));
-      for (IClusterNotificationMessage m : m_messageQueue) {
-        getStatusInfoInternal().updateSentStatus(m);
-      }
+      publishInternal(m_messageQueue);
     }
 
     @Override

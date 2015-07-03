@@ -10,10 +10,6 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.server.services.common.clustersync.internal;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
 import java.util.HashSet;
 import java.util.Set;
 
@@ -22,7 +18,6 @@ import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificat
 import org.eclipse.scout.rt.server.services.common.code.UnloadCodeTypeCacheClusterNotification;
 import org.eclipse.scout.rt.server.services.common.security.AccessControlCacheChangedClusterNotification;
 import org.junit.Before;
-import org.junit.Test;
 
 /**
  * Test for {@link ClusterNotificationMessage}
@@ -63,23 +58,23 @@ public class ClusterNotificationMessageTest {
     m_differentProps = new ClusterNotificationMessageProperties(m_originNode, m_originUser);
     m_differentMessage = new ClusterNotificationMessage(m_differentNotification, m_differentProps);
   }
-
-  @Test
-  public void testCoalesce() {
-    assertTrue(m_oldMessage.coalesce(m_newMessage));
-
-    Set<String> userIds = new HashSet<String>(m_oldUserIds);
-    userIds.addAll(m_newUserIds);
-    Set<String> resultList = ((AccessControlCacheChangedClusterNotification) m_newMessage.getNotification()).getUserIds();
-    assertEquals(userIds, resultList);
-  }
-
-  @Test
-  public void testCoalesceFail() {
-    assertFalse(m_differentMessage.coalesce(m_newMessage));
-    Set<String> resultList = ((AccessControlCacheChangedClusterNotification) m_newMessage.getNotification()).getUserIds();
-    assertEquals(m_newUserIds, resultList);
-
-  }
+//
+//  @Test
+//  public void testCoalesce() {
+//    assertTrue(m_oldMessage.coalesce(m_newMessage));
+//
+//    Set<String> userIds = new HashSet<String>(m_oldUserIds);
+//    userIds.addAll(m_newUserIds);
+//    Set<String> resultList = ((AccessControlCacheChangedClusterNotification) m_newMessage.getNotification()).getUserIds();
+//    assertEquals(userIds, resultList);
+//  }
+//
+//  @Test
+//  public void testCoalesceFail() {
+//    assertFalse(m_differentMessage.coalesce(m_newMessage));
+//    Set<String> resultList = ((AccessControlCacheChangedClusterNotification) m_newMessage.getNotification()).getUserIds();
+//    assertEquals(m_newUserIds, resultList);
+//
+//  }
 
 }

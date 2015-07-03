@@ -215,9 +215,10 @@ public class NotificationRegistry {
     }
   }
 
-  public void distributeCluster(NotificationMessage message) {
+  private void distributeCluster(NotificationMessage message) {
     try {
-      BEANS.get(IClusterSynchronizationService.class).publishNotification(new ClientNotificationClusterNotification(message));
+      IClusterSynchronizationService service = BEANS.get(IClusterSynchronizationService.class);
+      service.publish(new ClientNotificationClusterNotification(message));
     }
     catch (ProcessingException e) {
       LOG.error("Error distributing cluster notification ", e);

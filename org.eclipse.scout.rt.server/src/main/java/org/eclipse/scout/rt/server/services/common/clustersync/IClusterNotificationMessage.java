@@ -19,15 +19,6 @@ public interface IClusterNotificationMessage extends Serializable {
 
   IClusterNotificationMessageProperties getProperties();
 
-  IClusterNotification getNotification();
-
-  /**
-   * Merge notification with other notifications of the same type.<br>
-   * Same type means notification1.getClass()==notification2.getClass()
-   *
-   * @return true if this notification was coalesced and therefore is consumed. This notification will be removed from
-   *         the queue.
-   */
-  boolean coalesce(IClusterNotificationMessage newMessage);
+  Serializable getNotification();
 
 }

@@ -10,14 +10,15 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.server.services.common.clientnotification;
 
+import java.io.Serializable;
+
 import org.eclipse.scout.commons.ToStringBuilder;
-import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotification;
 import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
 
 /**
  * Cluster notification for new client notification
  */
-public class ClientNotificationClusterNotification implements IClusterNotification {
+public class ClientNotificationClusterNotification implements Serializable {
 
   private static final long serialVersionUID = -8513131031858145786L;
   private final NotificationMessage m_cnMessage;
@@ -37,8 +38,4 @@ public class ClientNotificationClusterNotification implements IClusterNotificati
     return tsb.toString();
   }
 
-  @Override
-  public boolean coalesce(IClusterNotification existingNotification0) {
-    return false;
-  }
 }

@@ -55,8 +55,8 @@ public class ClusterSynchronizationServiceTest {
     m_beans.add(
         TestingUtility.registerBean(
             new BeanMetaData(IPublishSubscribeMessageService.class).
-                initialInstance(ps).
-                applicationScoped(true)
+            initialInstance(ps).
+            applicationScoped(true)
             ));
   }
 
@@ -89,7 +89,7 @@ public class ClusterSynchronizationServiceTest {
     svc.initializeService();
     svc.enable();
     final IClusterNotification notification = mock(IClusterNotification.class);
-    svc.publishNotification(notification);
+    svc.publishTransactional(notification);
     ITransaction.CURRENT.get().commitPhase1();
     ITransaction.CURRENT.get().commitPhase2();
 
