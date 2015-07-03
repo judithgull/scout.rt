@@ -246,13 +246,13 @@ public class ClusterSynchronizationService extends AbstractService implements IC
 
   @Override
   public void publish(Serializable notification) throws ProcessingException {
-    publish(CollectionUtility.arrayList(notification));
+    publishAll(CollectionUtility.arrayList(notification));
   }
 
-  private void publish(Collection<IClusterNotification> notifications) {
+  private void publishAll(Collection<Serializable> notifications) {
     if (isEnabled()) {
       List<IClusterNotificationMessage> internalMessages = new ArrayList<IClusterNotificationMessage>();
-      for (IClusterNotification n : notifications) {
+      for (Serializable n : notifications) {
         internalMessages.add(new ClusterNotificationMessage(n, getNotificationProperties()));
       }
       publishInternal(internalMessages);

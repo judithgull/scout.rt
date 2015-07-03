@@ -11,22 +11,14 @@
 package org.eclipse.scout.rt.client.services.common.notification;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import javax.annotation.PostConstruct;
-
 import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.IRunnable;
-import org.eclipse.scout.commons.TypeCastUtility;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.filter.IFilter;
 import org.eclipse.scout.commons.logger.IScoutLogger;
@@ -45,6 +37,8 @@ import org.eclipse.scout.rt.platform.job.IDoneCallback;
 import org.eclipse.scout.rt.platform.job.IFuture;
 import org.eclipse.scout.rt.platform.job.Jobs;
 import org.eclipse.scout.rt.shared.ISession;
+import org.eclipse.scout.rt.shared.notification.INotificationHandler;
+import org.eclipse.scout.rt.shared.notification.NotificationHandlerRegistry;
 import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
 
 /**
@@ -61,59 +55,7 @@ public class NotificationDispatcher {
     }
   };
 
-  private final Map<Class<? extends Serializable> /*notification class*/, List<INotificationHandler<? extends Serializable>>> m_notificationClassToNotifcationHandler = new HashMap<>();
-  private final Map<Class<? extends Serializable> /*notification class*/, List<INotificationHandler<? extends Serializable>>> m_cachedNotificationHandlers = new HashMap<>();
-  private final Object m_cacheLock = new Object();
   private final Set<IFuture<Void>> m_notificationFutures = new HashSet<>();
-  // TODO[aho] make configurable
-  private boolean m_useCachedNotificationHandlerLookup = true;
-
-  /**
-   * builds a linking of all handlers generic types to handlers. This is used to find the corresponding handler of a
-   * notification.
-   */
-  @SuppressWarnings("unchecked")
-  @PostConstruct
-  protected void buildHandlerLinking() {
-    List<INotificationHandler> notificationHandlers = BEANS.all(INotificationHandler.class);
-    for (INotificationHandler<?> notificationHandler : notificationHandlers) {
-      Class notificationClass = TypeCastUtility.getGenericsParameterClass(notificationHandler.getClass(), INotificationHandler.class);
-      List<INotificationHandler<?>> handlerList = m_notificationClassToNotifcationHandler.get(notificationClass);
-      if (handlerList == null) {
-        handlerList = new LinkedList<>();
-        m_notificationClassToNotifcationHandler.put(notificationClass, handlerList);
-      }
-      handlerList.add(notificationHandler);
-    }
-  }
-
-  protected List<INotificationHandler<? extends Serializable>> getNotificationHandlers(Class<? extends Serializable> notificationClass) {
-    if (m_useCachedNotificationHandlerLookup) {
-      synchronized (m_cacheLock) {
-        List<INotificationHandler<? extends Serializable>> notificationHandlers = m_cachedNotificationHandlers.get(notificationClass);
-        if (notificationHandlers == null) {
-          notificationHandlers = findNotificationHandlers(notificationClass);
-          m_cachedNotificationHandlers.put(notificationClass, notificationHandlers);
-        }
-        return new ArrayList<INotificationHandler<? extends Serializable>>(notificationHandlers);
-      }
-    }
-    else {
-      return findNotificationHandlers(notificationClass);
-    }
-  }
-
-  private List<INotificationHandler<? extends Serializable>> findNotificationHandlers(Class<? extends Serializable> notificationClass) {
-    List<INotificationHandler<? extends Serializable>> handlers = new LinkedList<>();
-    synchronized (m_cacheLock) {
-      for (Entry<Class<? extends Serializable> /*notification class*/, List<INotificationHandler<? extends Serializable>>> e : m_notificationClassToNotifcationHandler.entrySet()) {
-        if (e.getKey().isAssignableFrom(notificationClass)) {
-          handlers.addAll(e.getValue());
-        }
-      }
-    }
-    return handlers;
-  }
 
   public void dispatchNotifications(Collection<NotificationMessage> notifications) {
     dispatchNotifications(notifications, ACCEPT_ALL_FILTER);
@@ -239,7 +181,8 @@ public class NotificationDispatcher {
     @SuppressWarnings("unchecked")
     @Override
     public void run() throws Exception {
-      List<INotificationHandler<? extends Serializable>> notificationHandlers = getNotificationHandlers(m_notification.getClass());
+      NotificationHandlerRegistry reg = BEANS.get(NotificationHandlerRegistry.class);
+      List<INotificationHandler<? extends Serializable>> notificationHandlers = reg.getNotificationHandlers(m_notification.getClass());
       for (INotificationHandler handler : notificationHandlers) {
         try {
           handler.handleNotification(m_notification);
