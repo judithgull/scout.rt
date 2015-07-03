@@ -17,7 +17,7 @@ import org.eclipse.scout.rt.platform.ApplicationScoped;
 import org.eclipse.scout.rt.platform.BEANS;
 
 /**
- *
+ * Registry for {@link INotificationHandler}s.
  */
 @ApplicationScoped
 public class NotificationHandlerRegistry {
@@ -46,9 +46,15 @@ public class NotificationHandlerRegistry {
     }
   }
 
+  /**
+   * Notify all {@link INotificationHandler}s with the message, if the message type matches the handler type.
+   *
+   * @param notification
+   *          notification message
+   */
   @SuppressWarnings("unchecked")
   public void notifyHandlers(Serializable notification) {
-    List<INotificationHandler<? extends Serializable>> handlers = getNotificationHandlers(notification.getClass());
+    List<INotificationHandler<? extends Serializable>> handlers = getHandlers(notification.getClass());
     for (INotificationHandler handler : handlers) {
       try {
         handler.handleNotification(notification);
@@ -59,7 +65,7 @@ public class NotificationHandlerRegistry {
     }
   }
 
-  protected List<INotificationHandler<? extends Serializable>> getNotificationHandlers(Class<? extends Serializable> notificationClass) {
+  protected List<INotificationHandler<? extends Serializable>> getHandlers(Class<? extends Serializable> notificationClass) {
     synchronized (m_cacheLock) {
       List<INotificationHandler<? extends Serializable>> notificationHandlers = m_cachedHandlers.get(notificationClass);
       if (notificationHandlers == null) {

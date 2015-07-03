@@ -21,9 +21,6 @@ import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.service.IService;
 import org.eclipse.scout.rt.server.Server;
-import org.eclipse.scout.rt.server.services.common.clientnotification.AllUserFilter;
-import org.eclipse.scout.rt.server.services.common.clientnotification.IClientNotificationService;
-import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotification;
 import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificationListener;
 import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificationListenerService;
 import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificationMessage;
@@ -56,7 +53,7 @@ public class CodeService extends AbstractSharedCodeService implements IClusterNo
     distributeCluster(new UnloadCodeTypeCacheClusterNotification(codetypeList));
   }
 
-  protected void distributeCluster(IClusterNotification notification) {
+  protected void distributeCluster(Serializable notification) {
     IClusterSynchronizationService s = BEANS.opt(IClusterSynchronizationService.class);
     if (s != null) {
       try {
