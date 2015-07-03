@@ -47,11 +47,12 @@ public class NotificationTransactionMember extends AbstractTransactionMember {
   @Override
   public void commitPhase2() {
     // coalease
-    BEANS.get(NotificationCoalescer.class).coalesce(m_notifications);
+    Set<NotificationMessage> coalescedNotifications = BEANS.get(ClientNotificationCoalescer.class).coalesce(m_notifications);
+    m_notifications.clear();
     // piggy back
-    NotificationContainer.get().addAll(m_notifications);
+    NotificationContainer.get().addAll(coalescedNotifications);
     // notify others
-    BEANS.get(NotificationRegistry.class).put(m_notifications);
+    BEANS.get(NotificationRegistry.class).put(coalescedNotifications);
   }
 
 }

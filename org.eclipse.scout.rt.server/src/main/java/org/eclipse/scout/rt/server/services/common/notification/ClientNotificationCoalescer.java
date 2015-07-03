@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.rt.platform.ApplicationScoped;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.shared.services.common.notification.NotficationAddress;
@@ -29,6 +30,7 @@ import org.eclipse.scout.rt.shared.services.common.notification.NotificationMess
 public class ClientNotificationCoalescer {
 
   public Set<NotificationMessage> coalesce(Set<NotificationMessage> inNotifications) {
+    Set<NotificationMessage> result = new HashSet<>();
     // sort by address
     Map<NotficationAddress, Set<Serializable>> notificationsPerAddress = new HashMap<>();
     for (NotificationMessage message : inNotifications) {
@@ -40,13 +42,26 @@ public class ClientNotificationCoalescer {
       notifications.add(message.getNotification());
     }
     for (Entry<NotficationAddress, Set<Serializable>> e : notificationsPerAddress.entrySet()) {
-
+      result.addAll(coalesce(e.getKey(), e.getValue()));
     }
-    return inNotifications;
+    return result;
   }
 
   protected Set<NotificationMessage> coalesce(NotficationAddress address, Set<Serializable> notificationsIn) {
-    BEANS.get(NotificationCoalescer.class).coalesce(notificationsIn);
-    return null;
+    if (notificationsIn.isEmpty()) {
+      return new HashSet<>();
+    }
+    else if (notificationsIn.size() == 1) {
+      // no coalesce needed
+      return CollectionUtility.hashSet(new NotificationMessage(address, CollectionUtility.firstElement(notificationsIn)));
+    }
+    else {
+      Set<? extends Serializable> outNotifications = BEANS.get(NotificationCoalescer.class).coalesce(notificationsIn);
+      Set<NotificationMessage> result = new HashSet<>();
+      for (Serializable n : outNotifications) {
+        result.add(new NotificationMessage(address, n));
+      }
+      return result;
+    }
   }
 }
