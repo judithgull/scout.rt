@@ -104,7 +104,7 @@ public class NotificationNodeQueue {
     if (CompareUtility.equals(getNodeId(), message.getExcludeNodeId())) {
       return false;
     }
-    if (message.isNotifyAll()) {
+    if (message.isNotifyAllSessions()) {
       return true;
     }
     Set<String> messageSessionIds = message.getSessionIds();

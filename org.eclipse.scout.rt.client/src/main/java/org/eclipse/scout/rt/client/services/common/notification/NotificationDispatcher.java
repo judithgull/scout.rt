@@ -37,6 +37,7 @@ import org.eclipse.scout.rt.client.context.ClientRunContexts;
 import org.eclipse.scout.rt.client.job.ClientJobs;
 import org.eclipse.scout.rt.platform.ApplicationScoped;
 import org.eclipse.scout.rt.platform.BEANS;
+import org.eclipse.scout.rt.platform.context.RunContext;
 import org.eclipse.scout.rt.platform.exception.RuntimeExceptionTranslator;
 import org.eclipse.scout.rt.platform.job.DoneEvent;
 import org.eclipse.scout.rt.platform.job.IDoneCallback;
@@ -85,6 +86,34 @@ public class NotificationDispatcher {
     }
   }
 
+  protected List<INotificationHandler<? extends Serializable>> getNotificationHandlers(Class<? extends Serializable> notificationClass) {
+    if (m_useCachedNotificationHandlerLookup) {
+      synchronized (m_cacheLock) {
+        List<INotificationHandler<? extends Serializable>> notificationHandlers = m_cachedNotificationHandlers.get(notificationClass);
+        if (notificationHandlers == null) {
+          notificationHandlers = findNotificationHandlers(notificationClass);
+          m_cachedNotificationHandlers.put(notificationClass, notificationHandlers);
+        }
+        return new ArrayList<INotificationHandler<? extends Serializable>>(notificationHandlers);
+      }
+    }
+    else {
+      return findNotificationHandlers(notificationClass);
+    }
+  }
+
+  private List<INotificationHandler<? extends Serializable>> findNotificationHandlers(Class<? extends Serializable> notificationClass) {
+    List<INotificationHandler<? extends Serializable>> handlers = new LinkedList<>();
+    synchronized (m_cacheLock) {
+      for (Entry<Class<? extends Serializable> /*notification class*/, List<INotificationHandler<? extends Serializable>>> e : m_notificationClassToNotifcationHandler.entrySet()) {
+        if (e.getKey().isAssignableFrom(notificationClass)) {
+          handlers.addAll(e.getValue());
+        }
+      }
+    }
+    return handlers;
+  }
+
   public void dispatchNotifications(Collection<NotificationMessage> notifications) {
     dispatchNotifications(notifications, ACCEPT_ALL_FILTER);
   }
@@ -98,7 +127,7 @@ public class NotificationDispatcher {
       if (!filter.accept(message)) {
         continue;
       }
-      if (message.isNotifyAll()) {
+      if (message.isNotifyAllSessions()) {
         // notify all sessions
         for (IClientSession session : notificationService.getAllClientSessions()) {
           dispatch(session, message.getNotification());
@@ -128,7 +157,9 @@ public class NotificationDispatcher {
   }
 
   /**
-   * Called of the {@link NotificationClientService} to schedule a specific notification into a client thread.
+   * to dispatch a notification within the context of a current session. If this method is called within a
+   * {@link ClientRunContext} containing the same session as the addressed session (method argument) the notification
+   * will be dispatched sync in the current {@link RunContext}.
    *
    * @param session
    *          the session describes the runcontext in which the notification should be processed.
@@ -151,40 +182,17 @@ public class NotificationDispatcher {
     }
   }
 
+  /**
+   * This method should only be used for debugging or test reasons. It waits for all notification jobs to be executed.
+   *
+   * @throws ProcessingException
+   */
   public void waitForPendingNotifications() throws ProcessingException {
     final Set<IFuture<?>> futures = new HashSet<>();
     synchronized (m_notificationFutures) {
       futures.addAll(m_notificationFutures);
     }
     Jobs.getJobManager().awaitDone(Jobs.newFutureFilter().andMatchFutures(futures).andMatchNotCurrentFuture(), Integer.MAX_VALUE, TimeUnit.SECONDS);
-  }
-
-  protected List<INotificationHandler<? extends Serializable>> getNotificationHandlers(Class<? extends Serializable> notificationClass) {
-    if (m_useCachedNotificationHandlerLookup) {
-      synchronized (m_cacheLock) {
-        List<INotificationHandler<? extends Serializable>> notificationHandlers = m_cachedNotificationHandlers.get(notificationClass);
-        if (notificationHandlers == null) {
-          notificationHandlers = findNotificationHandlers(notificationClass);
-          m_cachedNotificationHandlers.put(notificationClass, notificationHandlers);
-        }
-        return new ArrayList<INotificationHandler<? extends Serializable>>(notificationHandlers);
-      }
-    }
-    else {
-      return findNotificationHandlers(notificationClass);
-    }
-  }
-
-  private List<INotificationHandler<? extends Serializable>> findNotificationHandlers(Class<? extends Serializable> notificationClass) {
-    List<INotificationHandler<? extends Serializable>> handlers = new LinkedList<>();
-    synchronized (m_cacheLock) {
-      for (Entry<Class<? extends Serializable> /*notification class*/, List<INotificationHandler<? extends Serializable>>> e : m_notificationClassToNotifcationHandler.entrySet()) {
-        if (e.getKey().isAssignableFrom(notificationClass)) {
-          handlers.addAll(e.getValue());
-        }
-      }
-    }
-    return handlers;
   }
 
   /**

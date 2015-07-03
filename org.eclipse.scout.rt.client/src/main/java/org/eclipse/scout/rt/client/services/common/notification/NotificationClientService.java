@@ -10,7 +10,6 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.client.services.common.notification;
 
-import java.io.Serializable;
 import java.lang.ref.WeakReference;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -186,68 +185,6 @@ public class NotificationClientService implements INotificationClientService {
       }
     }
     return result;
-  }
-
-//  @Override
-//  public void dispatchNotifications(Collection<NotificationMessage> notifications) {
-//    dispatchNotifications(notifications, ACCEPT_ALL_FILTER);
-//  }
-
-//  /**
-//   * @param notifications
-//   */
-//  @Override
-//  public void dispatchNotifications(Collection<NotificationMessage> notifications, IFilter<NotificationMessage> filter) {
-//    NotificationDispatcher dispatcher = BEANS.get(NotificationDispatcher.class);
-//    for (NotificationMessage message : notifications) {
-//      if (!filter.accept(message)) {
-//        continue;
-//      }
-//      if (message.isNotifyAll()) {
-//        // notify all sessions
-//        synchronized (m_cacheLock) {
-//          for (WeakReference<IClientSession> sessionRef : m_sessionIdToSession.values()) {
-//            if (sessionRef.get() != null) {
-//              dispatch(dispatcher, sessionRef.get(), message.getNotification());
-//            }
-//          }
-//        }
-//      }
-//      else {
-//        if (CollectionUtility.hasElements(message.getSessionIds())) {
-//          for (String sessionId : message.getSessionIds()) {
-//            WeakReference<IClientSession> sessionRef = m_sessionIdToSession.get(sessionId);
-//            if (sessionRef.get() != null) {
-//              dispatch(dispatcher, sessionRef.get(), message.getNotification());
-//            }
-//          }
-//          if (CollectionUtility.hasElements(message.getUserIds())) {
-//            for (String userId : message.getUserIds()) {
-//              List<WeakReference<IClientSession>> sessionRefs = m_userToSessions.get(userId);
-//              Iterator<WeakReference<IClientSession>> sessionRefIt = sessionRefs.iterator();
-//              while (sessionRefIt.hasNext()) {
-//                WeakReference<IClientSession> sessionRef = sessionRefIt.next();
-//                if (sessionRef.get() == null) {
-//                  sessionRefIt.remove();
-//                }
-//                else {
-//                  dispatch(dispatcher, sessionRef.get(), message.getNotification());
-//                }
-//              }
-//            }
-//          }
-//        }
-//      }
-//    }
-//  }
-
-  protected void dispatch(NotificationDispatcher dispatcher, IClientSession session, Serializable notification) {
-    try {
-      dispatcher.dispatch(session, notification);
-    }
-    catch (Exception e) {
-      LOG.error(String.format("Error during dispatching notificaiton '%s'", notification));
-    }
   }
 
   private class P_ClientSessionStateListener implements ISessionListener {

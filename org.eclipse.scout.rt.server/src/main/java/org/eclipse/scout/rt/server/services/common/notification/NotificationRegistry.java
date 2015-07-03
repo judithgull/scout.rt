@@ -59,23 +59,6 @@ public class NotificationRegistry {
    *
    * @param notificationNodeId
    */
-  void registerNotificationNode(String notificationNodeId) {
-    synchronized (m_notificationQueues) {
-      NotificationNodeQueue queue = m_notificationQueues.get(notificationNodeId);
-      if (queue == null) {
-        // create new
-        // TODO[aho] make configurable
-        queue = new NotificationNodeQueue(notificationNodeId, 200);
-        m_notificationQueues.put(notificationNodeId, queue);
-      }
-    }
-  }
-
-  /**
-   * This method should only be accessed from {@link NotificationServerService}
-   *
-   * @param notificationNodeId
-   */
   void unregisterNode(String notificationNodeId) {
   }
 
@@ -125,7 +108,7 @@ public class NotificationRegistry {
    * @param notification
    */
   public void putForUser(String userId, Serializable notification) {
-    NotificationMessage message = new NotificationMessage(null, CollectionUtility.hashSet(userId), false, notification);
+    NotificationMessage message = NotificationMessage.createUserNotification(CollectionUtility.hashSet(userId), notification);
     put(message);
   }
 
@@ -137,7 +120,7 @@ public class NotificationRegistry {
    * @param notification
    */
   public void putForSession(String sessionId, Serializable notification) {
-    NotificationMessage message = new NotificationMessage(CollectionUtility.hashSet(sessionId), null, false, notification);
+    NotificationMessage message = NotificationMessage.createSessionNotification(CollectionUtility.hashSet(sessionId), notification);
     put(message);
   }
 
@@ -146,8 +129,8 @@ public class NotificationRegistry {
    *
    * @param notification
    */
-  public void putForAll(Serializable notification) {
-    NotificationMessage message = new NotificationMessage(null, null, true, notification);
+  public void putForAllSessions(Serializable notification) {
+    NotificationMessage message = NotificationMessage.createAllSessionsNotification(notification);
     put(message);
   }
 
@@ -165,6 +148,7 @@ public class NotificationRegistry {
         queue.put(message);
       }
     }
+    // TODO aho/jgu clustersync
   }
 
   /**
@@ -178,7 +162,7 @@ public class NotificationRegistry {
    */
   public void putTransactionalForUser(String userId, Serializable notification) {
     // exclude the node the request comes from
-    NotificationMessage message = new NotificationMessage(null, CollectionUtility.hashSet(userId), false,
+    NotificationMessage message = NotificationMessage.createUserNotification(CollectionUtility.hashSet(userId),
         Assertions.assertNotNull(NotificationNodeId.CURRENT.get(), "No notification node id found on the thread context."), notification);
     putTransactional(message);
   }
@@ -193,7 +177,7 @@ public class NotificationRegistry {
    * @param notification
    */
   public void putTransactionalForSession(String sessionId, Serializable notification) {
-    NotificationMessage message = new NotificationMessage(CollectionUtility.hashSet(sessionId), null, false,
+    NotificationMessage message = NotificationMessage.createSessionNotification(CollectionUtility.hashSet(sessionId),
         Assertions.assertNotNull(NotificationNodeId.CURRENT.get(), "No notification node id found on the thread context."), notification);
     putTransactional(message);
   }
@@ -205,8 +189,8 @@ public class NotificationRegistry {
    *
    * @param notification
    */
-  public void putTransactionalForAll(Serializable notification) {
-    NotificationMessage message = new NotificationMessage(null, null, true,
+  public void putTransactionalForAllSessions(Serializable notification) {
+    NotificationMessage message = NotificationMessage.createAllSessionsNotification(
         Assertions.assertNotNull(NotificationNodeId.CURRENT.get(), "No notification node id found on the thread context."), notification);
     putTransactional(message);
   }

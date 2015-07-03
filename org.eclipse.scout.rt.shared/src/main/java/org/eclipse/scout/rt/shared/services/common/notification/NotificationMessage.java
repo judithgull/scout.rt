@@ -25,19 +25,50 @@ public class NotificationMessage implements Serializable {
   private final Set<String> m_sessionIds;
   private final Set<String> m_userIds;
   private final String m_excludeNodeId;
-  private final boolean m_notifyAll;
+  private final boolean m_notifyAllSessions;
+  private final boolean m_notifyAllNodes;
+
   private final Serializable m_notification;
 
-  public NotificationMessage(Set<String> sessionIds, Set<String> userIds, boolean notifyAll, Serializable notification) {
-    this(sessionIds, userIds, notifyAll, null, notification);
-  }
-
-  public NotificationMessage(Set<String> sessionIds, Set<String> userIds, boolean notifyAll, String excludeNodeId, Serializable notification) {
+  public NotificationMessage(Set<String> sessionIds, Set<String> userIds, boolean notifyAllSessions, boolean notifyAllNodes, String excludeNodeId, Serializable notification) {
     m_sessionIds = Collections.unmodifiableSet(CollectionUtility.hashSet(sessionIds));
     m_userIds = Collections.unmodifiableSet(CollectionUtility.hashSet(userIds));
-    m_notifyAll = notifyAll;
+    m_notifyAllSessions = notifyAllSessions;
+    m_notifyAllNodes = notifyAllNodes;
     m_excludeNodeId = excludeNodeId;
     m_notification = notification;
+  }
+
+  public static NotificationMessage createSessionNotification(Set<String> sessionIds, Serializable notification) {
+    return createSessionNotification(sessionIds, null, notification);
+  }
+
+  public static NotificationMessage createSessionNotification(Set<String> sessionIds, String excludeNodeId, Serializable notification) {
+    return new NotificationMessage(sessionIds, null, false, false, excludeNodeId, notification);
+  }
+
+  public static NotificationMessage createUserNotification(Set<String> userIds, Serializable notification) {
+    return createUserNotification(userIds, null, notification);
+  }
+
+  public static NotificationMessage createUserNotification(Set<String> userIds, String excludeNodeId, Serializable notification) {
+    return new NotificationMessage(null, userIds, false, false, excludeNodeId, notification);
+  }
+
+  public static NotificationMessage createAllSessionsNotification(Serializable notification) {
+    return createAllSessionsNotification(null, notification);
+  }
+
+  public static NotificationMessage createAllSessionsNotification(String excludeNodeId, Serializable notification) {
+    return new NotificationMessage(null, null, true, false, excludeNodeId, notification);
+  }
+
+  public static NotificationMessage createAllNodesNotification(Serializable notification) {
+    return createAllNodesNotification(null, notification);
+  }
+
+  public static NotificationMessage createAllNodesNotification(String excludeNodeId, Serializable notification) {
+    return new NotificationMessage(null, null, false, true, excludeNodeId, notification);
   }
 
   public Set<String> getSessionIds() {
@@ -48,8 +79,12 @@ public class NotificationMessage implements Serializable {
     return m_userIds;
   }
 
-  public boolean isNotifyAll() {
-    return m_notifyAll;
+  public boolean isNotifyAllSessions() {
+    return m_notifyAllSessions;
+  }
+
+  public boolean isNotifyAllNodes() {
+    return m_notifyAllNodes;
   }
 
   public String getExcludeNodeId() {
@@ -66,6 +101,8 @@ public class NotificationMessage implements Serializable {
     builder.append("NotificationMessage sessions=").append(getSessionIds()).append(", ");
     builder.append("userIds=").append(getUserIds()).append(", ");
     builder.append("excludeNodeId=").append(getExcludeNodeId()).append(", ");
+    builder.append("notifyAllSessions=").append(isNotifyAllSessions()).append(", ");
+    builder.append("notifyAllNodes=").append(isNotifyAllNodes()).append(", ");
     builder.append("notification=").append(getNotification());
     return builder.toString();
   }
