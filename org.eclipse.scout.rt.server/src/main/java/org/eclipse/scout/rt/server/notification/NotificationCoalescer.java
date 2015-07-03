@@ -8,7 +8,7 @@
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
-package org.eclipse.scout.rt.server.services.common.notification;
+package org.eclipse.scout.rt.server.notification;
 
 import java.io.Serializable;
 import java.util.HashMap;
@@ -34,14 +34,14 @@ import org.eclipse.scout.rt.platform.CreateImmediately;
 public class NotificationCoalescer {
 
   /**
-   * static bindings of available {@link ITransactionalNotificationCoalescer}
+   * static bindings of available {@link INotificationCoalescer}
    */
-  private final Map<Class<? extends Serializable> /*notification class*/, Set<ITransactionalNotificationCoalescer<? extends Serializable>>> m_notificationClassToCoalescer = new HashMap<>();
+  private final Map<Class<? extends Serializable> /*notification class*/, Set<INotificationCoalescer<? extends Serializable>>> m_notificationClassToCoalescer = new HashMap<>();
 
   /**
-   * dynamic bindings of notifications to {@link ITransactionalNotificationCoalescer}
+   * dynamic bindings of notifications to {@link INotificationCoalescer}
    */
-  private final Map<Class<? extends Serializable> /*notification class*/, Set<ITransactionalNotificationCoalescer<? extends Serializable>>> m_cachedNotificationCoalescers = new HashMap<>();
+  private final Map<Class<? extends Serializable> /*notification class*/, Set<INotificationCoalescer<? extends Serializable>>> m_cachedNotificationCoalescers = new HashMap<>();
   private final Object m_cacheLock = new Object();
 
   private boolean m_useCachedNotificationCoalescerLookup = true;
@@ -53,10 +53,10 @@ public class NotificationCoalescer {
   @SuppressWarnings("unchecked")
   @PostConstruct
   protected void buildCoalescerLinking() {
-    List<ITransactionalNotificationCoalescer> notificationCoalescers = BEANS.all(ITransactionalNotificationCoalescer.class);
-    for (ITransactionalNotificationCoalescer<?> notificationCoalescer : notificationCoalescers) {
-      Class notificationClass = TypeCastUtility.getGenericsParameterClass(notificationCoalescer.getClass(), ITransactionalNotificationCoalescer.class);
-      Set<ITransactionalNotificationCoalescer<?>> coalescerSet = m_notificationClassToCoalescer.get(notificationClass);
+    List<INotificationCoalescer> notificationCoalescers = BEANS.all(INotificationCoalescer.class);
+    for (INotificationCoalescer<?> notificationCoalescer : notificationCoalescers) {
+      Class notificationClass = TypeCastUtility.getGenericsParameterClass(notificationCoalescer.getClass(), INotificationCoalescer.class);
+      Set<INotificationCoalescer<?>> coalescerSet = m_notificationClassToCoalescer.get(notificationClass);
       if (coalescerSet == null) {
         coalescerSet = new HashSet<>();
         m_notificationClassToCoalescer.put(notificationClass, coalescerSet);
@@ -65,15 +65,15 @@ public class NotificationCoalescer {
     }
   }
 
-  protected Set<ITransactionalNotificationCoalescer<? extends Serializable>> getNotificationCoalescers(Class<? extends Serializable> notificationClass) {
+  protected Set<INotificationCoalescer<? extends Serializable>> getNotificationCoalescers(Class<? extends Serializable> notificationClass) {
     if (m_useCachedNotificationCoalescerLookup) {
       synchronized (m_cacheLock) {
-        Set<ITransactionalNotificationCoalescer<? extends Serializable>> notificationCoalescers = m_cachedNotificationCoalescers.get(notificationClass);
+        Set<INotificationCoalescer<? extends Serializable>> notificationCoalescers = m_cachedNotificationCoalescers.get(notificationClass);
         if (notificationCoalescers == null) {
           notificationCoalescers = findNotificationCoalescers(notificationClass);
           m_cachedNotificationCoalescers.put(notificationClass, notificationCoalescers);
         }
-        return new HashSet<ITransactionalNotificationCoalescer<? extends Serializable>>(notificationCoalescers);
+        return new HashSet<INotificationCoalescer<? extends Serializable>>(notificationCoalescers);
       }
     }
     else {
@@ -81,10 +81,10 @@ public class NotificationCoalescer {
     }
   }
 
-  private Set<ITransactionalNotificationCoalescer<? extends Serializable>> findNotificationCoalescers(Class<? extends Serializable> notificationClass) {
-    Set<ITransactionalNotificationCoalescer<? extends Serializable>> coalescers = new HashSet<>();
+  private Set<INotificationCoalescer<? extends Serializable>> findNotificationCoalescers(Class<? extends Serializable> notificationClass) {
+    Set<INotificationCoalescer<? extends Serializable>> coalescers = new HashSet<>();
     synchronized (m_cacheLock) {
-      for (Entry<Class<? extends Serializable> /*notification class*/, Set<ITransactionalNotificationCoalescer<? extends Serializable>>> e : m_notificationClassToCoalescer.entrySet()) {
+      for (Entry<Class<? extends Serializable> /*notification class*/, Set<INotificationCoalescer<? extends Serializable>>> e : m_notificationClassToCoalescer.entrySet()) {
         if (e.getKey().isAssignableFrom(notificationClass)) {
           coalescers.addAll(e.getValue());
         }
@@ -95,8 +95,8 @@ public class NotificationCoalescer {
 
   public Set<? extends Serializable> coalesce(Set<? extends Serializable> notificationsIn) {
     Set<? extends Serializable> notifications = new HashSet<>(notificationsIn);
-    List<ITransactionalNotificationCoalescer> notificationCoalescers = BEANS.all(ITransactionalNotificationCoalescer.class);
-    for (ITransactionalNotificationCoalescer notificationCoalescer : notificationCoalescers) {
+    List<INotificationCoalescer> notificationCoalescers = BEANS.all(INotificationCoalescer.class);
+    for (INotificationCoalescer notificationCoalescer : notificationCoalescers) {
       notifications = coalesce(notificationCoalescer, notifications);
     }
 
@@ -104,7 +104,7 @@ public class NotificationCoalescer {
   }
 
   @SuppressWarnings("unchecked")
-  protected Set<? extends Serializable> coalesce(ITransactionalNotificationCoalescer coalescer, Set<? extends Serializable> notifications) {
+  protected Set<? extends Serializable> coalesce(INotificationCoalescer coalescer, Set<? extends Serializable> notifications) {
     Set<Serializable> toCoalesceNotificaitons = new HashSet<>();
     Iterator<? extends Serializable> notificationIt = notifications.iterator();
     while (notificationIt.hasNext()) {

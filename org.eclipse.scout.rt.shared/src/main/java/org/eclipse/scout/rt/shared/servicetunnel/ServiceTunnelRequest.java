@@ -12,7 +12,6 @@ package org.eclipse.scout.rt.shared.servicetunnel;
 
 import java.io.Serializable;
 import java.util.Locale;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.eclipse.scout.commons.VerboseUtility;
@@ -38,7 +37,6 @@ public class ServiceTunnelRequest implements Serializable {
   private final Locale m_locale;
   private String m_userAgent;
   private String m_notificationNodeId;
-  private Set<String> m_consumedNotificationIds;
 
   public ServiceTunnelRequest(String serviceInterfaceName, String op, Class[] parameterTypes, Object[] args) {
     m_serviceInterfaceClassName = serviceInterfaceName;
@@ -108,20 +106,12 @@ public class ServiceTunnelRequest implements Serializable {
     m_userAgent = userAgent;
   }
 
-  public String getNotificationNodeId() {
+  public String getClientNotificationNodeId() {
     return m_notificationNodeId;
   }
 
-  public void setNotificationNodeId(String notificationNodeId) {
+  public void setClientNotificationNodeId(String notificationNodeId) {
     m_notificationNodeId = notificationNodeId;
-  }
-
-  public void setConsumedNotifications(Set<String> notificationsIds) {
-    m_consumedNotificationIds = notificationsIds;
-  }
-
-  public Set<String> getConsumedNotifications() {
-    return m_consumedNotificationIds;
   }
 
   @Override

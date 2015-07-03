@@ -8,7 +8,7 @@
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
-package org.eclipse.scout.rt.server.services.common.notification;
+package org.eclipse.scout.rt.server.clientnotification;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;

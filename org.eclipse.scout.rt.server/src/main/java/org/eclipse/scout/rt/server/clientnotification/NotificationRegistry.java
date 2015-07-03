@@ -8,7 +8,7 @@
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
-package org.eclipse.scout.rt.server.services.common.notification;
+package org.eclipse.scout.rt.server.clientnotification;
 
 import java.io.Serializable;
 import java.util.Collection;
@@ -167,7 +167,7 @@ public class NotificationRegistry {
   public void putTransactionalForUser(String userId, Serializable notification) {
     // exclude the node the request comes from
     NotificationMessage message = new NotificationMessage(NotficationAddress.createUserAddress(CollectionUtility.hashSet(userId),
-        Assertions.assertNotNull(NotificationNodeId.CURRENT.get(), "No notification node id found on the thread context.")), notification);
+        Assertions.assertNotNull(ClientNotificationNodeId.CURRENT.get(), "No notification node id found on the thread context.")), notification);
     putTransactional(message);
   }
 
@@ -182,7 +182,7 @@ public class NotificationRegistry {
    */
   public void putTransactionalForSession(String sessionId, Serializable notification) {
     NotificationMessage message = new NotificationMessage(NotficationAddress.createSessionAddress(CollectionUtility.hashSet(sessionId),
-        Assertions.assertNotNull(NotificationNodeId.CURRENT.get(), "No notification node id found on the thread context.")), notification);
+        Assertions.assertNotNull(ClientNotificationNodeId.CURRENT.get(), "No notification node id found on the thread context.")), notification);
     putTransactional(message);
   }
 
@@ -195,7 +195,7 @@ public class NotificationRegistry {
    */
   public void putTransactionalForAllSessions(Serializable notification) {
     NotificationMessage message = new NotificationMessage(NotficationAddress.createAllSessionsAddress(
-        Assertions.assertNotNull(NotificationNodeId.CURRENT.get(), "No notification node id found on the thread context.")), notification);
+        Assertions.assertNotNull(ClientNotificationNodeId.CURRENT.get(), "No notification node id found on the thread context.")), notification);
     putTransactional(message);
   }
 

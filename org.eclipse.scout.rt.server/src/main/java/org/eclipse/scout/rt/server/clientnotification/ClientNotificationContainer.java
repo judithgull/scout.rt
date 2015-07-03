@@ -8,7 +8,7 @@
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
-package org.eclipse.scout.rt.server.services.common.notification;
+package org.eclipse.scout.rt.server.clientnotification;
 
 import java.util.Collection;
 import java.util.HashSet;
@@ -23,21 +23,21 @@ import org.eclipse.scout.rt.shared.services.common.notification.NotificationMess
  *
  * @see NotificationTransactionMember
  */
-public class NotificationContainer {
+public class ClientNotificationContainer {
 
   /**
    * The {@link Locale} which is currently associated with the current thread.
    */
-  public static final ThreadLocal<NotificationContainer> CURRENT = new ThreadLocal<>();
+  public static final ThreadLocal<ClientNotificationContainer> CURRENT = new ThreadLocal<>();
 
   private final Set<NotificationMessage> m_notifications = new HashSet<>();
 
-  public NotificationContainer() {
+  public ClientNotificationContainer() {
   }
 
   /**
    */
-  public static NotificationContainer get() {
+  public static ClientNotificationContainer get() {
     return CURRENT.get();
   }
 

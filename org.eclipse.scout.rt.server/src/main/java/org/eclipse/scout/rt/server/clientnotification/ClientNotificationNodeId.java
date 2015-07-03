@@ -8,22 +8,22 @@
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
-package org.eclipse.scout.rt.server.services.common.notification;
+package org.eclipse.scout.rt.server.clientnotification;
 
 import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelRequest;
 
 /**
  * Every client node opens a connection to a server node to access notifications. This connection is addressed by the
- * {@link NotificationNodeId}. The node id is provided on every {@link ServiceTunnelRequest#getNotificationNodeId()}.
+ * {@link ClientNotificationNodeId}. The node id is provided on every {@link ServiceTunnelRequest#getClientNotificationNodeId()}.
  */
-public class NotificationNodeId {
+public class ClientNotificationNodeId {
 
   /**
    * The notification node id which is currently associated with the current thread.
    */
   public static final ThreadLocal<String> CURRENT = new ThreadLocal<>();
 
-  private NotificationNodeId() {
+  private ClientNotificationNodeId() {
   }
 
   /**

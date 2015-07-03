@@ -36,13 +36,13 @@ import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.context.RunMonitor;
 import org.eclipse.scout.rt.platform.exception.ExceptionTranslator;
 import org.eclipse.scout.rt.server.admin.html.AdminSession;
+import org.eclipse.scout.rt.server.clientnotification.ClientNotificationContainer;
 import org.eclipse.scout.rt.server.commons.cache.IHttpSessionCacheService;
 import org.eclipse.scout.rt.server.commons.context.ServletRunContexts;
 import org.eclipse.scout.rt.server.commons.servlet.IHttpServletRoundtrip;
 import org.eclipse.scout.rt.server.context.RunMonitorCancelRegistry;
 import org.eclipse.scout.rt.server.context.ServerRunContext;
 import org.eclipse.scout.rt.server.context.ServerRunContexts;
-import org.eclipse.scout.rt.server.services.common.notification.NotificationContainer;
 import org.eclipse.scout.rt.server.session.ServerSessionProvider;
 import org.eclipse.scout.rt.shared.servicetunnel.DefaultServiceTunnelContentHandler;
 import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelContentHandler;
@@ -115,7 +115,7 @@ public class ServiceTunnelServlet extends HttpServlet {
 
           ServiceTunnelRequest serviceRequest = deserializeServiceRequest();
 
-          NotificationContainer txNotificationContainer = new NotificationContainer();
+          ClientNotificationContainer txNotificationContainer = new ClientNotificationContainer();
           // Enable global cancellation of the service request.
           RunMonitor runMonitor = BEANS.get(RunMonitor.class);
 
@@ -124,7 +124,7 @@ public class ServiceTunnelServlet extends HttpServlet {
           serverRunContext.userAgent(UserAgent.createByIdentifier(serviceRequest.getUserAgent()));
           serverRunContext.runMonitor(runMonitor);
           serverRunContext.txNotificationContainer(txNotificationContainer);
-          serverRunContext.notificationNodeId(serviceRequest.getNotificationNodeId());
+          serverRunContext.notificationNodeId(serviceRequest.getClientNotificationNodeId());
           serverRunContext.propertyMap().put(SESSION_ID, serviceRequest.getSessionId());
           serverRunContext.session(lookupServerSessionOnHttpSession(serverRunContext.copy()), true);
 

@@ -8,7 +8,7 @@
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
-package org.eclipse.scout.rt.server.services.common.notification;
+package org.eclipse.scout.rt.server.clientnotification;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -50,7 +50,7 @@ public class NotificationTransactionMember extends AbstractTransactionMember {
     Set<NotificationMessage> coalescedNotifications = BEANS.get(ClientNotificationCoalescer.class).coalesce(m_notifications);
     m_notifications.clear();
     // piggy back
-    NotificationContainer.get().addAll(coalescedNotifications);
+    ClientNotificationContainer.get().addAll(coalescedNotifications);
     // notify others
     BEANS.get(NotificationRegistry.class).put(coalescedNotifications);
   }

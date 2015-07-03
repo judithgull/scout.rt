@@ -8,7 +8,7 @@
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
-package org.eclipse.scout.rt.server.services.common.notification;
+package org.eclipse.scout.rt.server.clientnotification;
 
 import java.io.Serializable;
 import java.util.HashMap;
@@ -20,6 +20,7 @@ import java.util.Set;
 import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.rt.platform.ApplicationScoped;
 import org.eclipse.scout.rt.platform.BEANS;
+import org.eclipse.scout.rt.server.notification.NotificationCoalescer;
 import org.eclipse.scout.rt.shared.services.common.notification.NotficationAddress;
 import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
 

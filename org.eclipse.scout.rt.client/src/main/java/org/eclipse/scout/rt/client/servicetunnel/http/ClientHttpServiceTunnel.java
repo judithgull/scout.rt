@@ -78,7 +78,7 @@ public class ClientHttpServiceTunnel extends AbstractHttpServiceTunnel implement
     if (session != null) {
       serviceRequest.setSessionId(session.getId());
     }
-    serviceRequest.setNotificationNodeId(INotificationClientService.NOTIFICATION_NODE_ID);
+    serviceRequest.setClientNotificationNodeId(INotificationClientService.NOTIFICATION_NODE_ID);
     // TODO piggyback notifications
 //    IClientNotificationConsumerService cns = BEANS.get(IClientNotificationConsumerService.class);
 //    if (call instanceof ServiceTunnelRequest && cns != null) {
