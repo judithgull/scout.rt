@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2010 BSI Business Systems Integration AG.
+ * Copyright (c) 2015 BSI Business Systems Integration AG.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -8,19 +8,15 @@
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
-package org.eclipse.scout.rt.server.services.common.clientnotification;
+package org.eclipse.scout.rt.shared.notification;
 
 import java.io.Serializable;
+import java.util.EventListener;
 
-import org.eclipse.scout.rt.shared.services.common.clientnotification.IClientNotification;
+/**
+ *
+ */
+public interface IClientNotificationListener<T extends Serializable> extends EventListener {
 
-public interface IClientNotificationQueueElement extends Serializable {
-
-  IClientNotification getNotification();
-
-  IClientNotificationFilter getFilter();
-
-  boolean isActive();
-
-  boolean isReplacableBy(IClientNotificationQueueElement newElem);
+  void handleNotification(T notification);
 }

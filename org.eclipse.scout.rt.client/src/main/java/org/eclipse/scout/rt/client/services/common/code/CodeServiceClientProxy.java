@@ -35,6 +35,7 @@ import org.eclipse.scout.rt.client.services.common.clientnotification.ClientNoti
 import org.eclipse.scout.rt.client.services.common.clientnotification.IClientNotificationConsumerListener;
 import org.eclipse.scout.rt.client.services.common.clientnotification.IClientNotificationConsumerService;
 import org.eclipse.scout.rt.client.session.ClientSessionProvider;
+import org.eclipse.scout.rt.platform.ApplicationScoped;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.CreateImmediately;
 import org.eclipse.scout.rt.platform.service.AbstractService;
@@ -55,6 +56,7 @@ import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelUtility;
 @Client
 @Order(3)
 @CreateImmediately
+@ApplicationScoped
 public class CodeServiceClientProxy extends AbstractService implements ICodeService {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(CodeServiceClientProxy.class);
 

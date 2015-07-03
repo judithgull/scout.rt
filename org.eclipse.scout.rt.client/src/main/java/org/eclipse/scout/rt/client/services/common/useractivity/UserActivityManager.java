@@ -44,6 +44,7 @@ public class UserActivityManager {
 
   public UserActivityManager(IClientSession clientSession) {
     m_clientSession = clientSession;
+    BEANS.get(UserActivityClientNotificationHandler.class).addListener(listener);
     m_clientNotificationConsumerListener = new IClientNotificationConsumerListener() {
       @Override
       public void handleEvent(ClientNotificationConsumerEvent e, boolean sync) {
