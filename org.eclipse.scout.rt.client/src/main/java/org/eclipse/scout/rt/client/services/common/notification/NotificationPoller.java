@@ -64,8 +64,8 @@ public class NotificationPoller {
     if (!notifications.isEmpty()) {
       BEANS.get(NotificationDispatcher.class).dispatchNotifications(notifications, new IFilter<NotificationMessage>() {
         @Override
-        public boolean accept(NotificationMessage element) {
-          return !CompareUtility.equals(element.getExcludeNodeId(), INotificationClientService.NOTIFICATION_NODE_ID);
+        public boolean accept(NotificationMessage message) {
+          return !CompareUtility.equals(message.getAddress().getExcludeNodeId(), INotificationClientService.NOTIFICATION_NODE_ID);
         }
       });
     }

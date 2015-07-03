@@ -10,8 +10,8 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.server.services.common.notification;
 
-import java.util.LinkedList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.server.context.ServerRunContext;
@@ -29,7 +29,7 @@ public class NotificationTransactionMember extends AbstractTransactionMember {
 
   public static final String TRANSACTION_MEMBER_ID = "notification.transactionMemberId";
 
-  private final List<NotificationMessage> m_notifications = new LinkedList<>();
+  private final Set<NotificationMessage> m_notifications = new HashSet<>();
 
   public NotificationTransactionMember() {
     super(TRANSACTION_MEMBER_ID);
@@ -46,6 +46,8 @@ public class NotificationTransactionMember extends AbstractTransactionMember {
 
   @Override
   public void commitPhase2() {
+    // coalease
+    BEANS.get(NotificationCoalescer.class).coalesce(m_notifications);
     // piggy back
     NotificationContainer.get().addAll(m_notifications);
     // notify others

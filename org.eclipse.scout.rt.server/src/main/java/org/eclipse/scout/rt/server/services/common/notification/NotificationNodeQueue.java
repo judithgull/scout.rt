@@ -101,13 +101,13 @@ public class NotificationNodeQueue {
   }
 
   public boolean isRelevant(NotificationMessage message) {
-    if (CompareUtility.equals(getNodeId(), message.getExcludeNodeId())) {
+    if (CompareUtility.equals(getNodeId(), message.getAddress().getExcludeNodeId())) {
       return false;
     }
-    if (message.isNotifyAllSessions()) {
+    if (message.getAddress().isNotifyAllSessions()) {
       return true;
     }
-    Set<String> messageSessionIds = message.getSessionIds();
+    Set<String> messageSessionIds = message.getAddress().getSessionIds();
     if (CollectionUtility.hasElements(messageSessionIds)) {
       // check message session ids registered in this Notificaiton Node
       Set<String> sessionIds = getAllSessionIds();
@@ -116,7 +116,7 @@ public class NotificationNodeQueue {
         return true;
       }
     }
-    Set<String> messageUserIds = message.getUserIds();
+    Set<String> messageUserIds = message.getAddress().getUserIds();
     if (CollectionUtility.hasElements(messageUserIds)) {
       Set<String> userIds = getAllUserIds();
       userIds.retainAll(messageUserIds);

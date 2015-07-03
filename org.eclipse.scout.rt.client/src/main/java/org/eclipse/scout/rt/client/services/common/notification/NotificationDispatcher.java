@@ -38,6 +38,7 @@ import org.eclipse.scout.rt.client.job.ClientJobs;
 import org.eclipse.scout.rt.platform.ApplicationScoped;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.context.RunContext;
+import org.eclipse.scout.rt.platform.context.RunContexts;
 import org.eclipse.scout.rt.platform.exception.RuntimeExceptionTranslator;
 import org.eclipse.scout.rt.platform.job.DoneEvent;
 import org.eclipse.scout.rt.platform.job.IDoneCallback;
@@ -127,15 +128,18 @@ public class NotificationDispatcher {
       if (!filter.accept(message)) {
         continue;
       }
-      if (message.isNotifyAllSessions()) {
+      if (message.getAddress().isNotifyAllNodes()) {
+        dispatch(message.getNotification());
+      }
+      else if (message.getAddress().isNotifyAllSessions()) {
         // notify all sessions
         for (IClientSession session : notificationService.getAllClientSessions()) {
           dispatch(session, message.getNotification());
         }
       }
       else {
-        if (CollectionUtility.hasElements(message.getSessionIds())) {
-          for (String sessionId : message.getSessionIds()) {
+        if (CollectionUtility.hasElements(message.getAddress().getSessionIds())) {
+          for (String sessionId : message.getAddress().getSessionIds()) {
             IClientSession session = notificationService.getClientSession(sessionId);
             if (session == null) {
               LOG.warn(String.format("received notification for invalid session '%s'.", sessionId));
@@ -144,14 +148,39 @@ public class NotificationDispatcher {
               dispatch(session, message.getNotification());
             }
           }
-          if (CollectionUtility.hasElements(message.getUserIds())) {
-            for (String userId : message.getUserIds()) {
+          if (CollectionUtility.hasElements(message.getAddress().getUserIds())) {
+            for (String userId : message.getAddress().getUserIds()) {
               for (IClientSession session : notificationService.getClientSessionsForUser(userId)) {
                 dispatch(session, message.getNotification());
               }
             }
           }
         }
+      }
+    }
+  }
+
+  /**
+   * the notification will be applied sync if the method invocation is done in with a {@link IClientSession} in the
+   * {@link RunContext}. The sync execution is due to piggyback notifications expected to be applied after a successful
+   * backendcall. In case no {@link IClientSession} is in the current {@link RunContext} the notification is applied
+   * async.
+   *
+   * @param notification
+   */
+  public void dispatch(Serializable notification) {
+    P_DispatchRunnable dispatchJob = new P_DispatchRunnable(notification);
+    ISession currentSession = ISession.CURRENT.get();
+    if (currentSession != null) {
+      // sync dispatch to ensure applied notification after return
+      RunContexts.copyCurrent().run(dispatchJob, BEANS.get(RuntimeExceptionTranslator.class));
+    }
+    else {
+      // schedule
+      IFuture<Void> future = Jobs.schedule(dispatchJob, Jobs.newInput(ClientRunContexts.empty()));
+      synchronized (m_notificationFutures) {
+        m_notificationFutures.add(future);
+        future.whenDone(new P_NotificationFutureCallback(future));
       }
     }
   }
@@ -168,8 +197,8 @@ public class NotificationDispatcher {
    */
   public void dispatch(IClientSession session, Serializable notification) {
     P_DispatchRunnable dispatchJob = new P_DispatchRunnable(notification);
-    // sync dispatch if session is equal
     ISession currentSession = ISession.CURRENT.get();
+    // sync dispatch if session is equal
     if (session == currentSession) {
       ClientRunContexts.copyCurrent().run(dispatchJob, BEANS.get(RuntimeExceptionTranslator.class));
     }
