@@ -48,6 +48,8 @@ import org.eclipse.scout.rt.server.session.ServerSessionProvider;
 import org.eclipse.scout.rt.server.session.ServerSessionProviderWithCache;
 import org.eclipse.scout.rt.server.transaction.AbstractTransactionMember;
 import org.eclipse.scout.rt.server.transaction.ITransaction;
+import org.eclipse.scout.rt.shared.notification.INotificationHandler;
+import org.eclipse.scout.rt.shared.notification.NotificationHandlerRegistry;
 
 public class ClusterSynchronizationService extends AbstractService implements IClusterSynchronizationService, IPublishSubscribeMessageListener {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(ClusterSynchronizationService.class);
@@ -273,17 +275,6 @@ public class ClusterSynchronizationService extends AbstractService implements IC
     return new ClusterNotificationMessageProperties(getNodeId(), ServerSessionProvider.currentSession().getUserId());
   }
 
-  protected void notifyListeners(IClusterNotificationMessage message) {
-    for (IClusterNotificationListener listener : getListeners()) {
-      try {
-        listener.onNotification(message);
-      }
-      catch (Exception e) {
-        LOG.error(String.format("Failed to notify listener about cluster-sync-message [message=%s, listener=%s]", message, listener.getClass().getName()), e);
-      }
-    }
-  }
-
   @Override
   public void onMessage(final IClusterNotificationMessage message) throws ProcessingException {
     //Do not progress notifications sent by node itself
@@ -301,7 +292,8 @@ public class ClusterSynchronizationService extends AbstractService implements IC
 
       @Override
       public void run() throws Exception {
-        notifyListeners(message);
+        NotificationHandlerRegistry reg = BEANS.get(NotificationHandlerRegistry.class);
+        reg.notifyHandlers(message.getNotification());
       }
     });
   }

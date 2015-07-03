@@ -13,7 +13,6 @@ package org.eclipse.scout.rt.client.services.common.notification;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -37,7 +36,6 @@ import org.eclipse.scout.rt.platform.job.IDoneCallback;
 import org.eclipse.scout.rt.platform.job.IFuture;
 import org.eclipse.scout.rt.platform.job.Jobs;
 import org.eclipse.scout.rt.shared.ISession;
-import org.eclipse.scout.rt.shared.notification.INotificationHandler;
 import org.eclipse.scout.rt.shared.notification.NotificationHandlerRegistry;
 import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
 
@@ -178,19 +176,10 @@ public class NotificationDispatcher {
       m_notification = notification;
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public void run() throws Exception {
       NotificationHandlerRegistry reg = BEANS.get(NotificationHandlerRegistry.class);
-      List<INotificationHandler<? extends Serializable>> notificationHandlers = reg.getNotificationHandlers(m_notification.getClass());
-      for (INotificationHandler handler : notificationHandlers) {
-        try {
-          handler.handleNotification(m_notification);
-        }
-        catch (Exception e) {
-          LOG.error(String.format("Handler '%s' notification with notification '%s' failed.", handler, m_notification), e);
-        }
-      }
+      reg.notifyHandlers(m_notification);
     }
   }
 
