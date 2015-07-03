@@ -10,13 +10,13 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.server.services.common.security;
 
+import java.io.Serializable;
 import java.util.Collection;
 import java.util.Set;
 
 import org.eclipse.scout.commons.CollectionUtility;
-import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotification;
 
-public class AccessControlCacheChangedClusterNotification implements IClusterNotification {
+public class AccessControlCacheChangedClusterNotification implements Serializable {
   private static final long serialVersionUID = 128460814967537176L;
 
   private final Set<String> m_userIds;
@@ -38,6 +38,7 @@ public class AccessControlCacheChangedClusterNotification implements IClusterNot
     return "AccessControlCacheChangedClusterNotification [m_userIds=" + m_userIds + "]";
   }
 
+/* TODO JGU
   @Override
   public boolean coalesce(IClusterNotification existingNotification0) {
     if (existingNotification0 instanceof AccessControlCacheChangedClusterNotification) {
@@ -47,4 +48,6 @@ public class AccessControlCacheChangedClusterNotification implements IClusterNot
     }
     return false;
   }
+
+ */
 }

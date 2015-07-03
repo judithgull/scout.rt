@@ -10,12 +10,12 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.server.services.common.code;
 
+import java.io.Serializable;
 import java.util.List;
 
-import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotification;
 import org.eclipse.scout.rt.shared.services.common.code.ICodeType;
 
-public class UnloadCodeTypeCacheClusterNotification implements IClusterNotification {
+public class UnloadCodeTypeCacheClusterNotification implements Serializable {
   private static final long serialVersionUID = 3498451762775759388L;
 
   private final List<Class<? extends ICodeType<?, ?>>> m_types;
@@ -33,6 +33,7 @@ public class UnloadCodeTypeCacheClusterNotification implements IClusterNotificat
     return "UnloadCodeTypeCacheClusterNotification [m_types=" + m_types + "]";
   }
 
+  /* TODO JGU
   @Override
   public boolean coalesce(IClusterNotification existingNotification0) {
     if (existingNotification0 instanceof UnloadCodeTypeCacheClusterNotification) {
@@ -42,4 +43,6 @@ public class UnloadCodeTypeCacheClusterNotification implements IClusterNotificat
     }
     return false;
   }
+
+   */
 }
