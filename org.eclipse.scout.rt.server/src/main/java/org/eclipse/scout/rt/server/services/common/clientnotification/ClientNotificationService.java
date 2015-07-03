@@ -23,7 +23,6 @@ import org.eclipse.scout.rt.platform.service.IService;
 import org.eclipse.scout.rt.server.services.common.clientnotification.internal.ClientNotificationQueue;
 import org.eclipse.scout.rt.server.services.common.clientnotification.internal.ClientNotificationQueueElement;
 import org.eclipse.scout.rt.server.services.common.clientnotification.internal.ConsumableClientNotificationQueueElement;
-import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotification;
 import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificationListener;
 import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificationListenerService;
 import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificationMessage;
@@ -106,20 +105,21 @@ public class ClientNotificationService extends AbstractService implements IClien
     return m;
   }
 
-  /**
-   * Has no effect, if no cluster service is registered
-   */
+//  /**
+//   * Has no effect, if no cluster service is registered
+//   */
   protected void distributeCluster(IClientNotificationQueueElement element) {
-    try {
-      IClusterSynchronizationService s = BEANS.opt(IClusterSynchronizationService.class);
-      if (s != null) {
-        element.getNotification().setOriginalServerNode(s.getNodeId());
-        s.publishNotification(new ClientNotificationClusterNotification(element));
-      }
-    }
-    catch (ProcessingException e) {
-      LOG.error("could not send cluster sync message", e);
-    }
+    //TODO remove
+//    try {
+//      IClusterSynchronizationService s = BEANS.opt(IClusterSynchronizationService.class);
+//      if (s != null) {
+//        element.getNotification().setOriginalServerNode(s.getNodeId());
+//        s.publishNotification(new ClientNotificationClusterNotification(element));
+//      }
+//    }
+//    catch (ProcessingException e) {
+//      LOG.error("could not send cluster sync message", e);
+//    }
   }
 
   /**
@@ -139,10 +139,10 @@ public class ClientNotificationService extends AbstractService implements IClien
     return IClientNotificationService.class;
   }
 
-  protected boolean accept(IClusterNotification notification) {
-    return (notification instanceof ClientNotificationClusterNotification) &&
-        ((ClientNotificationClusterNotification) notification).getQueueElement().isActive();
-  }
+//  protected boolean accept(IClusterNotification notification) {
+//    return (notification instanceof ClientNotificationClusterNotification) &&
+//        ((ClientNotificationClusterNotification) notification).getQueueElement().isActive();
+//  }
 
   /**
    * Client notifications fired within transaction are cached in a transaction-local queue and published into global
@@ -205,10 +205,12 @@ public class ClientNotificationService extends AbstractService implements IClien
 
       @Override
       public void onNotification(IClusterNotificationMessage message) throws ProcessingException {
-        if (accept(message.getNotification())) {
-          ClientNotificationClusterNotification n = (ClientNotificationClusterNotification) message.getNotification();
-          BEANS.get(IClientNotificationService.class).putNonClusterDistributedNotification(n.getQueueElement().getNotification(), n.getQueueElement().getFilter());
-        }
+//        if (accept(message.getNotification())) {
+//          ClientNotificationClusterNotification n = (ClientNotificationClusterNotification) message.getNotification();
+//          BEANS.get(IClientNotificationService.class).putNonClusterDistributedNotification(n.getQueueElement().getNotification(), n.getQueueElement().getFilter());
+//        }
+
+        //TODO remove
       }
     };
   }

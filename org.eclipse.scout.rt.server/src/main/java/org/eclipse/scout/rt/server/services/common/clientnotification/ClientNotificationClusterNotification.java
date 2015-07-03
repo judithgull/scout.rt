@@ -10,7 +10,9 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.server.services.common.clientnotification;
 
+import org.eclipse.scout.commons.ToStringBuilder;
 import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotification;
+import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
 
 /**
  * Cluster notification for new client notification
@@ -18,27 +20,25 @@ import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificat
 public class ClientNotificationClusterNotification implements IClusterNotification {
 
   private static final long serialVersionUID = -8513131031858145786L;
-  private final IClientNotificationQueueElement m_queueElement;
+  private final NotificationMessage m_cnMessage;
 
-  public ClientNotificationClusterNotification(IClientNotificationQueueElement queueElement) {
-    m_queueElement = queueElement;
+  public ClientNotificationClusterNotification(NotificationMessage message) {
+    m_cnMessage = message;
   }
 
-  public IClientNotificationQueueElement getQueueElement() {
-    return m_queueElement;
+  public NotificationMessage getClientNotificationMessage() {
+    return m_cnMessage;
   }
 
   @Override
   public String toString() {
-    return "ClientNotificationClusterNotification [m_queueElement=" + m_queueElement + "]";
+    ToStringBuilder tsb = new ToStringBuilder(this);
+    tsb.attr("ClientNotificationMessage", m_cnMessage);
+    return tsb.toString();
   }
 
   @Override
   public boolean coalesce(IClusterNotification existingNotification0) {
-    if (existingNotification0 instanceof ClientNotificationClusterNotification) {
-      ClientNotificationClusterNotification existingNotification = (ClientNotificationClusterNotification) existingNotification0;
-      return existingNotification.getQueueElement().isReplacableBy(getQueueElement());
-    }
     return false;
   }
 }

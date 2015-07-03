@@ -25,6 +25,9 @@ import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.platform.ApplicationScoped;
+import org.eclipse.scout.rt.platform.BEANS;
+import org.eclipse.scout.rt.server.services.common.clientnotification.ClientNotificationClusterNotification;
+import org.eclipse.scout.rt.server.services.common.clustersync.IClusterSynchronizationService;
 import org.eclipse.scout.rt.server.transaction.ITransaction;
 import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
 
@@ -209,6 +212,15 @@ public class NotificationRegistry {
       LOG.warn("Could not register transaction member. The notification will be processed immediately", e);
       put(message);
 
+    }
+  }
+
+  public void distributeCluster(NotificationMessage message) {
+    try {
+      BEANS.get(IClusterSynchronizationService.class).publishNotification(new ClientNotificationClusterNotification(message));
+    }
+    catch (ProcessingException e) {
+      LOG.error("Error distributing cluster notification ", e);
     }
   }
 
