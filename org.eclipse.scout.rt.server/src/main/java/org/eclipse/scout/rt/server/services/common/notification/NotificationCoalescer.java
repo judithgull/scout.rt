@@ -27,7 +27,7 @@ import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.CreateImmediately;
 
 /**
- *
+ * The {@link NotificationCoalescer} is used to coalesce notifications.
  */
 @ApplicationScoped
 @CreateImmediately
@@ -37,6 +37,10 @@ public class NotificationCoalescer {
    * static bindings of available {@link ITransactionalNotificationCoalescer}
    */
   private final Map<Class<? extends Serializable> /*notification class*/, Set<ITransactionalNotificationCoalescer<? extends Serializable>>> m_notificationClassToCoalescer = new HashMap<>();
+
+  /**
+   * dynamic bindings of notifications to {@link ITransactionalNotificationCoalescer}
+   */
   private final Map<Class<? extends Serializable> /*notification class*/, Set<ITransactionalNotificationCoalescer<? extends Serializable>>> m_cachedNotificationCoalescers = new HashMap<>();
   private final Object m_cacheLock = new Object();
 
@@ -99,6 +103,7 @@ public class NotificationCoalescer {
     return notifications;
   }
 
+  @SuppressWarnings("unchecked")
   protected Set<? extends Serializable> coalesce(ITransactionalNotificationCoalescer coalescer, Set<? extends Serializable> notifications) {
     Set<Serializable> toCoalesceNotificaitons = new HashSet<>();
     Iterator<? extends Serializable> notificationIt = notifications.iterator();

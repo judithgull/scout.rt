@@ -16,11 +16,17 @@ import java.util.Set;
 import org.eclipse.scout.rt.platform.ApplicationScoped;
 
 /**
- *
+ * Every implementation of this interface will be applied to coalesce notifications of the same super class (generic
+ * type of this class).
  */
 @ApplicationScoped
 public interface ITransactionalNotificationCoalescer<NOTIFICATION extends Serializable> {
 
+  /**
+   * @param notifications
+   *          all notifications to coalesce.
+   * @return a coalesced set of notifications.
+   */
   Set<NOTIFICATION> coalesce(Set<NOTIFICATION> notifications);
 
 }
