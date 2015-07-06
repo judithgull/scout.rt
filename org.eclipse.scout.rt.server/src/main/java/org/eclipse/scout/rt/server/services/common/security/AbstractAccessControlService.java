@@ -18,6 +18,7 @@ import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.platform.BEANS;
+import org.eclipse.scout.rt.server.clientnotification.NotificationRegistry;
 import org.eclipse.scout.rt.server.services.common.clustersync.IClusterSynchronizationService;
 import org.eclipse.scout.rt.server.transaction.ITransaction;
 import org.eclipse.scout.rt.shared.notification.INotificationHandler;
@@ -36,7 +37,7 @@ public abstract class AbstractAccessControlService extends AbstractSharedAccessC
   protected void notifySetPermisions(Permissions p) {
     // notify clients:
     String userId = BEANS.get(IAccessControlService.class).getUserIdOfCurrentSubject();
-    BEANS.get(IClientNotificationService.class).putNotification(new AccessControlChangedNotification(p), new SingleUserFilter(userId, 120000L));
+    BEANS.get(NotificationRegistry.class).putTransactionalForUser(userId, new AccessControlChangedNotification(p));
   }
 
   @Override
@@ -44,7 +45,7 @@ public abstract class AbstractAccessControlService extends AbstractSharedAccessC
     clearCacheNoFire();
 
     //notify clients with a filter, that will be accepted nowhere:
-    BEANS.get(IClientNotificationService.class).putNotification(new ResetAccessControlChangedNotification(), new SingleUserFilter(null, 0L));
+    BEANS.get(NotificationRegistry.class).putTransactionalForAllNodes(new ResetAccessControlChangedNotification());
     distributeCluster(new AccessControlClusterNotification());
   }
 
@@ -56,7 +57,7 @@ public abstract class AbstractAccessControlService extends AbstractSharedAccessC
     //notify clients:
     for (String userId : userIds) {
       if (userId != null) {
-        BEANS.get(IClientNotificationService.class).putNotification(new AccessControlChangedNotification(null), new SingleUserFilter(userId, 120000L));
+        BEANS.get(NotificationRegistry.class).putTransactionalForUser(userId, new AccessControlChangedNotification(null));
       }
     }
   }

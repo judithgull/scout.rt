@@ -137,6 +137,16 @@ public class NotificationRegistry {
     put(message);
   }
 
+  /**
+   * This notification will be distributed to client nodes.
+   *
+   * @param notification
+   */
+  public void putForAllNodes(Serializable notification) {
+    NotificationMessage message = new NotificationMessage(NotficationAddress.createAllNodesAddress(), notification);
+    put(message);
+  }
+
   public void put(NotificationMessage message) {
     synchronized (m_notificationQueues) {
       for (NotificationNodeQueue queue : m_notificationQueues.values()) {
@@ -194,6 +204,19 @@ public class NotificationRegistry {
    */
   public void putTransactionalForAllSessions(Serializable notification) {
     NotificationMessage message = new NotificationMessage(NotficationAddress.createAllSessionsAddress(
+        Assertions.assertNotNull(ClientNotificationNodeId.CURRENT.get(), "No notification node id found on the thread context.")), notification);
+    putTransactional(message);
+  }
+
+  /**
+   * To put a notifications with transactional behavior. The notification will be processed on successful commit of the
+   * {@link ITransaction} surrounding the server call.
+   * This notification will be distributed to all client nodes.
+   *
+   * @param notification
+   */
+  public void putTransactionalForAllNodes(Serializable notification) {
+    NotificationMessage message = new NotificationMessage(NotficationAddress.createAllNodesAddress(
         Assertions.assertNotNull(ClientNotificationNodeId.CURRENT.get(), "No notification node id found on the thread context.")), notification);
     putTransactional(message);
   }
