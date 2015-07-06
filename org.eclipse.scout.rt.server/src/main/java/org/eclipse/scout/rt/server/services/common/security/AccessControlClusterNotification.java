@@ -16,16 +16,19 @@ import java.util.Set;
 
 import org.eclipse.scout.commons.CollectionUtility;
 
-public class AccessControlCacheChangedClusterNotification implements Serializable {
+/**
+ * Cluster notification for access control changes for a set of users.
+ */
+public class AccessControlClusterNotification implements Serializable {
   private static final long serialVersionUID = 128460814967537176L;
 
   private final Set<String> m_userIds;
 
-  public AccessControlCacheChangedClusterNotification() {
+  public AccessControlClusterNotification() {
     this(null);
   }
 
-  public AccessControlCacheChangedClusterNotification(Collection<String> userIds) {
+  public AccessControlClusterNotification(Collection<String> userIds) {
     m_userIds = CollectionUtility.hashSetWithoutNullElements(userIds);
   }
 
@@ -35,19 +38,7 @@ public class AccessControlCacheChangedClusterNotification implements Serializabl
 
   @Override
   public String toString() {
-    return "AccessControlCacheChangedClusterNotification [m_userIds=" + m_userIds + "]";
+    return "AccessControlClusterNotification [m_userIds=" + m_userIds + "]";
   }
 
-/* TODO JGU
-  @Override
-  public boolean coalesce(IClusterNotification existingNotification0) {
-    if (existingNotification0 instanceof AccessControlCacheChangedClusterNotification) {
-      AccessControlCacheChangedClusterNotification existingNotification = (AccessControlCacheChangedClusterNotification) existingNotification0;
-      m_userIds.addAll(existingNotification.getUserIds());
-      return true;
-    }
-    return false;
-  }
-
- */
 }
