@@ -37,14 +37,11 @@ import org.eclipse.scout.commons.nls.NlsLocale;
 import org.eclipse.scout.commons.security.SimplePrincipal;
 import org.eclipse.scout.rt.client.ClientConfigProperties.MemoryPolicyProperty;
 import org.eclipse.scout.rt.client.context.ClientRunContexts;
+import org.eclipse.scout.rt.client.context.SharedContextNotificationHanlder;
 import org.eclipse.scout.rt.client.extension.ClientSessionChains.ClientSessionLoadSessionChain;
 import org.eclipse.scout.rt.client.extension.ClientSessionChains.ClientSessionStoreSessionChain;
 import org.eclipse.scout.rt.client.extension.IClientSessionExtension;
 import org.eclipse.scout.rt.client.job.ClientJobs;
-import org.eclipse.scout.rt.client.job.ModelJobs;
-import org.eclipse.scout.rt.client.services.common.clientnotification.ClientNotificationConsumerEvent;
-import org.eclipse.scout.rt.client.services.common.clientnotification.IClientNotificationConsumerListener;
-import org.eclipse.scout.rt.client.services.common.clientnotification.IClientNotificationConsumerService;
 import org.eclipse.scout.rt.client.ui.ClientUIPreferences;
 import org.eclipse.scout.rt.client.ui.DataChangeListener;
 import org.eclipse.scout.rt.client.ui.desktop.DesktopListener;
@@ -61,6 +58,7 @@ import org.eclipse.scout.rt.shared.extension.AbstractExtension;
 import org.eclipse.scout.rt.shared.extension.IExtensibleObject;
 import org.eclipse.scout.rt.shared.extension.IExtension;
 import org.eclipse.scout.rt.shared.extension.ObjectExtensions;
+import org.eclipse.scout.rt.shared.notification.IClientNotificationListener;
 import org.eclipse.scout.rt.shared.services.common.context.SharedContextChangedNotification;
 import org.eclipse.scout.rt.shared.services.common.context.SharedVariableMap;
 import org.eclipse.scout.rt.shared.services.common.prefs.IPreferences;
@@ -248,33 +246,19 @@ public abstract class AbstractClientSession extends AbstractPropertyObserver imp
     }
 
     // add client notification listener
-    IClientNotificationConsumerService clientNotificationConsumerService = BEANS.get(IClientNotificationConsumerService.class);
-    if (clientNotificationConsumerService != null) {
-      clientNotificationConsumerService.addClientNotificationConsumerListener(this, new IClientNotificationConsumerListener() {
-        @Override
-        public void handleEvent(final ClientNotificationConsumerEvent e, boolean sync) {
-          if (e.getClientNotification().getClass() == SharedContextChangedNotification.class) {
-            final SharedContextChangedNotification notification = (SharedContextChangedNotification) e.getClientNotification();
-            if (sync) {
-              try {
-                updateSharedVariableMap(notification.getSharedVariableMap());
-              }
-              catch (Exception ex) {
-                LOG.error("update of shared contex", ex);
-              }
-            }
-            else {
-              ModelJobs.schedule(new IRunnable() {
-                @Override
-                public void run() throws Exception {
-                  updateSharedVariableMap(notification.getSharedVariableMap());
-                }
-              }, ModelJobs.newInput(ClientRunContexts.copyCurrent()).name("Update shared context"));
-            }
-          }
+    BEANS.get(SharedContextNotificationHanlder.class).addListener(new IClientNotificationListener<SharedContextChangedNotification>() {
+
+      @Override
+      public void handleNotification(SharedContextChangedNotification notification) {
+
+        try {
+          updateSharedVariableMap(notification.getSharedVariableMap());
         }
-      });
-    }
+        catch (Exception ex) {
+          LOG.error("update of shared contex", ex);
+        }
+      }
+    });
   }
 
   private void updateSharedVariableMap(SharedVariableMap newMap) {
