@@ -13,7 +13,6 @@ package org.eclipse.scout.rt.server;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.Date;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
@@ -29,13 +28,10 @@ import org.eclipse.scout.rt.platform.service.ServiceUtility;
 import org.eclipse.scout.rt.server.admin.inspector.CallInspector;
 import org.eclipse.scout.rt.server.admin.inspector.ProcessInspector;
 import org.eclipse.scout.rt.server.admin.inspector.SessionInspector;
-import org.eclipse.scout.rt.server.services.common.clientnotification.IClientNotificationService;
 import org.eclipse.scout.rt.server.session.ServerSessionProvider;
-import org.eclipse.scout.rt.server.transaction.AbstractTransactionMember;
 import org.eclipse.scout.rt.server.transaction.ITransaction;
 import org.eclipse.scout.rt.shared.ScoutTexts;
 import org.eclipse.scout.rt.shared.security.RemoteServiceAccessPermission;
-import org.eclipse.scout.rt.shared.services.common.clientnotification.IClientNotification;
 import org.eclipse.scout.rt.shared.services.common.security.ACCESS;
 import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelResponse;
 import org.eclipse.scout.rt.shared.servicetunnel.RemoteServiceAccessDenied;
@@ -135,11 +131,6 @@ public class DefaultTransactionDelegate {
     if (LOG.isDebugEnabled()) {
       LOG.debug("started " + serviceReq.getServiceInterfaceClassName() + "." + serviceReq.getOperation() + " by " + authenticatedUser + " at " + new Date());
     }
-    Set<String> consumedNotifications = serviceReq.getConsumedNotifications();
-    if (consumedNotifications != null && consumedNotifications.size() > 0) {
-      IClientNotificationService notificationService = BEANS.get(IClientNotificationService.class);
-      notificationService.ackNotifications(consumedNotifications);
-    }
     CallInspector callInspector = null;
     SessionInspector sessionInspector = ProcessInspector.instance().getSessionInspector(serverSession, true);
     if (sessionInspector != null) {
@@ -189,9 +180,6 @@ public class DefaultTransactionDelegate {
       }
       serviceRes = new ServiceTunnelResponse(data, outParameters, null);
 
-      // TODO[aho] write cliet notificaitons to response.
-//      serviceRes.setNotifications(NotificationContainer.get().getNotifications());
-      ITransaction.CURRENT.get().registerMember(new P_ClientNotificationTransactionMember(serviceRes));
       return serviceRes;
     }
     finally {
@@ -484,48 +472,6 @@ public class DefaultTransactionDelegate {
     else {
       LOG.error(String.format("Unexpected error while invoking service operation [%s]", serviceOperation), t);
     }
-  }
-
-  /**
-   * This transaction member ensures that the retrieval of client notifications is done at the last possible moment, and
-   * not during the normal duration of the transaction. Notifications are added to the global notification queue at
-   * commit-time, so this is in fact needed.
-   */
-  private static class P_ClientNotificationTransactionMember extends AbstractTransactionMember {
-
-    private static final String TRANSACTION_MEMBER_ID = P_ClientNotificationTransactionMember.class.getSimpleName();
-
-    private final ServiceTunnelResponse m_serviceTunnelResponse;
-
-    public P_ClientNotificationTransactionMember(ServiceTunnelResponse serviceRes) {
-      super(TRANSACTION_MEMBER_ID);
-      m_serviceTunnelResponse = serviceRes;
-    }
-
-    @Override
-    public boolean needsCommit() {
-      return true;
-    }
-
-    @Override
-    public boolean commitPhase1() {
-      return true;
-    }
-
-    @Override
-    public void commitPhase2() {
-    }
-
-    @Override
-    public void rollback() {
-    }
-
-    @Override
-    public void release() {
-      Set<IClientNotification> nextNotifications = BEANS.get(IClientNotificationService.class).getNextNotifications(0);
-      m_serviceTunnelResponse.setClientNotifications(nextNotifications);
-    }
-
   }
 
 }
