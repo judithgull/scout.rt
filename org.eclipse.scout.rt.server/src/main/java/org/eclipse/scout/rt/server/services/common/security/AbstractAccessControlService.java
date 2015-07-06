@@ -18,15 +18,9 @@ import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.platform.BEANS;
-import org.eclipse.scout.rt.platform.service.IService;
-import org.eclipse.scout.rt.server.services.common.clientnotification.IClientNotificationService;
-import org.eclipse.scout.rt.server.services.common.clientnotification.SingleUserFilter;
-import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotification;
-import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificationListener;
-import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificationListenerService;
-import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificationMessage;
 import org.eclipse.scout.rt.server.services.common.clustersync.IClusterSynchronizationService;
 import org.eclipse.scout.rt.server.transaction.ITransaction;
+import org.eclipse.scout.rt.shared.notification.INotificationHandler;
 import org.eclipse.scout.rt.shared.services.common.security.AbstractSharedAccessControlService;
 import org.eclipse.scout.rt.shared.services.common.security.AccessControlChangedNotification;
 import org.eclipse.scout.rt.shared.services.common.security.IAccessControlService;
@@ -35,7 +29,7 @@ import org.eclipse.scout.rt.shared.services.common.security.ResetAccessControlCh
 /**
  * Implementations should override {@link #execLoadPermissions()}
  */
-public abstract class AbstractAccessControlService extends AbstractSharedAccessControlService implements IClusterNotificationListenerService {
+public abstract class AbstractAccessControlService extends AbstractSharedAccessControlService implements INotificationHandler<AccessControlClusterNotification> {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractAccessControlService.class);
 
   @Override
@@ -51,13 +45,13 @@ public abstract class AbstractAccessControlService extends AbstractSharedAccessC
 
     //notify clients with a filter, that will be accepted nowhere:
     BEANS.get(IClientNotificationService.class).putNotification(new ResetAccessControlChangedNotification(), new SingleUserFilter(null, 0L));
-    distributeCluster(new AccessControlCacheChangedClusterNotification());
+    distributeCluster(new AccessControlClusterNotification());
   }
 
   @Override
   public void clearCacheOfUserIds(Collection<String> userIds) {
     clearCacheOfUserIdsNoFire(userIds);
-    distributeCluster(new AccessControlCacheChangedClusterNotification(userIds));
+    distributeCluster(new AccessControlClusterNotification(userIds));
 
     //notify clients:
     for (String userId : userIds) {
@@ -67,7 +61,7 @@ public abstract class AbstractAccessControlService extends AbstractSharedAccessC
     }
   }
 
-  protected void distributeCluster(IClusterNotification notification) {
+  protected void distributeCluster(Serializable notification) {
     IClusterSynchronizationService s = BEANS.opt(IClusterSynchronizationService.class);
     if (s != null) {
       try {
@@ -85,27 +79,13 @@ public abstract class AbstractAccessControlService extends AbstractSharedAccessC
   }
 
   @Override
-  public Class<? extends IService> getDefiningServiceInterface() {
-    return IAccessControlService.class;
+  public void handleNotification(AccessControlClusterNotification notification) {
+    if (notification.getUserIds().isEmpty()) {
+      clearCacheNoFire();
+    }
+    else {
+      clearCacheOfUserIdsNoFire(notification.getUserIds());
+    }
   }
 
-  @Override
-  public IClusterNotificationListener getClusterNotificationListener() {
-    return new IClusterNotificationListener() {
-
-      @Override
-      public void onNotification(IClusterNotificationMessage message) throws ProcessingException {
-        Serializable clusterNotification = message.getNotification();
-        if ((clusterNotification instanceof AccessControlCacheChangedClusterNotification)) {
-          AccessControlCacheChangedClusterNotification n = (AccessControlCacheChangedClusterNotification) clusterNotification;
-          if (n.getUserIds().isEmpty()) {
-            clearCacheNoFire();
-          }
-          else {
-            clearCacheOfUserIdsNoFire(n.getUserIds());
-          }
-        }
-      }
-    };
-  }
 }

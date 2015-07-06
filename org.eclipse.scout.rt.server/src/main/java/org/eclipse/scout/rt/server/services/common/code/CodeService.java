@@ -14,27 +14,25 @@ import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.annotations.Order;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.platform.BEANS;
-import org.eclipse.scout.rt.platform.service.IService;
+import org.eclipse.scout.rt.platform.exception.ExceptionHandler;
 import org.eclipse.scout.rt.server.Server;
-import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificationListener;
-import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificationListenerService;
-import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificationMessage;
 import org.eclipse.scout.rt.server.services.common.clustersync.IClusterSynchronizationService;
 import org.eclipse.scout.rt.server.session.ServerSessionProvider;
 import org.eclipse.scout.rt.server.transaction.ITransaction;
+import org.eclipse.scout.rt.shared.notification.INotificationHandler;
 import org.eclipse.scout.rt.shared.services.common.code.AbstractSharedCodeService;
 import org.eclipse.scout.rt.shared.services.common.code.CodeTypeChangedNotification;
-import org.eclipse.scout.rt.shared.services.common.code.ICodeService;
 import org.eclipse.scout.rt.shared.services.common.code.ICodeType;
 
 @Server
 @Order(2)
-public class CodeService extends AbstractSharedCodeService implements IClusterNotificationListenerService {
+public class CodeService extends AbstractSharedCodeService implements INotificationHandler<UnloadCodeTypeCacheClusterNotification> {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(CodeService.class);
 
   @Override
@@ -71,21 +69,13 @@ public class CodeService extends AbstractSharedCodeService implements IClusterNo
   }
 
   @Override
-  public IClusterNotificationListener getClusterNotificationListener() {
-    return new IClusterNotificationListener() {
-      @Override
-      public void onNotification(IClusterNotificationMessage message) throws ProcessingException {
-        Serializable clusterNotification = message.getNotification();
-        if (clusterNotification instanceof UnloadCodeTypeCacheClusterNotification) {
-          UnloadCodeTypeCacheClusterNotification n = (UnloadCodeTypeCacheClusterNotification) clusterNotification;
-          reloadCodeTypesNoFire(n.getTypes());
-        }
-      }
-    };
+  public void handleNotification(UnloadCodeTypeCacheClusterNotification notification) {
+    try {
+      reloadCodeTypesNoFire(CollectionUtility.arrayList(notification.getTypes()));
+    }
+    catch (ProcessingException e) {
+      BEANS.get(ExceptionHandler.class).handle(e);
+    }
   }
 
-  @Override
-  public Class<? extends IService> getDefiningServiceInterface() {
-    return ICodeService.class;
-  }
 }
