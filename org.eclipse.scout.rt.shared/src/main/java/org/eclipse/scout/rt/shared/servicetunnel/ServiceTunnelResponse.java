@@ -11,11 +11,8 @@
 package org.eclipse.scout.rt.shared.servicetunnel;
 
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Set;
 
-import org.eclipse.scout.commons.CollectionUtility;
-import org.eclipse.scout.rt.shared.services.common.clientnotification.IClientNotification;
 import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
 
 public class ServiceTunnelResponse implements IServiceTunnelResponse {
@@ -24,7 +21,6 @@ public class ServiceTunnelResponse implements IServiceTunnelResponse {
   private final Object m_data;
   private final Object[] m_outVars;
   private final Throwable m_exception;
-  private Set<IClientNotification> m_clientNotifications;
   // added in 3.1.17
   private volatile Long m_processingDuration;
 
@@ -49,15 +45,6 @@ public class ServiceTunnelResponse implements IServiceTunnelResponse {
   @Override
   public Throwable getException() {
     return m_exception;
-  }
-
-  @Override
-  public Set<IClientNotification> getClientNotifications() {
-    return CollectionUtility.hashSet(m_clientNotifications);
-  }
-
-  public void setClientNotifications(Collection<? extends IClientNotification> clientNotifications) {
-    m_clientNotifications = CollectionUtility.hashSet(clientNotifications);
   }
 
   @Override
