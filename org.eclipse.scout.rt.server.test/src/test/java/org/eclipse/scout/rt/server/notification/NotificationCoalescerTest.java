@@ -34,11 +34,21 @@ public class NotificationCoalescerTest {
     assertTrue(res.isEmpty());
   }
 
+  @Test
+  public void testAccessControlCoalesce_empty() throws Exception {
+    HashSet<AccessControlClusterNotification> testNotifications = CollectionUtility.hashSet(new AccessControlClusterNotification());
+    Set<? extends Serializable> res = BEANS.get(NotificationCoalescer.class).coalesce(testNotifications);
+
+    assertEquals(1, res.size());
+    AccessControlClusterNotification firstNotification = (AccessControlClusterNotification) res.iterator().next();
+    assertTrue(firstNotification.getUserIds().isEmpty());
+  }
+
   /**
    * Tests that AccessControlClusterNotification are coalesced to one notification containing all users.
    */
   @Test
-  public void test() {
+  public void testAccessControlCoalesce() {
     AccessControlClusterNotification n1 = new AccessControlClusterNotification(CollectionUtility.hashSet("user1", "user2"));
     AccessControlClusterNotification n2 = new AccessControlClusterNotification(CollectionUtility.hashSet("user1", "user3"));
     AccessControlClusterNotification n3 = new AccessControlClusterNotification();

@@ -30,10 +30,19 @@ public class AccessControlClusterCoalescer implements INotificationCoalescer<Acc
    */
   @Override
   public Set<AccessControlClusterNotification> coalesce(Set<AccessControlClusterNotification> notifications) {
+    if (notifications.isEmpty()) {
+      return CollectionUtility.emptyHashSet();
+    }
+
+    Set<String> userIds = collectUserIds(notifications);
+    return CollectionUtility.hashSet(new AccessControlClusterNotification(userIds));
+  }
+
+  private Set<String> collectUserIds(Set<AccessControlClusterNotification> notifications) {
     Set<String> userIds = new HashSet<String>();
     for (AccessControlClusterNotification notification : notifications) {
       userIds.addAll(notification.getUserIds());
     }
-    return CollectionUtility.hashSet(new AccessControlClusterNotification(userIds));
+    return userIds;
   }
 }
