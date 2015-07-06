@@ -119,16 +119,28 @@ public class ClusterSynchronizationService extends AbstractService implements IC
     return m_listenerList;
   }
 
+  /**
+   * @deprecated use {@link INotificationHandler}
+   */
+  @Deprecated
   @Override
   public void addListener(IClusterNotificationListener listener) {
     m_listenerList.add(IClusterNotificationListener.class, listener);
   }
 
+  /**
+   * @deprecated use {@link INotificationHandler}
+   */
+  @Deprecated
   @Override
   public void removeListener(IClusterNotificationListener listener) {
     m_listenerList.remove(IClusterNotificationListener.class, listener);
   }
 
+  /**
+   * @deprecated use {@link INotificationHandler}
+   */
+  @Deprecated
   protected IClusterNotificationListener[] getListeners() {
     return getListenerList().getListeners(IClusterNotificationListener.class);
   }

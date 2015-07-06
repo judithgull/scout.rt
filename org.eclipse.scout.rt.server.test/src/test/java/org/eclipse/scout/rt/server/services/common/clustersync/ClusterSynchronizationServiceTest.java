@@ -26,7 +26,11 @@ import org.eclipse.scout.rt.platform.IBean;
 import org.eclipse.scout.rt.server.TestServerSession;
 import org.eclipse.scout.rt.server.services.common.clustersync.internal.ClusterNotificationMessage;
 import org.eclipse.scout.rt.server.services.common.clustersync.internal.ClusterNotificationMessageProperties;
+import org.eclipse.scout.rt.server.services.common.code.UnloadCodeTypeCacheClusterNotification;
+import org.eclipse.scout.rt.server.services.common.security.AccessControlClusterNotification;
 import org.eclipse.scout.rt.server.transaction.ITransaction;
+import org.eclipse.scout.rt.shared.services.common.code.AbstractCodeType;
+import org.eclipse.scout.rt.shared.services.common.code.ICodeType;
 import org.eclipse.scout.rt.testing.platform.runner.RunWithSubject;
 import org.eclipse.scout.rt.testing.server.runner.RunWithServerSession;
 import org.eclipse.scout.rt.testing.server.runner.ServerTestRunner;
@@ -151,6 +155,19 @@ public class ClusterSynchronizationServiceTest {
     assertNoMessageSent();
   }
 
+  @Test
+  public void testTransactionalWithCoalesce() throws Exception {
+    m_svc.publishTransactional(new AccessControlClusterNotification());
+    m_svc.publishTransactional(new AccessControlClusterNotification());
+    ArrayList<Class<? extends ICodeType<?, ?>>> codeTypes = new ArrayList<>();
+    codeTypes.add(TestCodeType.class);
+    m_svc.publishTransactional(new UnloadCodeTypeCacheClusterNotification(codeTypes));
+    ITransaction.CURRENT.get().commitPhase1();
+    ITransaction.CURRENT.get().commitPhase2();
+    verify(m_messageService, times(1)).publishNotifications(any(List.class));
+    assertEquals(2, m_svc.getStatusInfo().getSentMessageCount());
+  }
+
   @SuppressWarnings("unchecked")
   private void assertNoMessageSent() {
     verify(m_messageService, never()).publishNotifications(any(List.class));
@@ -172,6 +189,14 @@ public class ClusterSynchronizationServiceTest {
     assertEquals(0, status.getSentMessageCount());
     assertEquals(null, status.getLastChangedOriginNodeId());
     assertEquals(null, status.getLastChangedUserId());
+  }
+
+  class TestCodeType extends AbstractCodeType<Long, Long> {
+
+    @Override
+    public Long getId() {
+      return null;
+    }
   }
 
 }
