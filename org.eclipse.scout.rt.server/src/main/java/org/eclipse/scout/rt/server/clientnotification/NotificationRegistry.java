@@ -151,7 +151,7 @@ public class NotificationRegistry {
         queue.put(message);
       }
     }
-    // TODO aho/jgu clustersync
+    distributeCluster(message);
   }
 
   /**
@@ -215,10 +215,10 @@ public class NotificationRegistry {
     }
   }
 
-  private void distributeCluster(NotificationMessage message) {
+  private void distributeCluster(Collection<? extends NotificationMessage> messages) {
     try {
       IClusterSynchronizationService service = BEANS.get(IClusterSynchronizationService.class);
-      service.publish(new ClientNotificationClusterNotification(message));
+      service.publish(new ClientNotificationClusterNotification(messages));
     }
     catch (ProcessingException e) {
       LOG.error("Error distributing cluster notification ", e);

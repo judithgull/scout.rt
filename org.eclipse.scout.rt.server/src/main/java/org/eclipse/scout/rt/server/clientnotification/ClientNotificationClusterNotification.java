@@ -11,6 +11,7 @@
 package org.eclipse.scout.rt.server.clientnotification;
 
 import java.io.Serializable;
+import java.util.Collection;
 
 import org.eclipse.scout.commons.ToStringBuilder;
 import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
@@ -20,20 +21,20 @@ import org.eclipse.scout.rt.shared.services.common.notification.NotificationMess
  */
 public class ClientNotificationClusterNotification implements Serializable {
   private static final long serialVersionUID = -8513131031858145786L;
-  private final NotificationMessage m_cnMessage;
+  private final Collection<? extends NotificationMessage> m_cnMessages;
 
-  public ClientNotificationClusterNotification(NotificationMessage message) {
-    m_cnMessage = message;
+  public ClientNotificationClusterNotification(Collection<? extends NotificationMessage> messages) {
+    m_cnMessages = messages;
   }
 
-  public NotificationMessage getClientNotificationMessage() {
-    return m_cnMessage;
+  public Collection<? extends NotificationMessage> getClientNotificationMessages() {
+    return m_cnMessages;
   }
 
   @Override
   public String toString() {
     ToStringBuilder tsb = new ToStringBuilder(this);
-    tsb.attr("ClientNotificationMessage", m_cnMessage);
+    tsb.attr("ClientNotificationMessage", m_cnMessages);
     return tsb.toString();
   }
 

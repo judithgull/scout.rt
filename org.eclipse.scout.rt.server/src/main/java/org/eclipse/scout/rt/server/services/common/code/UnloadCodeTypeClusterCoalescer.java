@@ -15,12 +15,14 @@ import java.util.List;
 import java.util.Set;
 
 import org.eclipse.scout.commons.CollectionUtility;
+import org.eclipse.scout.rt.platform.Bean;
 import org.eclipse.scout.rt.server.notification.INotificationCoalescer;
 import org.eclipse.scout.rt.shared.services.common.code.ICodeType;
 
 /**
  * Coalesce {@link UnloadCodeTypeCacheClusterNotification}s.
  */
+@Bean
 public class UnloadCodeTypeClusterCoalescer implements INotificationCoalescer<UnloadCodeTypeCacheClusterNotification> {
 
   /**

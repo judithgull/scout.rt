@@ -14,15 +14,11 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.eclipse.scout.commons.CollectionUtility;
-import org.eclipse.scout.rt.platform.ApplicationScoped;
-import org.eclipse.scout.rt.platform.Bean;
 import org.eclipse.scout.rt.server.notification.INotificationCoalescer;
 
 /**
  * Coalesce {@link AccessControlClusterNotification}s.
  */
-@Bean
-@ApplicationScoped
 public class AccessControlClusterCoalescer implements INotificationCoalescer<AccessControlClusterNotification> {
 
   /**

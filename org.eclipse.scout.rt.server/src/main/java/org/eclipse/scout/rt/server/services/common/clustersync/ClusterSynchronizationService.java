@@ -48,7 +48,6 @@ import org.eclipse.scout.rt.server.session.ServerSessionProvider;
 import org.eclipse.scout.rt.server.session.ServerSessionProviderWithCache;
 import org.eclipse.scout.rt.server.transaction.AbstractTransactionMember;
 import org.eclipse.scout.rt.server.transaction.ITransaction;
-import org.eclipse.scout.rt.shared.notification.INotificationHandler;
 import org.eclipse.scout.rt.shared.notification.NotificationHandlerRegistry;
 
 public class ClusterSynchronizationService extends AbstractService implements IClusterSynchronizationService, IPublishSubscribeMessageListener {
@@ -308,7 +307,7 @@ public class ClusterSynchronizationService extends AbstractService implements IC
     ITransaction tx = Assertions.assertNotNull(ITransaction.CURRENT.get(), "Transaction required");
     ClusterSynchTransactionMember m = (ClusterSynchTransactionMember) tx.getMember(TRANSACTION_MEMBER_ID);
     if (m == null) {
-      m = new ClusterSynchTransactionMember(TRANSACTION_MEMBER_ID, m_statusInfo);
+      m = new ClusterSynchTransactionMember(TRANSACTION_MEMBER_ID);
       tx.registerMember(m);
     }
     return m;
@@ -318,30 +317,17 @@ public class ClusterSynchronizationService extends AbstractService implements IC
    * Transaction member that notifies other cluster nodes after the causing Scout transaction has been committed. This
    * ensures that other cluster nodes are not informed too early.
    */
-  protected class ClusterSynchTransactionMember extends AbstractTransactionMember {
-    private final List<IClusterNotificationMessage> m_messageQueue;
-    private final ClusterNodeStatusInfo m_statusInfo;
+  private class ClusterSynchTransactionMember extends AbstractTransactionMember {
+    private List<IClusterNotificationMessage> m_messageQueue;
 
-    public ClusterSynchTransactionMember(String transactionId, ClusterNodeStatusInfo statusInfo) throws ProcessingException {
+    public ClusterSynchTransactionMember(String transactionId) throws ProcessingException {
       super(transactionId);
       m_messageQueue = new LinkedList<IClusterNotificationMessage>();
-      m_statusInfo = statusInfo;
-    }
-
-    protected ClusterNodeStatusInfo getStatusInfoInternal() {
-      return m_statusInfo;
     }
 
     public synchronized void addMessage(IClusterNotificationMessage m) {
-      //TODO coalesce
-      // check if new message can be merged with existing or if it is replacing a new one
-//      for (Iterator<IClusterNotificationMessage> it = m_messageQueue.iterator(); it.hasNext();) {
-//        IClusterNotificationMessage existingElem = it.next();
-//        if (existingElem.coalesce(m)) {
-//          it.remove();
-//        }
-//      }
       m_messageQueue.add(m);
+      m_messageQueue = BEANS.get(ClusterNotificationMessageCoalescer.class).coalesce(m_messageQueue);
     }
 
     @Override
