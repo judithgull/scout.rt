@@ -12,9 +12,12 @@ package org.eclipse.scout.rt.server.services.common.clustersync;
 
 import java.util.List;
 
+import org.eclipse.scout.rt.platform.ApplicationScoped;
+
 /**
  *
  */
+@ApplicationScoped
 public class ClusterNotificationMessageCoalescer {
 
   //TODO

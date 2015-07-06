@@ -22,6 +22,7 @@ import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.exception.ExceptionHandler;
 import org.eclipse.scout.rt.server.Server;
+import org.eclipse.scout.rt.server.clientnotification.NotificationRegistry;
 import org.eclipse.scout.rt.server.services.common.clustersync.IClusterSynchronizationService;
 import org.eclipse.scout.rt.server.session.ServerSessionProvider;
 import org.eclipse.scout.rt.server.transaction.ITransaction;
@@ -46,8 +47,7 @@ public class CodeService extends AbstractSharedCodeService implements INotificat
 
   @Override
   protected void notifyReloadCodeTypes(List<Class<? extends ICodeType<?, ?>>> codetypeList) throws ProcessingException {
-    // notify clients:
-    BEANS.get(IClientNotificationService.class).putNotification(new CodeTypeChangedNotification(codetypeList), new AllUserFilter(AllUserFilter.DEFAULT_TIMEOUT));
+    BEANS.get(NotificationRegistry.class).putTransactionalForAllSessions(new CodeTypeChangedNotification(codetypeList));
     distributeCluster(new UnloadCodeTypeCacheClusterNotification(codetypeList));
   }
 

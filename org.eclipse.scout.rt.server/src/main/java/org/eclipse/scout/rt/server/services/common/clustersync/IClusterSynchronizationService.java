@@ -26,7 +26,7 @@ public interface IClusterSynchronizationService extends IService {
   void publish(Serializable notification) throws ProcessingException;
 
   /**
-   * Publish a message with the given notification for the other server nodes.
+   * Publish a message with the given notification for the other server nodes, if the transaction is commited.
    */
   void publishTransactional(Serializable notification) throws ProcessingException;
 
