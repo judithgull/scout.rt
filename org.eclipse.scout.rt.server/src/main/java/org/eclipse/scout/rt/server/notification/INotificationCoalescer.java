@@ -27,7 +27,7 @@ public interface INotificationCoalescer<NOTIFICATION extends Serializable> {
   /**
    * @param notifications
    *          all notifications to coalesce.
-   * @return a coalesced set of notifications.
+   * @return a coalesced set of notifications. Never <code>null</code>.
    */
   Set<NOTIFICATION> coalesce(Set<NOTIFICATION> notifications);
 
