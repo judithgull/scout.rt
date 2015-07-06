@@ -7,6 +7,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import javax.annotation.PostConstruct;
 
@@ -24,8 +26,10 @@ public class NotificationHandlerRegistry {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(NotificationHandlerRegistry.class);
 
   private final Map<Class<? extends Serializable> /*notification class*/, List<INotificationHandler<? extends Serializable>>> m_notificationClassToHandler = new HashMap<>();
+  protected final ReadWriteLock m_classToHandlerLock = new ReentrantReadWriteLock();
+
   private final Map<Class<? extends Serializable> /*notification class*/, List<INotificationHandler<? extends Serializable>>> m_cachedHandlers = new HashMap<>();
-  private final Object m_cacheLock = new Object();
+  protected final ReadWriteLock m_cachedHandlerLock = new ReentrantReadWriteLock();
 
   /**
    * builds a linking of all handlers generic types to handlers. This is used to find the corresponding handler of a
@@ -35,14 +39,21 @@ public class NotificationHandlerRegistry {
   @PostConstruct
   protected void buildHandlerLinking() {
     List<INotificationHandler> notificationHandlers = BEANS.all(INotificationHandler.class);
-    for (INotificationHandler<?> notificationHandler : notificationHandlers) {
-      Class notificationClass = TypeCastUtility.getGenericsParameterClass(notificationHandler.getClass(), INotificationHandler.class);
-      List<INotificationHandler<?>> handlerList = m_notificationClassToHandler.get(notificationClass);
-      if (handlerList == null) {
-        handlerList = new LinkedList<>();
-        m_notificationClassToHandler.put(notificationClass, handlerList);
+    m_classToHandlerLock.writeLock().lock();
+    try {
+
+      for (INotificationHandler<?> notificationHandler : notificationHandlers) {
+        Class notificationClass = TypeCastUtility.getGenericsParameterClass(notificationHandler.getClass(), INotificationHandler.class);
+        List<INotificationHandler<?>> handlerList = m_notificationClassToHandler.get(notificationClass);
+        if (handlerList == null) {
+          handlerList = new LinkedList<>();
+          m_notificationClassToHandler.put(notificationClass, handlerList);
+        }
+        handlerList.add(notificationHandler);
       }
-      handlerList.add(notificationHandler);
+    }
+    finally {
+      m_classToHandlerLock.writeLock().unlock();
     }
   }
 
@@ -66,24 +77,49 @@ public class NotificationHandlerRegistry {
   }
 
   protected List<INotificationHandler<? extends Serializable>> getHandlers(Class<? extends Serializable> notificationClass) {
-    synchronized (m_cacheLock) {
-      List<INotificationHandler<? extends Serializable>> notificationHandlers = m_cachedHandlers.get(notificationClass);
-      if (notificationHandlers == null) {
-        notificationHandlers = findHandlers(notificationClass);
-        m_cachedHandlers.put(notificationClass, notificationHandlers);
-      }
-      return new ArrayList<INotificationHandler<? extends Serializable>>(notificationHandlers);
+    List<INotificationHandler<? extends Serializable>> handlers = getCachedHandlers(notificationClass);
+    if (handlers != null) {
+      return new ArrayList<INotificationHandler<? extends Serializable>>(handlers);
+    }
+    else {
+      handlers = findHandlers(notificationClass);
+      cacheHandlers(notificationClass, handlers);
+      return new ArrayList<INotificationHandler<? extends Serializable>>(handlers);
+    }
+  }
+
+  private List<INotificationHandler<? extends Serializable>> getCachedHandlers(Class<? extends Serializable> notificationClass) {
+    m_cachedHandlerLock.readLock().lock();
+    try {
+      return m_cachedHandlers.get(notificationClass);
+    }
+    finally {
+      m_cachedHandlerLock.readLock().unlock();
+    }
+  }
+
+  private void cacheHandlers(Class<? extends Serializable> notificationClass, List<INotificationHandler<? extends Serializable>> notificationHandlers) {
+    m_cachedHandlerLock.writeLock().lock();
+    try {
+      m_cachedHandlers.put(notificationClass, notificationHandlers);
+    }
+    finally {
+      m_cachedHandlerLock.writeLock().unlock();
     }
   }
 
   protected List<INotificationHandler<? extends Serializable>> findHandlers(Class<? extends Serializable> notificationClass) {
     List<INotificationHandler<? extends Serializable>> handlers = new LinkedList<>();
-    synchronized (m_cacheLock) {
+    m_classToHandlerLock.readLock().lock();
+    try {
       for (Entry<Class<? extends Serializable> /*notification class*/, List<INotificationHandler<? extends Serializable>>> e : m_notificationClassToHandler.entrySet()) {
         if (e.getKey().isAssignableFrom(notificationClass)) {
           handlers.addAll(e.getValue());
         }
       }
+    }
+    finally {
+      m_classToHandlerLock.readLock().unlock();
     }
     return handlers;
   }
