@@ -50,7 +50,7 @@ public class NotificationClientService implements INotificationClientService {
 
   @Override
   public void registerClientSession(IClientSession clientSession) {
-    if (BEANS.get(IServiceTunnel.class).isActive()) {
+    if (BEANS.get(IServiceTunnel.class).isActive() && BEANS.opt(INotificationServerService.class) != null) {
       clientSession.addListener(m_clientSessionStateListener);
       // if the client session is already started, otherwise the listener will invoke the clientSessionStated method.
       if (clientSession.isActive()) {

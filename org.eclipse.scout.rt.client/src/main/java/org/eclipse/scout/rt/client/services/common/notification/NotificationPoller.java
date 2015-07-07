@@ -43,7 +43,7 @@ public class NotificationPoller {
 
   @PostConstruct
   protected void setup() {
-    if (BEANS.get(IServiceTunnel.class).isActive()) {
+    if (BEANS.get(IServiceTunnel.class).isActive() && BEANS.opt(INotificationServerService.class) != null) {
       P_NotificationPollJob pollJob = new P_NotificationPollJob();
       m_pollerFuture = Jobs.schedule(pollJob, Jobs.newInput(ClientRunContexts.copyCurrent().subject(BEANS.get(NotificationSubjectProperty.class).getValue()).userAgent(UserAgent.createDefault()).session(null, false)));
     }

@@ -246,7 +246,7 @@ public abstract class AbstractClientSession extends AbstractPropertyObserver imp
     }
 
     // add client notification listener
-    BEANS.get(SharedContextNotificationHanlder.class).addListener(new IClientNotificationListener<SharedContextChangedNotification>() {
+    BEANS.get(SharedContextNotificationHanlder.class).addListener(this, new IClientNotificationListener<SharedContextChangedNotification>() {
 
       @Override
       public void handleNotification(SharedContextChangedNotification notification) {

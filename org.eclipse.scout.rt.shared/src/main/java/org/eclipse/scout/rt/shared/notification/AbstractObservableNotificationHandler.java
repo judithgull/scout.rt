@@ -46,9 +46,12 @@ public abstract class AbstractObservableNotificationHandler<T extends Serializab
    * @param listener
    */
   public void addListener(IClientNotificationListener<T> listener) {
-    ISession session = Assertions.assertNotNull(ISession.CURRENT.get());
+    addListener(ISession.CURRENT.get(), listener);
+  }
+
+  public void addListener(ISession session, IClientNotificationListener<T> listener) {
     synchronized (m_listeners) {
-      List<IClientNotificationListener<T>> listeners = m_listeners.get(session);
+      List<IClientNotificationListener<T>> listeners = m_listeners.get(Assertions.assertNotNull(session));
       if (listeners == null) {
         listeners = new ArrayList<>();
         m_listeners.put(session, listeners);
@@ -58,9 +61,12 @@ public abstract class AbstractObservableNotificationHandler<T extends Serializab
   }
 
   public void removeListener(IClientNotificationListener<T> listener) {
-    ISession session = Assertions.assertNotNull(ISession.CURRENT.get());
+    removeListener(ISession.CURRENT.get(), listener);
+  }
+
+  public void removeListener(ISession session, IClientNotificationListener<T> listener) {
     synchronized (m_listeners) {
-      List<IClientNotificationListener<T>> listeners = m_listeners.get(session);
+      List<IClientNotificationListener<T>> listeners = m_listeners.get(Assertions.assertNotNull(session));
       if (listeners != null) {
         listeners.remove(listener);
       }
