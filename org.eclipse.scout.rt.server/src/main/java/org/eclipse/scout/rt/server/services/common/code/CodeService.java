@@ -49,7 +49,7 @@ public class CodeService extends AbstractSharedCodeService implements INotificat
   protected void notifyReloadCodeTypes(List<Class<? extends ICodeType<?, ?>>> codetypeList) throws ProcessingException {
     BEANS.get(NotificationRegistry.class).putTransactionalForAllSessions(new CodeTypeChangedNotification(codetypeList));
     distributeCluster(new UnloadCodeTypeCacheClusterNotification(codetypeList));
-  } 
+  }
 
   protected void distributeCluster(Serializable notification) {
     IClusterSynchronizationService s = BEANS.opt(IClusterSynchronizationService.class);
@@ -77,5 +77,5 @@ public class CodeService extends AbstractSharedCodeService implements INotificat
       BEANS.get(ExceptionHandler.class).handle(e);
     }
   }
- 
+
 }

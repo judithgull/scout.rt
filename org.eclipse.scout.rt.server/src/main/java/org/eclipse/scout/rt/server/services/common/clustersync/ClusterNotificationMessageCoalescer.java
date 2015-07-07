@@ -13,11 +13,9 @@ package org.eclipse.scout.rt.server.services.common.clustersync;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 
 import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.rt.platform.ApplicationScoped;
@@ -34,23 +32,23 @@ public class ClusterNotificationMessageCoalescer {
   public List<IClusterNotificationMessage> coalesce(List<IClusterNotificationMessage> inNotifications) {
     List<IClusterNotificationMessage> result = new ArrayList<>();
     // sort by properties
-    Map<IClusterNotificationMessageProperties, Set<Serializable>> notificationsPerProps = new HashMap<>();
+    Map<IClusterNotificationMessageProperties, List<Serializable>> notificationsPerProps = new HashMap<>();
     for (IClusterNotificationMessage message : inNotifications) {
-      Set<Serializable> messages = notificationsPerProps.get(message.getProperties());
+      List<Serializable> messages = notificationsPerProps.get(message.getProperties());
       if (messages == null) {
-        messages = new HashSet<>();
+        messages = new ArrayList<>();
         notificationsPerProps.put(message.getProperties(), messages);
       }
       messages.add(message.getNotification());
     }
 
-    for (Entry<IClusterNotificationMessageProperties, Set<Serializable>> e : notificationsPerProps.entrySet()) {
+    for (Entry<IClusterNotificationMessageProperties, List<Serializable>> e : notificationsPerProps.entrySet()) {
       result.addAll(coalesce(e.getKey(), e.getValue()));
     }
     return result;
   }
 
-  protected List<IClusterNotificationMessage> coalesce(IClusterNotificationMessageProperties props, Set<Serializable> notificationsIn) {
+  protected List<IClusterNotificationMessage> coalesce(IClusterNotificationMessageProperties props, List<Serializable> notificationsIn) {
     if (notificationsIn.isEmpty()) {
       return new ArrayList<>();
     }
@@ -60,7 +58,7 @@ public class ClusterNotificationMessageCoalescer {
       return CollectionUtility.arrayList(message);
     }
     else {
-      Set<? extends Serializable> outNotifications = BEANS.get(NotificationCoalescer.class).coalesce(notificationsIn);
+      List<? extends Serializable> outNotifications = BEANS.get(NotificationCoalescer.class).coalesce(notificationsIn);
       List<IClusterNotificationMessage> result = new ArrayList<>();
       for (Serializable n : outNotifications) {
         result.add(new ClusterNotificationMessage(n, props));

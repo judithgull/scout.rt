@@ -57,7 +57,7 @@ public class NotificationCoalescer {
     List<ICoalescer> notificationCoalescers = BEANS.all(ICoalescer.class);
     for (ICoalescer<?> notificationCoalescer : notificationCoalescers) {
       Class notificationClass = TypeCastUtility.getGenericsParameterClass(notificationCoalescer.getClass(), ICoalescer.class);
-      if (notificationClass.isAssignableFrom(Serializable.class)) {
+      if (Serializable.class.isAssignableFrom(notificationClass)) {
 
         Set<ICoalescer<? extends Serializable>> coalescerSet = m_notificationClassToCoalescer.get(notificationClass);
         if (coalescerSet == null) {
@@ -97,8 +97,8 @@ public class NotificationCoalescer {
     return coalescers;
   }
 
-  public Set<? extends Serializable> coalesce(Set<? extends Serializable> notificationsIn) {
-    Set<? extends Serializable> notifications = new HashSet<>(notificationsIn);
+  public List<? extends Serializable> coalesce(List<? extends Serializable> notificationsIn) {
+    List<? extends Serializable> notifications = new ArrayList<>(notificationsIn);
     List<ICoalescer> notificationCoalescers = BEANS.all(ICoalescer.class);
     for (ICoalescer notificationCoalescer : notificationCoalescers) {
       notifications = coalesce(notificationCoalescer, notifications);
@@ -108,7 +108,7 @@ public class NotificationCoalescer {
   }
 
   @SuppressWarnings("unchecked")
-  protected Set<? extends Serializable> coalesce(ICoalescer coalescer, Set<? extends Serializable> notifications) {
+  protected List<? extends Serializable> coalesce(ICoalescer coalescer, List<? extends Serializable> notifications) {
     List<Serializable> toCoalesceNotificaitons = new ArrayList<>();
     Iterator<? extends Serializable> notificationIt = notifications.iterator();
     while (notificationIt.hasNext()) {

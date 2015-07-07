@@ -11,11 +11,11 @@
 package org.eclipse.scout.rt.server.clientnotification;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 
 import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.rt.platform.ApplicationScoped;
@@ -30,35 +30,35 @@ import org.eclipse.scout.rt.shared.services.common.notification.NotificationMess
 @ApplicationScoped
 public class ClientNotificationCoalescer {
 
-  public Set<NotificationMessage> coalesce(Set<NotificationMessage> inNotifications) {
-    Set<NotificationMessage> result = new HashSet<>();
+  public List<NotificationMessage> coalesce(List<NotificationMessage> inNotifications) {
+    List<NotificationMessage> result = new ArrayList<>();
     // sort by address
-    Map<NotficationAddress, Set<Serializable>> notificationsPerAddress = new HashMap<>();
+    Map<NotficationAddress, List<Serializable>> notificationsPerAddress = new HashMap<>();
     for (NotificationMessage message : inNotifications) {
-      Set<Serializable> notifications = notificationsPerAddress.get(message.getAddress());
+      List<Serializable> notifications = notificationsPerAddress.get(message.getAddress());
       if (notifications == null) {
-        notifications = new HashSet<>();
+        notifications = new ArrayList<>();
         notificationsPerAddress.put(message.getAddress(), notifications);
       }
       notifications.add(message.getNotification());
     }
-    for (Entry<NotficationAddress, Set<Serializable>> e : notificationsPerAddress.entrySet()) {
+    for (Entry<NotficationAddress, List<Serializable>> e : notificationsPerAddress.entrySet()) {
       result.addAll(coalesce(e.getKey(), e.getValue()));
     }
     return result;
   }
 
-  protected Set<NotificationMessage> coalesce(NotficationAddress address, Set<Serializable> notificationsIn) {
+  protected List<NotificationMessage> coalesce(NotficationAddress address, List<Serializable> notificationsIn) {
     if (notificationsIn.isEmpty()) {
-      return new HashSet<>();
+      return new ArrayList<>();
     }
     else if (notificationsIn.size() == 1) {
       // no coalesce needed
-      return CollectionUtility.hashSet(new NotificationMessage(address, CollectionUtility.firstElement(notificationsIn)));
+      return CollectionUtility.arrayList(new NotificationMessage(address, CollectionUtility.firstElement(notificationsIn)));
     }
     else {
-      Set<? extends Serializable> outNotifications = BEANS.get(NotificationCoalescer.class).coalesce(notificationsIn);
-      Set<NotificationMessage> result = new HashSet<>();
+      List<? extends Serializable> outNotifications = BEANS.get(NotificationCoalescer.class).coalesce(notificationsIn);
+      List<NotificationMessage> result = new ArrayList<>();
       for (Serializable n : outNotifications) {
         result.add(new NotificationMessage(address, n));
       }

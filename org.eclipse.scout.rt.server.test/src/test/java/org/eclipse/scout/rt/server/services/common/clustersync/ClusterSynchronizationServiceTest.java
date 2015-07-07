@@ -155,6 +155,7 @@ public class ClusterSynchronizationServiceTest {
     assertNoMessageSent();
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void testTransactionalWithCoalesce() throws Exception {
     m_svc.publishTransactional(new AccessControlClusterNotification());
@@ -192,6 +193,8 @@ public class ClusterSynchronizationServiceTest {
   }
 
   class TestCodeType extends AbstractCodeType<Long, Long> {
+
+    private static final long serialVersionUID = 1L;
 
     @Override
     public Long getId() {

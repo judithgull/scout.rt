@@ -14,8 +14,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.Serializable;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.rt.platform.BEANS;
@@ -30,14 +30,14 @@ public class NotificationCoalescerTest {
 
   @Test
   public void testCoalesceEmptySet() {
-    Set<? extends Serializable> res = BEANS.get(NotificationCoalescer.class).coalesce(new HashSet<Serializable>());
+    List<? extends Serializable> res = BEANS.get(NotificationCoalescer.class).coalesce(new ArrayList<Serializable>());
     assertTrue(res.isEmpty());
   }
 
   @Test
   public void testAccessControlCoalesce_empty() throws Exception {
-    HashSet<AccessControlClusterNotification> testNotifications = CollectionUtility.hashSet(new AccessControlClusterNotification());
-    Set<? extends Serializable> res = BEANS.get(NotificationCoalescer.class).coalesce(testNotifications);
+    List<AccessControlClusterNotification> testNotifications = CollectionUtility.arrayList(new AccessControlClusterNotification());
+    List<? extends Serializable> res = BEANS.get(NotificationCoalescer.class).coalesce(testNotifications);
 
     assertEquals(1, res.size());
     AccessControlClusterNotification firstNotification = (AccessControlClusterNotification) res.iterator().next();
@@ -52,9 +52,9 @@ public class NotificationCoalescerTest {
     AccessControlClusterNotification n1 = new AccessControlClusterNotification(CollectionUtility.hashSet("user1", "user2"));
     AccessControlClusterNotification n2 = new AccessControlClusterNotification(CollectionUtility.hashSet("user1", "user3"));
     AccessControlClusterNotification n3 = new AccessControlClusterNotification();
-    HashSet<AccessControlClusterNotification> testNotifications = CollectionUtility.hashSet(n1, n2, n3);
+    List<AccessControlClusterNotification> testNotifications = CollectionUtility.arrayList(n1, n2, n3);
 
-    Set<? extends Serializable> res = BEANS.get(NotificationCoalescer.class).coalesce(testNotifications);
+    List<? extends Serializable> res = BEANS.get(NotificationCoalescer.class).coalesce(testNotifications);
 
     assertEquals(1, res.size());
     AccessControlClusterNotification firstNotification = (AccessControlClusterNotification) res.iterator().next();
