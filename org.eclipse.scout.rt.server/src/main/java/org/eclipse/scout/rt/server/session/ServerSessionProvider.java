@@ -52,7 +52,6 @@ public class ServerSessionProvider {
       public SESSION call() throws Exception {
         // 1. Create an empty session instance.
         final SESSION serverSession = ServerSessionProvider.cast(BEANS.get(IServerSession.class));
-//        serverSession.setIdInternal(String.format("%s-%s", serverSession.getClass().getName(), UUID.randomUUID()));
 
         // 2. Load the session.
         ServerRunContexts.copyCurrent().session(serverSession, true).transactionScope(TransactionScope.MANDATORY).run(new IRunnable() {

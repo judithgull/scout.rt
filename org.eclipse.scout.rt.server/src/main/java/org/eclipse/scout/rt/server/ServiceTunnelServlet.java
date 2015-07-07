@@ -56,7 +56,7 @@ import org.eclipse.scout.rt.shared.ui.UserAgent;
  */
 public class ServiceTunnelServlet extends HttpServlet {
 
-  private static final String SESSION_ID = "sessionId";
+  public static final String SESSION_ID = "sessionId";
 
   private static final String ADMIN_SESSION_KEY = AdminSession.class.getName();
 
@@ -291,12 +291,7 @@ public class ServiceTunnelServlet extends HttpServlet {
    * @return {@link IServerSession}; must not be <code>null</code>.
    */
   protected IServerSession provideServerSession(final ServerRunContext serverRunContext) throws ProcessingException {
-    final HttpServletRequest servletRequest = IHttpServletRoundtrip.CURRENT_HTTP_SERVLET_REQUEST.get();
-    final HttpServletResponse servletResponse = IHttpServletRoundtrip.CURRENT_HTTP_SERVLET_RESPONSE.get();
-
-    final IServerSession serverSession = BEANS.get(ServerSessionProvider.class).provide(serverRunContext, (String) serverRunContext.propertyMap().get(SESSION_ID));
-//    serverSession.setIdInternal(BEANS.get(IClientIdentificationService.class).getClientId(servletRequest, servletResponse));
-    return serverSession;
+    return BEANS.get(ServerSessionProvider.class).<IServerSession> provide(serverRunContext, (String) serverRunContext.propertyMap().get(SESSION_ID));
   }
 
   // === Helper methods ===
