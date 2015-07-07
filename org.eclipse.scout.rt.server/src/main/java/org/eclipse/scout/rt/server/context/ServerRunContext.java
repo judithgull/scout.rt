@@ -63,6 +63,7 @@ import org.eclipse.scout.rt.shared.ui.UserAgent;
  * <li>{@link ISession#CURRENT}</li>
  * <li>{@link UserAgent#CURRENT}</li>
  * <li>{@link ClientNotificationNodeId#CURRENT}</li>
+ * <li>{@link ClientNotificationContainer#CURRENT}</li>
  * <li>{@link ScoutTexts#CURRENT}</li>
  * <li>{@link ITransaction#CURRENT}</li>
  * <li>{@link OfflineState#CURRENT}</li>

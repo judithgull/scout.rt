@@ -24,6 +24,7 @@ import org.eclipse.scout.rt.platform.context.internal.InitThreadLocalCallable;
 import org.eclipse.scout.rt.platform.context.internal.SubjectCallable;
 import org.eclipse.scout.rt.platform.job.PropertyMap;
 import org.eclipse.scout.rt.server.IServerSession;
+import org.eclipse.scout.rt.server.clientnotification.ClientNotificationContainer;
 import org.eclipse.scout.rt.server.clientnotification.ClientNotificationNodeId;
 import org.eclipse.scout.rt.server.context.internal.CurrentSessionLogCallable;
 import org.eclipse.scout.rt.server.context.internal.TwoPhaseTransactionBoundaryCallable;
@@ -170,14 +171,18 @@ public class ServerRunContextChainTest {
     InitThreadLocalCallable c10 = getNextAndAssert(c9, InitThreadLocalCallable.class);
     assertSame(ClientNotificationNodeId.CURRENT, ((InitThreadLocalCallable) c10).getThreadLocal());
 
-    // 11. InitThreadLocalCallable for ScoutTexts.CURRENT
+    // 11. InitThreadLocalCallable for NotificationNodeId.CURRENT
     InitThreadLocalCallable c11 = getNextAndAssert(c10, InitThreadLocalCallable.class);
-    assertSame(ScoutTexts.CURRENT, ((InitThreadLocalCallable) c11).getThreadLocal());
+    assertSame(ClientNotificationContainer.CURRENT, ((InitThreadLocalCallable) c11).getThreadLocal());
 
-    // 12. TwoPhaseTransactionBoundaryCallable
-    TwoPhaseTransactionBoundaryCallable c12 = getNextAndAssert(c11, TwoPhaseTransactionBoundaryCallable.class);
+    // 12. InitThreadLocalCallable for ScoutTexts.CURRENT
+    InitThreadLocalCallable c12 = getNextAndAssert(c11, InitThreadLocalCallable.class);
+    assertSame(ScoutTexts.CURRENT, ((InitThreadLocalCallable) c12).getThreadLocal());
 
-    return c12;
+    // 13. TwoPhaseTransactionBoundaryCallable
+    TwoPhaseTransactionBoundaryCallable c13 = getNextAndAssert(c12, TwoPhaseTransactionBoundaryCallable.class);
+
+    return c13;
   }
 
   @SuppressWarnings("unchecked")
