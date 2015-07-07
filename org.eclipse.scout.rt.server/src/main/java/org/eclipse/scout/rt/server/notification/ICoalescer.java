@@ -11,24 +11,22 @@
 package org.eclipse.scout.rt.server.notification;
 
 import java.io.Serializable;
-import java.util.Set;
+import java.util.List;
 
 import org.eclipse.scout.rt.platform.ApplicationScoped;
 
 /**
- * Every implementation of this interface will be applied to coalesce notifications of the same super class (generic
+ * Every implementation of this interface can be applied to coalesce objects of the same super class (generic
  * type of this class).
- * <b>
- * Will only be called for notifications within a transaction
  */
 @ApplicationScoped
-public interface INotificationCoalescer<NOTIFICATION extends Serializable> {
+public interface ICoalescer<T extends Serializable> {
 
   /**
-   * @param notifications
-   *          all notifications to coalesce.
-   * @return a coalesced set of notifications. Never <code>null</code>.
+   * @param data
+   *          all objects to coalesce.
+   * @return a coalesced result. Never <code>null</code>.
    */
-  Set<NOTIFICATION> coalesce(Set<NOTIFICATION> notifications);
+  List<T> coalesce(List<T> data);
 
 }

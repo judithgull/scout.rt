@@ -10,20 +10,20 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.server.services.common.security;
 
-import java.util.Set;
+import java.util.List;
 
 import org.eclipse.scout.commons.CollectionUtility;
-import org.eclipse.scout.rt.server.notification.INotificationCoalescer;
+import org.eclipse.scout.rt.server.notification.ICoalescer;
 import org.eclipse.scout.rt.shared.services.common.security.ResetAccessControlChangedNotification;
 
 /**
  *
  */
-public class ResetAccessControlNotificationCoalescer implements INotificationCoalescer<ResetAccessControlChangedNotification> {
+public class ResetAccessControlNotificationCoalescer implements ICoalescer<ResetAccessControlChangedNotification> {
 
   @Override
-  public Set<ResetAccessControlChangedNotification> coalesce(Set<ResetAccessControlChangedNotification> notifications) {
+  public List<ResetAccessControlChangedNotification> coalesce(List<ResetAccessControlChangedNotification> notifications) {
     // reduce to one
-    return CollectionUtility.hashSet(CollectionUtility.firstElement(notifications));
+    return CollectionUtility.arrayList(CollectionUtility.firstElement(notifications));
   }
 }

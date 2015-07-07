@@ -14,9 +14,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.rt.shared.services.common.code.AbstractCodeType;
@@ -32,7 +30,7 @@ public class UnloadCodeTypeClusterCoalescerTest {
   @Test
   public void testCoalesceEmptySet() {
     UnloadCodeTypeClusterCoalescer coalescer = new UnloadCodeTypeClusterCoalescer();
-    Set<UnloadCodeTypeCacheClusterNotification> res = coalescer.coalesce(new HashSet<UnloadCodeTypeCacheClusterNotification>());
+    List<UnloadCodeTypeCacheClusterNotification> res = coalescer.coalesce(new ArrayList<UnloadCodeTypeCacheClusterNotification>());
     assertTrue(res.isEmpty());
   }
 
@@ -44,15 +42,14 @@ public class UnloadCodeTypeClusterCoalescerTest {
     testTypes1.add(CodeType1.class);
     testTypes1.add(CodeType2.class);
     testTypes2.add(CodeType2.class);
-    Set<UnloadCodeTypeCacheClusterNotification> testList = CollectionUtility.hashSet(
+    List<UnloadCodeTypeCacheClusterNotification> testList = CollectionUtility.arrayList(
         new UnloadCodeTypeCacheClusterNotification(testTypes1),
         new UnloadCodeTypeCacheClusterNotification(testTypes1));
     CollectionUtility.arrayList(CodeType2.class);
-    Set<UnloadCodeTypeCacheClusterNotification> res = coalescer.coalesce(testList);
+    List<UnloadCodeTypeCacheClusterNotification> res = coalescer.coalesce(testList);
     assertEquals(1, res.size());
     UnloadCodeTypeCacheClusterNotification firstNotification = res.iterator().next();
     ScoutAssert.assertSetEquals(testTypes1, firstNotification.getTypes());
-
   }
 
   class CodeType1 extends AbstractCodeType<Long, Long> {

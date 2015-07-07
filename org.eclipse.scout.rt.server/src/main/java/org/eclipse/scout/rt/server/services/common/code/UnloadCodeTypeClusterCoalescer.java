@@ -16,29 +16,29 @@ import java.util.Set;
 
 import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.rt.platform.Bean;
-import org.eclipse.scout.rt.server.notification.INotificationCoalescer;
+import org.eclipse.scout.rt.server.notification.ICoalescer;
 import org.eclipse.scout.rt.shared.services.common.code.ICodeType;
 
 /**
  * Coalesce {@link UnloadCodeTypeCacheClusterNotification}s.
  */
 @Bean
-public class UnloadCodeTypeClusterCoalescer implements INotificationCoalescer<UnloadCodeTypeCacheClusterNotification> {
+public class UnloadCodeTypeClusterCoalescer implements ICoalescer<UnloadCodeTypeCacheClusterNotification> {
 
   /**
    * Coalesce all {@link UnloadCodeTypeCacheClusterNotification}s to a single notification with all codetypes.
    */
   @Override
-  public Set<UnloadCodeTypeCacheClusterNotification> coalesce(Set<UnloadCodeTypeCacheClusterNotification> notifications) {
+  public List<UnloadCodeTypeCacheClusterNotification> coalesce(List<UnloadCodeTypeCacheClusterNotification> notifications) {
     if (notifications.isEmpty()) {
-      return CollectionUtility.emptyHashSet();
+      return CollectionUtility.emptyArrayList();
     }
 
     List<Class<? extends ICodeType<?, ?>>> codeTypeList = CollectionUtility.arrayList(collectCodeTypes(notifications));
-    return CollectionUtility.hashSet(new UnloadCodeTypeCacheClusterNotification(codeTypeList));
+    return CollectionUtility.arrayList(new UnloadCodeTypeCacheClusterNotification(codeTypeList));
   }
 
-  private Set<Class<? extends ICodeType<?, ?>>> collectCodeTypes(Set<UnloadCodeTypeCacheClusterNotification> notifications) {
+  private Set<Class<? extends ICodeType<?, ?>>> collectCodeTypes(List<UnloadCodeTypeCacheClusterNotification> notifications) {
     Set<Class<? extends ICodeType<?, ?>>> codeTypes = new HashSet<>();
     for (UnloadCodeTypeCacheClusterNotification notification : notifications) {
       List<Class<? extends ICodeType<?, ?>>> types = notification.getTypes();

@@ -11,31 +11,32 @@
 package org.eclipse.scout.rt.server.services.common.security;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.eclipse.scout.commons.CollectionUtility;
-import org.eclipse.scout.rt.server.notification.INotificationCoalescer;
+import org.eclipse.scout.rt.server.notification.ICoalescer;
 
 /**
  * Coalesce {@link AccessControlClusterNotification}s.
  */
-public class AccessControlClusterCoalescer implements INotificationCoalescer<AccessControlClusterNotification> {
+public class AccessControlClusterCoalescer implements ICoalescer<AccessControlClusterNotification> {
 
   /**
    * Coalesce all {@link AccessControlClusterNotification}s to a single notification with all user ids.
    */
   @Override
-  public Set<AccessControlClusterNotification> coalesce(Set<AccessControlClusterNotification> notifications) {
+  public List<AccessControlClusterNotification> coalesce(List<AccessControlClusterNotification> notifications) {
     if (notifications.isEmpty()) {
-      return CollectionUtility.emptyHashSet();
+      return CollectionUtility.emptyArrayList();
     }
 
     Set<String> userIds = collectUserIds(notifications);
-    return CollectionUtility.hashSet(new AccessControlClusterNotification(userIds));
+    return CollectionUtility.arrayList(new AccessControlClusterNotification(userIds));
   }
 
-  private Set<String> collectUserIds(Set<AccessControlClusterNotification> notifications) {
-    Set<String> userIds = new HashSet<String>();
+  private Set<String> collectUserIds(List<AccessControlClusterNotification> notifications) {
+    Set<String> userIds = new HashSet<>();
     for (AccessControlClusterNotification notification : notifications) {
       userIds.addAll(notification.getUserIds());
     }

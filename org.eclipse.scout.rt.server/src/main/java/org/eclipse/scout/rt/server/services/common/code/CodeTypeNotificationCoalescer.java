@@ -11,25 +11,26 @@
 package org.eclipse.scout.rt.server.services.common.code;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.eclipse.scout.commons.CollectionUtility;
-import org.eclipse.scout.rt.server.notification.INotificationCoalescer;
+import org.eclipse.scout.rt.server.notification.ICoalescer;
 import org.eclipse.scout.rt.shared.services.common.code.CodeTypeChangedNotification;
 import org.eclipse.scout.rt.shared.services.common.code.ICodeType;
 
 /**
  *
  */
-public class CodeTypeNotificationCoalescer implements INotificationCoalescer<CodeTypeChangedNotification> {
+public class CodeTypeNotificationCoalescer implements ICoalescer<CodeTypeChangedNotification> {
 
   @Override
-  public Set<CodeTypeChangedNotification> coalesce(Set<CodeTypeChangedNotification> notifications) {
+  public List<CodeTypeChangedNotification> coalesce(List<CodeTypeChangedNotification> notifications) {
     Set<Class<? extends ICodeType<?, ?>>> codeTypeClasses = new HashSet<>();
     for (CodeTypeChangedNotification n : notifications) {
       codeTypeClasses.addAll(n.getCodeTypes());
     }
-    return CollectionUtility.hashSet(new CodeTypeChangedNotification(codeTypeClasses));
+    return CollectionUtility.arrayList(new CodeTypeChangedNotification(codeTypeClasses));
   }
 
 }

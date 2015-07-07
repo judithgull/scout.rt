@@ -10,21 +10,21 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.server.services.common.bookmark;
 
-import java.util.Set;
+import java.util.List;
 
 import org.eclipse.scout.commons.CollectionUtility;
-import org.eclipse.scout.rt.server.notification.INotificationCoalescer;
+import org.eclipse.scout.rt.server.notification.ICoalescer;
 import org.eclipse.scout.rt.shared.services.common.bookmark.BookmarkChangedClientNotification;
 
 /**
  *
  */
-public class BookmarkNotificationCoalescer implements INotificationCoalescer<BookmarkChangedClientNotification> {
+public class BookmarkNotificationCoalescer implements ICoalescer<BookmarkChangedClientNotification> {
 
   @Override
-  public Set<BookmarkChangedClientNotification> coalesce(Set<BookmarkChangedClientNotification> notifications) {
+  public List<BookmarkChangedClientNotification> coalesce(List<BookmarkChangedClientNotification> notifications) {
     // reduce to one
-    return CollectionUtility.hashSet(CollectionUtility.firstElement(notifications));
+    return CollectionUtility.arrayList(CollectionUtility.firstElement(notifications));
   }
 
 }

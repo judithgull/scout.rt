@@ -10,21 +10,21 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.server.services.common.context;
 
-import java.util.Set;
+import java.util.List;
 
 import org.eclipse.scout.commons.CollectionUtility;
-import org.eclipse.scout.rt.server.notification.INotificationCoalescer;
+import org.eclipse.scout.rt.server.notification.ICoalescer;
 import org.eclipse.scout.rt.shared.services.common.context.SharedContextChangedNotification;
 
 /**
  *
  */
-public class SharedContextNotificationCoalescer implements INotificationCoalescer<SharedContextChangedNotification> {
+public class SharedContextNotificationCoalescer implements ICoalescer<SharedContextChangedNotification> {
 
   @Override
-  public Set<SharedContextChangedNotification> coalesce(Set<SharedContextChangedNotification> notifications) {
+  public List<SharedContextChangedNotification> coalesce(List<SharedContextChangedNotification> notifications) {
     // reduce to one
-    return CollectionUtility.hashSet(CollectionUtility.firstElement(notifications));
+    return CollectionUtility.arrayList(CollectionUtility.firstElement(notifications));
   }
 
 }
