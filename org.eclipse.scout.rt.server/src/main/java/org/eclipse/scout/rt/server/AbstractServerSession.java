@@ -175,8 +175,15 @@ public abstract class AbstractServerSession implements IServerSession, Serializa
       @Override
       public void propertyChange(PropertyChangeEvent e) {
         if (OfflineState.isOfflineDefault() == OfflineState.isOfflineInCurrentThread()) {
-          BEANS.get(ClientNotificationRegistry.class).putForSession(getId(), new SharedContextChangedNotification(new SharedVariableMap(m_sharedVariableMap)));
-        } 
+          String sessionId = getId();
+          if (sessionId != null) {
+            SharedContextChangedNotification notification = new SharedContextChangedNotification(new SharedVariableMap(m_sharedVariableMap));
+            BEANS.get(ClientNotificationRegistry.class).putForSession(sessionId, notification);
+          }
+          else {
+            LOG.warn("No sessionId set");
+          }
+        }
       }
     });
     if (m_initialized) {

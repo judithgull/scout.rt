@@ -32,7 +32,8 @@ import org.eclipse.scout.rt.shared.clientnotification.ClientNotficationAddress;
 import org.eclipse.scout.rt.shared.clientnotification.ClientNotificationMessage;
 
 /**
- * The {@link ClientNotificationRegistry} is the registry for all notifications. It keeps a {@link ClientNotificationNodeQueue} for
+ * The {@link ClientNotificationRegistry} is the registry for all notifications. It keeps a
+ * {@link ClientNotificationNodeQueue} for
  * each notification node (usually a client node).
  * The {@link ClientNotificationService} consumes the notifications per node. The consumption of the notifications waits
  * for a given timeout for notifications. If no notifications are scheduled within this timeout the lock will be
@@ -52,7 +53,7 @@ public class ClientNotificationRegistry {
    */
   void registerSession(String notificationNodeId, String sessionId, String userId) {
     synchronized (m_notificationQueues) {
-      ClientNotificationNodeQueue queue = m_notificationQueues.get(Assertions.assertNotNull(notificationNodeId));
+      ClientNotificationNodeQueue queue = getQueue(notificationNodeId);
       queue.registerSession(sessionId, userId);
     }
   }
@@ -75,17 +76,22 @@ public class ClientNotificationRegistry {
    * @return
    */
   List<ClientNotificationMessage> consume(String notificationNodeId, int maxAmount, int amount, TimeUnit unit) {
-    ClientNotificationNodeQueue queue;
+    ClientNotificationNodeQueue queue = getQueue(notificationNodeId);
+    return queue.consume(maxAmount, amount, unit);
+  }
+
+  private ClientNotificationNodeQueue getQueue(String notificationNodeId) {
+    Assertions.assertNotNull(notificationNodeId);
     synchronized (m_notificationQueues) {
-      queue = m_notificationQueues.get(notificationNodeId);
+      ClientNotificationNodeQueue queue = m_notificationQueues.get(notificationNodeId);
       if (queue == null) {
         // create new
         // TODO[aho] make configurable
         queue = new ClientNotificationNodeQueue(notificationNodeId, 200);
         m_notificationQueues.put(notificationNodeId, queue);
       }
+      return queue;
     }
-    return queue.consume(maxAmount, amount, unit);
   }
 
   /**
