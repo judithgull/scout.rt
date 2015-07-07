@@ -14,8 +14,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
+import java.util.Collection;
 import java.util.List;
-import java.util.Set;
 
 import org.eclipse.scout.commons.CompareUtility;
 import org.eclipse.scout.commons.exception.ProcessingException;
@@ -55,7 +55,7 @@ public class CodeServiceTest {
       ICodeService service = BEANS.get(ICodeService.class);
       assertSame(testService, service);
       //
-      Set<Class<? extends ICodeType<?, ?>>> result = service.getAllCodeTypeClasses("");
+      Collection<Class<? extends ICodeType<?, ?>>> result = service.getAllCodeTypeClasses("");
       boolean testCodeType1Found = false;
       boolean testCodeType2Found = false;
       for (Class<? extends ICodeType<?, ?>> b : result) {

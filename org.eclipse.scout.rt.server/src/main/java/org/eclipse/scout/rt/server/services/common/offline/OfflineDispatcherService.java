@@ -25,7 +25,6 @@ import org.eclipse.scout.rt.server.IServerSession;
 import org.eclipse.scout.rt.server.context.RunMonitorCancelRegistry;
 import org.eclipse.scout.rt.server.context.ServerRunContext;
 import org.eclipse.scout.rt.server.context.ServerRunContexts;
-import org.eclipse.scout.rt.server.services.common.clientnotification.IClientNotificationService;
 import org.eclipse.scout.rt.server.session.ServerSessionProviderWithCache;
 import org.eclipse.scout.rt.shared.services.common.offline.IOfflineDispatcherService;
 import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnelResponse;
@@ -90,8 +89,6 @@ public class OfflineDispatcherService extends AbstractService implements IOfflin
 
         final ServiceTunnelResponse serviceResponse = new ServiceTunnelResponse(result, outParams, null);
 
-        // add accumulated client notifications as side-payload
-        serviceResponse.setClientNotifications(BEANS.get(IClientNotificationService.class).getNextNotifications(0));
         return serviceResponse;
       }
     }, BEANS.get(ExceptionTranslator.class));
