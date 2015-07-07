@@ -10,7 +10,6 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.server.notification;
 
-import java.io.Serializable;
 import java.util.List;
 
 import org.eclipse.scout.rt.platform.ApplicationScoped;
@@ -20,7 +19,7 @@ import org.eclipse.scout.rt.platform.ApplicationScoped;
  * type of this class).
  */
 @ApplicationScoped
-public interface ICoalescer<T extends Serializable> {
+public interface ICoalescer<T> {
 
   /**
    * @param data

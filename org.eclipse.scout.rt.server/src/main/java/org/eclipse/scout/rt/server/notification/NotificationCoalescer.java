@@ -57,12 +57,15 @@ public class NotificationCoalescer {
     List<ICoalescer> notificationCoalescers = BEANS.all(ICoalescer.class);
     for (ICoalescer<?> notificationCoalescer : notificationCoalescers) {
       Class notificationClass = TypeCastUtility.getGenericsParameterClass(notificationCoalescer.getClass(), ICoalescer.class);
-      Set<ICoalescer<?>> coalescerSet = m_notificationClassToCoalescer.get(notificationClass);
-      if (coalescerSet == null) {
-        coalescerSet = new HashSet<>();
-        m_notificationClassToCoalescer.put(notificationClass, coalescerSet);
+      if (notificationClass.isAssignableFrom(Serializable.class)) {
+
+        Set<ICoalescer<? extends Serializable>> coalescerSet = m_notificationClassToCoalescer.get(notificationClass);
+        if (coalescerSet == null) {
+          coalescerSet = new HashSet<>();
+          m_notificationClassToCoalescer.put(notificationClass, coalescerSet);
+        }
+        coalescerSet.add((ICoalescer<? extends Serializable>) notificationCoalescer);
       }
-      coalescerSet.add(notificationCoalescer);
     }
   }
 
