@@ -23,7 +23,6 @@ import org.eclipse.scout.rt.platform.config.AbstractConfigProperty;
 import org.eclipse.scout.rt.platform.config.AbstractPositiveLongConfigProperty;
 import org.eclipse.scout.rt.platform.config.AbstractStringConfigProperty;
 import org.eclipse.scout.rt.platform.config.AbstractSubjectConfigProperty;
-import org.eclipse.scout.rt.platform.config.CONFIG;
 import org.eclipse.scout.rt.shared.TierState.Tier;
 
 /**
@@ -39,8 +38,6 @@ public final class SharedConfigProperties {
    */
   public static class AuthTokenPrivateKeyProperty extends AbstractBinaryConfigProperty {
 
-
-
     @Override
     public String getKey() {
       return "scout.auth.privatekey";
@@ -51,8 +48,6 @@ public final class SharedConfigProperties {
    * public key for {@link AuthTokenPrivateKeyProperty}
    */
   public static class AuthTokenPublicKeyProperty extends AbstractBinaryConfigProperty {
-
-
 
     @Override
     public String getKey() {
@@ -167,6 +162,15 @@ public final class SharedConfigProperties {
     @Override
     public String getKey() {
       return "scout.beans.createTunnelToServerBeans";
+    }
+
+    @Override
+    protected Boolean createValue() {
+      // if no backend url is set proxy instances will not be created
+      if (StringUtility.isNullOrEmpty(BEANS.get(ServiceTunnelTargetUrlProperty.class).getValue())) {
+        return Boolean.FALSE;
+      }
+      return super.createValue();
     }
 
     @Override

@@ -10,6 +10,7 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.shared.services.common.notification;
 
+import java.io.Serializable;
 import java.util.Collections;
 import java.util.Set;
 
@@ -18,7 +19,9 @@ import org.eclipse.scout.commons.CollectionUtility;
 /**
  *
  */
-public class NotficationAddress {
+public class NotficationAddress implements Serializable {
+  private static final long serialVersionUID = 1L;
+
   private final Set<String> m_sessionIds;
   private final Set<String> m_userIds;
   private final String m_excludeNodeId;
