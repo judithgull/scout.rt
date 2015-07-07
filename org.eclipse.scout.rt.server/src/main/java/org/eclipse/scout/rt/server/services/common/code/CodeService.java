@@ -33,7 +33,7 @@ import org.eclipse.scout.rt.shared.services.common.code.ICodeType;
 
 @Server
 @Order(2)
-public class CodeService extends AbstractSharedCodeService implements INotificationHandler<UnloadCodeTypeCacheClusterNotification> {
+public class CodeService extends AbstractSharedCodeService implements INotificationHandler<CodeTypeChangedNotification> {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(CodeService.class);
 
   @Override
@@ -47,8 +47,9 @@ public class CodeService extends AbstractSharedCodeService implements INotificat
 
   @Override
   protected void notifyReloadCodeTypes(List<Class<? extends ICodeType<?, ?>>> codetypeList) throws ProcessingException {
-    BEANS.get(NotificationRegistry.class).putTransactionalForAllSessions(new CodeTypeChangedNotification(codetypeList));
-    distributeCluster(new UnloadCodeTypeCacheClusterNotification(codetypeList));
+    CodeTypeChangedNotification notification = new CodeTypeChangedNotification(codetypeList);
+    BEANS.get(NotificationRegistry.class).putTransactionalForAllSessions(notification);
+    distributeCluster(notification);
   }
 
   protected void distributeCluster(Serializable notification) {
@@ -69,9 +70,9 @@ public class CodeService extends AbstractSharedCodeService implements INotificat
   }
 
   @Override
-  public void handleNotification(UnloadCodeTypeCacheClusterNotification notification) {
+  public void handleNotification(CodeTypeChangedNotification notification) {
     try {
-      reloadCodeTypesNoFire(CollectionUtility.arrayList(notification.getTypes()));
+      reloadCodeTypesNoFire(CollectionUtility.arrayList(notification.getCodeTypes()));
     }
     catch (ProcessingException e) {
       BEANS.get(ExceptionHandler.class).handle(e);

@@ -26,11 +26,18 @@ public class CodeTypeNotificationCoalescer implements ICoalescer<CodeTypeChanged
 
   @Override
   public List<CodeTypeChangedNotification> coalesce(List<CodeTypeChangedNotification> notifications) {
+    if (notifications.isEmpty()) {
+      return CollectionUtility.emptyArrayList();
+    }
+    return CollectionUtility.arrayList(new CodeTypeChangedNotification(collectCodeTypeClasses(notifications)));
+  }
+
+  private Set<Class<? extends ICodeType<?, ?>>> collectCodeTypeClasses(List<CodeTypeChangedNotification> notifications) {
     Set<Class<? extends ICodeType<?, ?>>> codeTypeClasses = new HashSet<>();
     for (CodeTypeChangedNotification n : notifications) {
       codeTypeClasses.addAll(n.getCodeTypes());
     }
-    return CollectionUtility.arrayList(new CodeTypeChangedNotification(codeTypeClasses));
+    return codeTypeClasses;
   }
 
 }

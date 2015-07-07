@@ -18,38 +18,39 @@ import java.util.List;
 
 import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.rt.shared.services.common.code.AbstractCodeType;
+import org.eclipse.scout.rt.shared.services.common.code.CodeTypeChangedNotification;
 import org.eclipse.scout.rt.shared.services.common.code.ICodeType;
 import org.eclipse.scout.rt.testing.commons.ScoutAssert;
 import org.junit.Test;
 
 /**
- * Tests for {@link UnloadCodeTypeClusterCoalescer}
+ * Tests for {@link CodeTypeNotificationCoalescer}
  */
-public class UnloadCodeTypeClusterCoalescerTest {
+public class CodeTypeNotificationCoalescerTest {
 
   @Test
   public void testCoalesceEmptySet() {
-    UnloadCodeTypeClusterCoalescer coalescer = new UnloadCodeTypeClusterCoalescer();
-    List<UnloadCodeTypeCacheClusterNotification> res = coalescer.coalesce(new ArrayList<UnloadCodeTypeCacheClusterNotification>());
+    CodeTypeNotificationCoalescer coalescer = new CodeTypeNotificationCoalescer();
+    List<CodeTypeChangedNotification> res = coalescer.coalesce(new ArrayList<CodeTypeChangedNotification>());
     assertTrue(res.isEmpty());
   }
 
   @Test
   public void testCoalesceNotificationsSet() {
-    UnloadCodeTypeClusterCoalescer coalescer = new UnloadCodeTypeClusterCoalescer();
+    CodeTypeNotificationCoalescer coalescer = new CodeTypeNotificationCoalescer();
     List<Class<? extends ICodeType<?, ?>>> testTypes1 = new ArrayList<>();
     List<Class<? extends ICodeType<?, ?>>> testTypes2 = new ArrayList<>();
     testTypes1.add(CodeType1.class);
     testTypes1.add(CodeType2.class);
     testTypes2.add(CodeType2.class);
-    List<UnloadCodeTypeCacheClusterNotification> testList = CollectionUtility.arrayList(
-        new UnloadCodeTypeCacheClusterNotification(testTypes1),
-        new UnloadCodeTypeCacheClusterNotification(testTypes1));
+    List<CodeTypeChangedNotification> testList = CollectionUtility.arrayList(
+        new CodeTypeChangedNotification(testTypes1),
+        new CodeTypeChangedNotification(testTypes1));
     CollectionUtility.arrayList(CodeType2.class);
-    List<UnloadCodeTypeCacheClusterNotification> res = coalescer.coalesce(testList);
+    List<CodeTypeChangedNotification> res = coalescer.coalesce(testList);
     assertEquals(1, res.size());
-    UnloadCodeTypeCacheClusterNotification firstNotification = res.iterator().next();
-    ScoutAssert.assertSetEquals(testTypes1, firstNotification.getTypes());
+    CodeTypeChangedNotification firstNotification = res.iterator().next();
+    ScoutAssert.assertSetEquals(testTypes1, firstNotification.getCodeTypes());
   }
 
   class CodeType1 extends AbstractCodeType<Long, Long> {

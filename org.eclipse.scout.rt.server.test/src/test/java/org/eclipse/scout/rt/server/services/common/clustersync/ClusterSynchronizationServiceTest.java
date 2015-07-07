@@ -26,10 +26,10 @@ import org.eclipse.scout.rt.platform.IBean;
 import org.eclipse.scout.rt.server.TestServerSession;
 import org.eclipse.scout.rt.server.services.common.clustersync.internal.ClusterNotificationMessage;
 import org.eclipse.scout.rt.server.services.common.clustersync.internal.ClusterNotificationMessageProperties;
-import org.eclipse.scout.rt.server.services.common.code.UnloadCodeTypeCacheClusterNotification;
 import org.eclipse.scout.rt.server.services.common.security.AccessControlClusterNotification;
 import org.eclipse.scout.rt.server.transaction.ITransaction;
 import org.eclipse.scout.rt.shared.services.common.code.AbstractCodeType;
+import org.eclipse.scout.rt.shared.services.common.code.CodeTypeChangedNotification;
 import org.eclipse.scout.rt.shared.services.common.code.ICodeType;
 import org.eclipse.scout.rt.testing.platform.runner.RunWithSubject;
 import org.eclipse.scout.rt.testing.server.runner.RunWithServerSession;
@@ -64,8 +64,8 @@ public class ClusterSynchronizationServiceTest {
     m_beans.add(
         TestingUtility.registerBean(
             new BeanMetaData(IPublishSubscribeMessageService.class).
-            initialInstance(m_messageService).
-            applicationScoped(true)
+                initialInstance(m_messageService).
+                applicationScoped(true)
             ));
 
     m_svc = new ClusterSynchronizationService();
@@ -162,7 +162,7 @@ public class ClusterSynchronizationServiceTest {
     m_svc.publishTransactional(new AccessControlClusterNotification());
     ArrayList<Class<? extends ICodeType<?, ?>>> codeTypes = new ArrayList<>();
     codeTypes.add(TestCodeType.class);
-    m_svc.publishTransactional(new UnloadCodeTypeCacheClusterNotification(codeTypes));
+    m_svc.publishTransactional(new CodeTypeChangedNotification(codeTypes));
     ITransaction.CURRENT.get().commitPhase1();
     ITransaction.CURRENT.get().commitPhase2();
     verify(m_messageService, times(1)).publishNotifications(any(List.class));
