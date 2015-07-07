@@ -16,7 +16,7 @@ import java.util.EventListener;
 /**
  *
  */
-public interface IClientNotificationListener<T extends Serializable> extends EventListener {
+public interface INotificationListener<T extends Serializable> extends EventListener {
 
   void handleNotification(T notification);
 }

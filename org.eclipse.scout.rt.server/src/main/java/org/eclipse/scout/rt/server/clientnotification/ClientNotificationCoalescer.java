@@ -21,8 +21,8 @@ import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.rt.platform.ApplicationScoped;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.server.notification.NotificationCoalescer;
-import org.eclipse.scout.rt.shared.services.common.notification.NotficationAddress;
-import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
+import org.eclipse.scout.rt.shared.clientnotification.ClientNotficationAddress;
+import org.eclipse.scout.rt.shared.clientnotification.ClientNotificationMessage;
 
 /**
  *
@@ -30,11 +30,11 @@ import org.eclipse.scout.rt.shared.services.common.notification.NotificationMess
 @ApplicationScoped
 public class ClientNotificationCoalescer {
 
-  public List<NotificationMessage> coalesce(List<NotificationMessage> inNotifications) {
-    List<NotificationMessage> result = new ArrayList<>();
+  public List<ClientNotificationMessage> coalesce(List<ClientNotificationMessage> inNotifications) {
+    List<ClientNotificationMessage> result = new ArrayList<>();
     // sort by address
-    Map<NotficationAddress, List<Serializable>> notificationsPerAddress = new HashMap<>();
-    for (NotificationMessage message : inNotifications) {
+    Map<ClientNotficationAddress, List<Serializable>> notificationsPerAddress = new HashMap<>();
+    for (ClientNotificationMessage message : inNotifications) {
       List<Serializable> notifications = notificationsPerAddress.get(message.getAddress());
       if (notifications == null) {
         notifications = new ArrayList<>();
@@ -42,25 +42,25 @@ public class ClientNotificationCoalescer {
       }
       notifications.add(message.getNotification());
     }
-    for (Entry<NotficationAddress, List<Serializable>> e : notificationsPerAddress.entrySet()) {
+    for (Entry<ClientNotficationAddress, List<Serializable>> e : notificationsPerAddress.entrySet()) {
       result.addAll(coalesce(e.getKey(), e.getValue()));
     }
     return result;
   }
 
-  protected List<NotificationMessage> coalesce(NotficationAddress address, List<Serializable> notificationsIn) {
+  protected List<ClientNotificationMessage> coalesce(ClientNotficationAddress address, List<Serializable> notificationsIn) {
     if (notificationsIn.isEmpty()) {
       return new ArrayList<>();
     }
     else if (notificationsIn.size() == 1) {
       // no coalesce needed
-      return CollectionUtility.arrayList(new NotificationMessage(address, CollectionUtility.firstElement(notificationsIn)));
+      return CollectionUtility.arrayList(new ClientNotificationMessage(address, CollectionUtility.firstElement(notificationsIn)));
     }
     else {
       List<? extends Serializable> outNotifications = BEANS.get(NotificationCoalescer.class).coalesce(notificationsIn);
-      List<NotificationMessage> result = new ArrayList<>();
+      List<ClientNotificationMessage> result = new ArrayList<>();
       for (Serializable n : outNotifications) {
-        result.add(new NotificationMessage(address, n));
+        result.add(new ClientNotificationMessage(address, n));
       }
       return result;
     }

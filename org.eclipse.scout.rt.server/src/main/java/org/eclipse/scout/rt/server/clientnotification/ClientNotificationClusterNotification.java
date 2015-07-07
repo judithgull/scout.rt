@@ -14,20 +14,20 @@ import java.io.Serializable;
 import java.util.Collection;
 
 import org.eclipse.scout.commons.ToStringBuilder;
-import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
+import org.eclipse.scout.rt.shared.clientnotification.ClientNotificationMessage;
 
 /**
  *
  */
 public class ClientNotificationClusterNotification implements Serializable {
   private static final long serialVersionUID = -8513131031858145786L;
-  private final Collection<? extends NotificationMessage> m_cnMessages;
+  private final Collection<? extends ClientNotificationMessage> m_cnMessages;
 
-  public ClientNotificationClusterNotification(Collection<? extends NotificationMessage> messages) {
+  public ClientNotificationClusterNotification(Collection<? extends ClientNotificationMessage> messages) {
     m_cnMessages = messages;
   }
 
-  public Collection<? extends NotificationMessage> getClientNotificationMessages() {
+  public Collection<? extends ClientNotificationMessage> getClientNotificationMessages() {
     return m_cnMessages;
   }
 

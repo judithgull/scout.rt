@@ -28,37 +28,37 @@ import org.eclipse.scout.rt.platform.ApplicationScoped;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.server.services.common.clustersync.IClusterSynchronizationService;
 import org.eclipse.scout.rt.server.transaction.ITransaction;
-import org.eclipse.scout.rt.shared.services.common.notification.NotficationAddress;
-import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
+import org.eclipse.scout.rt.shared.clientnotification.ClientNotficationAddress;
+import org.eclipse.scout.rt.shared.clientnotification.ClientNotificationMessage;
 
 /**
- * The {@link NotificationRegistry} is the registry for all notifications. It keeps a {@link NotificationNodeQueue} for
+ * The {@link ClientNotificationRegistry} is the registry for all notifications. It keeps a {@link ClientNotificationNodeQueue} for
  * each notification node (usually a client node).
- * The {@link NotificationServerService} consumes the notifications per node. The consumption of the notifications waits
+ * The {@link ClientNotificationService} consumes the notifications per node. The consumption of the notifications waits
  * for a given timeout for notifications. If no notifications are scheduled within this timeout the lock will be
  * released and returns without any notifications. In case a notification gets scheduled during this timeout the
  * request will be released immediately.
  */
 @ApplicationScoped
-public class NotificationRegistry {
-  private static final IScoutLogger LOG = ScoutLogManager.getLogger(NotificationRegistry.class);
-  private final Map<String /*notificationNodeId*/, NotificationNodeQueue> m_notificationQueues = new HashMap<>();
+public class ClientNotificationRegistry {
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(ClientNotificationRegistry.class);
+  private final Map<String /*notificationNodeId*/, ClientNotificationNodeQueue> m_notificationQueues = new HashMap<>();
 
   /**
-   * This method should only be accessed from {@link NotificationServerService}
+   * This method should only be accessed from {@link ClientNotificationService}
    *
    * @param notificationNodeId
    * @param session
    */
   void registerSession(String notificationNodeId, String sessionId, String userId) {
     synchronized (m_notificationQueues) {
-      NotificationNodeQueue queue = m_notificationQueues.get(Assertions.assertNotNull(notificationNodeId));
+      ClientNotificationNodeQueue queue = m_notificationQueues.get(Assertions.assertNotNull(notificationNodeId));
       queue.registerSession(sessionId, userId);
     }
   }
 
   /**
-   * This method should only be accessed from {@link NotificationServerService}
+   * This method should only be accessed from {@link ClientNotificationService}
    *
    * @param notificationNodeId
    */
@@ -66,7 +66,7 @@ public class NotificationRegistry {
   }
 
   /**
-   * This method should only be accessed from {@link NotificationServerService}
+   * This method should only be accessed from {@link ClientNotificationService}
    *
    * @param notificationNodeId
    * @param maxAmount
@@ -74,14 +74,14 @@ public class NotificationRegistry {
    * @param unit
    * @return
    */
-  List<NotificationMessage> consume(String notificationNodeId, int maxAmount, int amount, TimeUnit unit) {
-    NotificationNodeQueue queue;
+  List<ClientNotificationMessage> consume(String notificationNodeId, int maxAmount, int amount, TimeUnit unit) {
+    ClientNotificationNodeQueue queue;
     synchronized (m_notificationQueues) {
       queue = m_notificationQueues.get(notificationNodeId);
       if (queue == null) {
         // create new
         // TODO[aho] make configurable
-        queue = new NotificationNodeQueue(notificationNodeId, 200);
+        queue = new ClientNotificationNodeQueue(notificationNodeId, 200);
         m_notificationQueues.put(notificationNodeId, queue);
       }
     }
@@ -96,7 +96,7 @@ public class NotificationRegistry {
   public Set<String> getAllSessionIds() {
     Set<String> allSessionIds = new HashSet<>();
     synchronized (m_notificationQueues) {
-      for (NotificationNodeQueue queue : m_notificationQueues.values()) {
+      for (ClientNotificationNodeQueue queue : m_notificationQueues.values()) {
         allSessionIds.addAll(queue.getAllSessionIds());
       }
     }
@@ -111,7 +111,7 @@ public class NotificationRegistry {
    * @param notification
    */
   public void putForUser(String userId, Serializable notification) {
-    NotificationMessage message = new NotificationMessage(NotficationAddress.createUserAddress(CollectionUtility.hashSet(userId)), notification);
+    ClientNotificationMessage message = new ClientNotificationMessage(ClientNotficationAddress.createUserAddress(CollectionUtility.hashSet(userId)), notification);
     put(message);
   }
 
@@ -123,7 +123,7 @@ public class NotificationRegistry {
    * @param notification
    */
   public void putForSession(String sessionId, Serializable notification) {
-    NotificationMessage message = new NotificationMessage(NotficationAddress.createSessionAddress(CollectionUtility.hashSet(sessionId)), notification);
+    ClientNotificationMessage message = new ClientNotificationMessage(ClientNotficationAddress.createSessionAddress(CollectionUtility.hashSet(sessionId)), notification);
     put(message);
   }
 
@@ -133,7 +133,7 @@ public class NotificationRegistry {
    * @param notification
    */
   public void putForAllSessions(Serializable notification) {
-    NotificationMessage message = new NotificationMessage(NotficationAddress.createAllSessionsAddress(), notification);
+    ClientNotificationMessage message = new ClientNotificationMessage(ClientNotficationAddress.createAllSessionsAddress(), notification);
     put(message);
   }
 
@@ -143,21 +143,21 @@ public class NotificationRegistry {
    * @param notification
    */
   public void putForAllNodes(Serializable notification) {
-    NotificationMessage message = new NotificationMessage(NotficationAddress.createAllNodesAddress(), notification);
+    ClientNotificationMessage message = new ClientNotificationMessage(ClientNotficationAddress.createAllNodesAddress(), notification);
     put(message);
   }
 
-  public void put(NotificationMessage message) {
+  public void put(ClientNotificationMessage message) {
     synchronized (m_notificationQueues) {
-      for (NotificationNodeQueue queue : m_notificationQueues.values()) {
+      for (ClientNotificationNodeQueue queue : m_notificationQueues.values()) {
         queue.put(message);
       }
     }
   }
 
-  public void put(Collection<? extends NotificationMessage> message) {
+  public void put(Collection<? extends ClientNotificationMessage> message) {
     synchronized (m_notificationQueues) {
-      for (NotificationNodeQueue queue : m_notificationQueues.values()) {
+      for (ClientNotificationNodeQueue queue : m_notificationQueues.values()) {
         queue.put(message);
       }
     }
@@ -175,7 +175,7 @@ public class NotificationRegistry {
    */
   public void putTransactionalForUser(String userId, Serializable notification) {
     // exclude the node the request comes from
-    NotificationMessage message = new NotificationMessage(NotficationAddress.createUserAddress(CollectionUtility.hashSet(userId),
+    ClientNotificationMessage message = new ClientNotificationMessage(ClientNotficationAddress.createUserAddress(CollectionUtility.hashSet(userId),
         Assertions.assertNotNull(ClientNotificationNodeId.CURRENT.get(), "No notification node id found on the thread context.")), notification);
     putTransactional(message);
   }
@@ -190,7 +190,7 @@ public class NotificationRegistry {
    * @param notification
    */
   public void putTransactionalForSession(String sessionId, Serializable notification) {
-    NotificationMessage message = new NotificationMessage(NotficationAddress.createSessionAddress(CollectionUtility.hashSet(sessionId),
+    ClientNotificationMessage message = new ClientNotificationMessage(ClientNotficationAddress.createSessionAddress(CollectionUtility.hashSet(sessionId),
         Assertions.assertNotNull(ClientNotificationNodeId.CURRENT.get(), "No notification node id found on the thread context.")), notification);
     putTransactional(message);
   }
@@ -203,7 +203,7 @@ public class NotificationRegistry {
    * @param notification
    */
   public void putTransactionalForAllSessions(Serializable notification) {
-    NotificationMessage message = new NotificationMessage(NotficationAddress.createAllSessionsAddress(
+    ClientNotificationMessage message = new ClientNotificationMessage(ClientNotficationAddress.createAllSessionsAddress(
         Assertions.assertNotNull(ClientNotificationNodeId.CURRENT.get(), "No notification node id found on the thread context.")), notification);
     putTransactional(message);
   }
@@ -216,17 +216,17 @@ public class NotificationRegistry {
    * @param notification
    */
   public void putTransactionalForAllNodes(Serializable notification) {
-    NotificationMessage message = new NotificationMessage(NotficationAddress.createAllNodesAddress(
+    ClientNotificationMessage message = new ClientNotificationMessage(ClientNotficationAddress.createAllNodesAddress(
         Assertions.assertNotNull(ClientNotificationNodeId.CURRENT.get(), "No notification node id found on the thread context.")), notification);
     putTransactional(message);
   }
 
-  public void putTransactional(NotificationMessage message) {
+  public void putTransactional(ClientNotificationMessage message) {
     ITransaction transaction = Assertions.assertNotNull(ITransaction.CURRENT.get(), "No transaction found in curren run context for processing notification %s", message);
     try {
-      NotificationTransactionMember tMember = (NotificationTransactionMember) transaction.getMember(NotificationTransactionMember.TRANSACTION_MEMBER_ID);
+      ClientNotificationTransactionMember tMember = (ClientNotificationTransactionMember) transaction.getMember(ClientNotificationTransactionMember.TRANSACTION_MEMBER_ID);
       if (tMember == null) {
-        tMember = new NotificationTransactionMember();
+        tMember = new ClientNotificationTransactionMember();
         transaction.registerMember(tMember);
       }
       tMember.addNotification(message);
@@ -238,7 +238,7 @@ public class NotificationRegistry {
     }
   }
 
-  private void distributeCluster(Collection<? extends NotificationMessage> messages) {
+  private void distributeCluster(Collection<? extends ClientNotificationMessage> messages) {
     try {
       IClusterSynchronizationService service = BEANS.get(IClusterSynchronizationService.class);
       service.publish(new ClientNotificationClusterNotification(messages));

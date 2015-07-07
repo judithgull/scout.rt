@@ -8,7 +8,7 @@
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
-package org.eclipse.scout.rt.shared.services.common.notification;
+package org.eclipse.scout.rt.shared.clientnotification;
 
 import java.util.List;
 
@@ -17,7 +17,7 @@ import org.eclipse.scout.rt.shared.TunnelToServer;
 
 @ApplicationScoped
 @TunnelToServer
-public interface INotificationServerService {
+public interface IClientNotificationService {
 
   /**
    * must be called in a session scope
@@ -30,6 +30,6 @@ public interface INotificationServerService {
 
   void unregisterSession(String notificationNodeId);
 
-  List<NotificationMessage> getNotifications(String notificationNodeId);
+  List<ClientNotificationMessage> getNotifications(String notificationNodeId);
 
 }

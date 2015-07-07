@@ -8,7 +8,7 @@
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
-package org.eclipse.scout.rt.client.services.common.notification;
+package org.eclipse.scout.rt.client.clientnotification;
 
 import java.io.Serializable;
 import java.util.Collection;
@@ -36,35 +36,35 @@ import org.eclipse.scout.rt.platform.job.IDoneCallback;
 import org.eclipse.scout.rt.platform.job.IFuture;
 import org.eclipse.scout.rt.platform.job.Jobs;
 import org.eclipse.scout.rt.shared.ISession;
+import org.eclipse.scout.rt.shared.clientnotification.ClientNotificationMessage;
 import org.eclipse.scout.rt.shared.notification.NotificationHandlerRegistry;
-import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
 
 /**
  *
  */
 @ApplicationScoped
-public class NotificationDispatcher {
-  private static final IScoutLogger LOG = ScoutLogManager.getLogger(NotificationDispatcher.class);
+public class ClientNotificationDispatcher {
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(ClientNotificationDispatcher.class);
 
-  private final IFilter<NotificationMessage> ACCEPT_ALL_FILTER = new IFilter<NotificationMessage>() {
+  private final IFilter<ClientNotificationMessage> ACCEPT_ALL_FILTER = new IFilter<ClientNotificationMessage>() {
     @Override
-    public boolean accept(NotificationMessage element) {
+    public boolean accept(ClientNotificationMessage element) {
       return true;
     }
   };
 
   private final Set<IFuture<Void>> m_notificationFutures = new HashSet<>();
 
-  public void dispatchNotifications(Collection<NotificationMessage> notifications) {
+  public void dispatchNotifications(Collection<ClientNotificationMessage> notifications) {
     dispatchNotifications(notifications, ACCEPT_ALL_FILTER);
   }
 
   /**
    * @param notifications
    */
-  public void dispatchNotifications(Collection<NotificationMessage> notifications, IFilter<NotificationMessage> filter) {
-    INotificationClientService notificationService = BEANS.get(INotificationClientService.class);
-    for (NotificationMessage message : notifications) {
+  public void dispatchNotifications(Collection<ClientNotificationMessage> notifications, IFilter<ClientNotificationMessage> filter) {
+    IClientSessionRegistry notificationService = BEANS.get(IClientSessionRegistry.class);
+    for (ClientNotificationMessage message : notifications) {
       if (!filter.accept(message)) {
         continue;
       }

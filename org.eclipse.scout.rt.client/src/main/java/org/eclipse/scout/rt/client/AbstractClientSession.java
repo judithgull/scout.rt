@@ -58,7 +58,7 @@ import org.eclipse.scout.rt.shared.extension.AbstractExtension;
 import org.eclipse.scout.rt.shared.extension.IExtensibleObject;
 import org.eclipse.scout.rt.shared.extension.IExtension;
 import org.eclipse.scout.rt.shared.extension.ObjectExtensions;
-import org.eclipse.scout.rt.shared.notification.IClientNotificationListener;
+import org.eclipse.scout.rt.shared.notification.INotificationListener;
 import org.eclipse.scout.rt.shared.services.common.context.SharedContextChangedNotification;
 import org.eclipse.scout.rt.shared.services.common.context.SharedVariableMap;
 import org.eclipse.scout.rt.shared.services.common.prefs.IPreferences;
@@ -246,7 +246,7 @@ public abstract class AbstractClientSession extends AbstractPropertyObserver imp
     }
 
     // add client notification listener
-    BEANS.get(SharedContextNotificationHanlder.class).addListener(this, new IClientNotificationListener<SharedContextChangedNotification>() {
+    BEANS.get(SharedContextNotificationHanlder.class).addListener(this, new INotificationListener<SharedContextChangedNotification>() {
 
       @Override
       public void handleNotification(SharedContextChangedNotification notification) {

@@ -8,7 +8,7 @@
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
-package org.eclipse.scout.rt.client.services.common.notification;
+package org.eclipse.scout.rt.client.clientnotification;
 
 import java.util.List;
 import java.util.UUID;
@@ -17,10 +17,10 @@ import org.eclipse.scout.rt.client.IClientSession;
 import org.eclipse.scout.rt.platform.ApplicationScoped;
 
 @ApplicationScoped
-public interface INotificationClientService {
+public interface IClientSessionRegistry {
   String NOTIFICATION_NODE_ID = UUID.randomUUID().toString();
 
-  void registerClientSession(IClientSession clientSession);
+  void register(IClientSession clientSession);
 
   /**
    * @param sessionid

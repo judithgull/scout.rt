@@ -8,7 +8,7 @@
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
-package org.eclipse.scout.rt.client.services.common.notification;
+package org.eclipse.scout.rt.client.clientnotification;
 
 import java.lang.ref.WeakReference;
 import java.util.HashMap;
@@ -29,7 +29,7 @@ import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.config.CONFIG;
 import org.eclipse.scout.rt.platform.context.RunContexts;
 import org.eclipse.scout.rt.shared.SharedConfigProperties.NotificationSubjectProperty;
-import org.eclipse.scout.rt.shared.services.common.notification.INotificationServerService;
+import org.eclipse.scout.rt.shared.clientnotification.IClientNotificationService;
 import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnel;
 import org.eclipse.scout.rt.shared.session.ISessionListener;
 import org.eclipse.scout.rt.shared.session.SessionEvent;
@@ -37,8 +37,8 @@ import org.eclipse.scout.rt.shared.session.SessionEvent;
 /**
  *
  */
-public class NotificationClientService implements INotificationClientService {
-  private static final IScoutLogger LOG = ScoutLogManager.getLogger(NotificationClientService.class);
+public class ClientSessionRegistry implements IClientSessionRegistry {
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(ClientSessionRegistry.class);
 
   protected final Subject NOTIFICATION_SUBJECT = CONFIG.getPropertyValue(NotificationSubjectProperty.class);
 
@@ -49,12 +49,12 @@ public class NotificationClientService implements INotificationClientService {
   private final ISessionListener m_clientSessionStateListener = new P_ClientSessionStateListener();
 
   @Override
-  public void registerClientSession(IClientSession clientSession) {
-    if (BEANS.get(IServiceTunnel.class).isActive() && BEANS.opt(INotificationServerService.class) != null) {
+  public void register(IClientSession clientSession) {
+    if (BEANS.get(IServiceTunnel.class).isActive() && BEANS.opt(IClientNotificationService.class) != null) {
       clientSession.addListener(m_clientSessionStateListener);
       // if the client session is already started, otherwise the listener will invoke the clientSessionStated method.
       if (clientSession.isActive()) {
-        clientSessionStarted(clientSession);
+        sessionStarted(clientSession);
       }
     }
   }
@@ -73,7 +73,7 @@ public class NotificationClientService implements INotificationClientService {
       RunContexts.empty().subject(NOTIFICATION_SUBJECT).run(new IRunnable() {
         @Override
         public void run() throws Exception {
-          BEANS.get(INotificationServerService.class).unregisterSession(NOTIFICATION_NODE_ID);
+          BEANS.get(IClientNotificationService.class).unregisterSession(NOTIFICATION_NODE_ID);
         }
       });
     }
@@ -92,10 +92,10 @@ public class NotificationClientService implements INotificationClientService {
    * @param session
    * @throws ProcessingException
    */
-  public void clientSessionStarted(final IClientSession session) {
+  public void sessionStarted(final IClientSession session) {
     LOG.debug(String.format("client session [sessionid=%s, userId=%s] started", session.getId(), session.getUserId()));
     // lookup the userid remote because the user is not necessarily set on the client session.
-    final String userId = BEANS.get(INotificationServerService.class).getUserIdOfCurrentSession();
+    final String userId = BEANS.get(IClientNotificationService.class).getUserIdOfCurrentSession();
     // local linking
     synchronized (m_cacheLock) {
       m_sessionIdToSession.put(session.getId(), new WeakReference<IClientSession>(session));
@@ -129,7 +129,7 @@ public class NotificationClientService implements INotificationClientService {
       RunContexts.empty().subject(NOTIFICATION_SUBJECT).run(new IRunnable() {
         @Override
         public void run() throws Exception {
-          BEANS.get(INotificationServerService.class).registerSession(NOTIFICATION_NODE_ID, session.getId(), userId);
+          BEANS.get(IClientNotificationService.class).registerSession(NOTIFICATION_NODE_ID, session.getId(), userId);
         }
       });
     }
@@ -193,7 +193,7 @@ public class NotificationClientService implements INotificationClientService {
     public void sessionChanged(SessionEvent event) {
       switch (event.getType()) {
         case SessionEvent.TYPE_STARTED:
-          clientSessionStarted((IClientSession) event.getSource());
+          sessionStarted((IClientSession) event.getSource());
           break;
         case SessionEvent.TYPE_STOPPED:
           clientSessionStopping((IClientSession) event.getSource());

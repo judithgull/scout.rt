@@ -16,8 +16,8 @@ import java.util.List;
 import org.eclipse.scout.commons.IRunnable;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.IClientSession;
+import org.eclipse.scout.rt.client.clientnotification.ClientNotificationDispatcher;
 import org.eclipse.scout.rt.client.job.ClientJobs;
-import org.eclipse.scout.rt.client.services.common.notification.NotificationDispatcher;
 import org.eclipse.scout.rt.client.testenvironment.TestEnvironmentClientSession;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.BeanMetaData;
@@ -62,7 +62,7 @@ public class NotificationDispatcherTest {
 
     // ensure bean hander cache of notification dispatcher gets refreshed
     IBeanManager beanManager = BEANS.getBeanManager();
-    IBean<NotificationDispatcher> bean = beanManager.getBean(NotificationDispatcher.class);
+    IBean<ClientNotificationDispatcher> bean = beanManager.getBean(ClientNotificationDispatcher.class);
     beanManager.unregisterBean(bean);
     beanManager.registerBean(new BeanMetaData(bean));
     System.out.println("END BEFORE");
@@ -74,7 +74,7 @@ public class NotificationDispatcherTest {
     TestingUtility.unregisterBeans(m_serviceReg);
     // ensure bean hander cache of notification dispatcher gets refreshed
     IBeanManager beanManager = BEANS.getBeanManager();
-    IBean<NotificationDispatcher> bean = beanManager.getBean(NotificationDispatcher.class);
+    IBean<ClientNotificationDispatcher> bean = beanManager.getBean(ClientNotificationDispatcher.class);
     beanManager.unregisterBean(bean);
     beanManager.registerBean(new BeanMetaData(bean));
     System.out.println("END AFTER");
@@ -89,7 +89,7 @@ public class NotificationDispatcherTest {
     ClientJobs.schedule(new IRunnable() {
       @Override
       public void run() throws Exception {
-        final NotificationDispatcher dispatcher = BEANS.get(NotificationDispatcher.class);
+        final ClientNotificationDispatcher dispatcher = BEANS.get(ClientNotificationDispatcher.class);
         dispatcher.dispatch((IClientSession) IClientSession.CURRENT.get(), stringNotification);
         dispatcher.waitForPendingNotifications();
       }
@@ -113,7 +113,7 @@ public class NotificationDispatcherTest {
     ClientJobs.schedule(new IRunnable() {
       @Override
       public void run() throws Exception {
-        NotificationDispatcher dispatcher = BEANS.get(NotificationDispatcher.class);
+        ClientNotificationDispatcher dispatcher = BEANS.get(ClientNotificationDispatcher.class);
         dispatcher.dispatch((IClientSession) IClientSession.CURRENT.get(), new Notification01());
         dispatcher.dispatch((IClientSession) IClientSession.CURRENT.get(), new Notification02());
         dispatcher.dispatch((IClientSession) IClientSession.CURRENT.get(), new Notification02());

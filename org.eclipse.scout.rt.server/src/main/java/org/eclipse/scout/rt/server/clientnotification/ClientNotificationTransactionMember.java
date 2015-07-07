@@ -16,7 +16,7 @@ import java.util.List;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.server.context.ServerRunContext;
 import org.eclipse.scout.rt.server.transaction.AbstractTransactionMember;
-import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
+import org.eclipse.scout.rt.shared.clientnotification.ClientNotificationMessage;
 import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelResponse;
 
 /**
@@ -25,13 +25,13 @@ import org.eclipse.scout.rt.shared.servicetunnel.ServiceTunnelResponse;
  * the txNotificationContainer will be added to the {@link ServiceTunnelResponse} and piggy backed to the client.
  * The reason to do so is to provide an immediate client side processing of transactional notifications.
  */
-public class NotificationTransactionMember extends AbstractTransactionMember {
+public class ClientNotificationTransactionMember extends AbstractTransactionMember {
 
-  public static final String TRANSACTION_MEMBER_ID = "notification.transactionMemberId";
+  public static final String TRANSACTION_MEMBER_ID = "clientNotification.transactionMemberId";
 
-  private final List<NotificationMessage> m_notifications = new ArrayList<>();
+  private final List<ClientNotificationMessage> m_notifications = new ArrayList<>();
 
-  public NotificationTransactionMember() {
+  public ClientNotificationTransactionMember() {
     super(TRANSACTION_MEMBER_ID);
   }
 
@@ -40,19 +40,19 @@ public class NotificationTransactionMember extends AbstractTransactionMember {
     return true;
   }
 
-  public void addNotification(NotificationMessage message) {
+  public void addNotification(ClientNotificationMessage message) {
     m_notifications.add(message);
   }
 
   @Override
   public void commitPhase2() {
     // coalease
-    List<NotificationMessage> coalescedNotifications = BEANS.get(ClientNotificationCoalescer.class).coalesce(m_notifications);
+    List<ClientNotificationMessage> coalescedNotifications = BEANS.get(ClientNotificationCoalescer.class).coalesce(m_notifications);
     m_notifications.clear();
     // piggy back
     ClientNotificationContainer.get().addAll(coalescedNotifications);
     // notify others
-    BEANS.get(NotificationRegistry.class).put(coalescedNotifications);
+    BEANS.get(ClientNotificationRegistry.class).put(coalescedNotifications);
   }
 
 }

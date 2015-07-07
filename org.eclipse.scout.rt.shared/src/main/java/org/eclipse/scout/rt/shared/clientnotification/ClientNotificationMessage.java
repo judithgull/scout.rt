@@ -8,25 +8,25 @@
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
-package org.eclipse.scout.rt.shared.services.common.notification;
+package org.eclipse.scout.rt.shared.clientnotification;
 
 import java.io.Serializable;
 
 /**
  *
  */
-public class NotificationMessage implements Serializable {
+public class ClientNotificationMessage implements Serializable {
   private static final long serialVersionUID = 1L;
 
-  private final NotficationAddress m_address;
+  private final ClientNotficationAddress m_address;
   private final Serializable m_notification;
 
-  public NotificationMessage(NotficationAddress address, Serializable notification) {
+  public ClientNotificationMessage(ClientNotficationAddress address, Serializable notification) {
     m_address = address;
     m_notification = notification;
   }
 
-  public NotficationAddress getAddress() {
+  public ClientNotficationAddress getAddress() {
     return m_address;
   }
 

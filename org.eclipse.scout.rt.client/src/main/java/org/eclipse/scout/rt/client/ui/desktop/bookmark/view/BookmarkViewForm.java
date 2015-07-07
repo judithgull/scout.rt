@@ -45,7 +45,7 @@ import org.eclipse.scout.rt.client.ui.form.fields.tabbox.AbstractTabBox;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.exception.ExceptionHandler;
 import org.eclipse.scout.rt.shared.ScoutTexts;
-import org.eclipse.scout.rt.shared.notification.IClientNotificationListener;
+import org.eclipse.scout.rt.shared.notification.INotificationListener;
 import org.eclipse.scout.rt.shared.security.CreateUserBookmarkPermission;
 import org.eclipse.scout.rt.shared.security.DeleteUserBookmarkPermission;
 import org.eclipse.scout.rt.shared.security.UpdateUserBookmarkPermission;
@@ -319,7 +319,7 @@ public class BookmarkViewForm extends AbstractForm {
   @Order(20f)
   public class ViewHandler extends AbstractFormHandler {
 
-    private final IClientNotificationListener<BookmarkChangedClientNotification> m_cncListener = new IClientNotificationListener<BookmarkChangedClientNotification>() {
+    private final INotificationListener<BookmarkChangedClientNotification> m_cncListener = new INotificationListener<BookmarkChangedClientNotification>() {
       @Override
       public void handleNotification(BookmarkChangedClientNotification notification) {
         try {

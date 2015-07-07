@@ -20,19 +20,19 @@ import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.shared.ISession;
-import org.eclipse.scout.rt.shared.services.common.notification.INotificationServerService;
-import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
+import org.eclipse.scout.rt.shared.clientnotification.IClientNotificationService;
+import org.eclipse.scout.rt.shared.clientnotification.ClientNotificationMessage;
 
 /**
  *
  */
-public class NotificationServerService implements INotificationServerService {
-  private static final IScoutLogger LOG = ScoutLogManager.getLogger(NotificationServerService.class);
-  private NotificationRegistry m_notificationRegistry;
+public class ClientNotificationService implements IClientNotificationService {
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(ClientNotificationService.class);
+  private ClientNotificationRegistry m_notificationRegistry;
 
   @PostConstruct
   protected void setup() {
-    m_notificationRegistry = BEANS.get(NotificationRegistry.class);
+    m_notificationRegistry = BEANS.get(ClientNotificationRegistry.class);
   }
 
   @Override
@@ -55,7 +55,7 @@ public class NotificationServerService implements INotificationServerService {
   }
 
   @Override
-  public List<NotificationMessage> getNotifications(String notificationNodeId) {
+  public List<ClientNotificationMessage> getNotifications(String notificationNodeId) {
     // TODO[aho] to be configured
     return m_notificationRegistry.consume(notificationNodeId, 30, 10, TimeUnit.SECONDS);
   }

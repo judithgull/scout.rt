@@ -8,7 +8,7 @@
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
-package org.eclipse.scout.rt.client.services.common.notification;
+package org.eclipse.scout.rt.client.clientnotification;
 
 import java.util.List;
 
@@ -27,8 +27,8 @@ import org.eclipse.scout.rt.platform.context.RunMonitor;
 import org.eclipse.scout.rt.platform.job.IFuture;
 import org.eclipse.scout.rt.platform.job.Jobs;
 import org.eclipse.scout.rt.shared.SharedConfigProperties.NotificationSubjectProperty;
-import org.eclipse.scout.rt.shared.services.common.notification.INotificationServerService;
-import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
+import org.eclipse.scout.rt.shared.clientnotification.ClientNotificationMessage;
+import org.eclipse.scout.rt.shared.clientnotification.IClientNotificationService;
 import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnel;
 import org.eclipse.scout.rt.shared.ui.UserAgent;
 
@@ -37,13 +37,14 @@ import org.eclipse.scout.rt.shared.ui.UserAgent;
  */
 @ApplicationScoped
 @CreateImmediately
-public class NotificationPoller {
-  private static final IScoutLogger LOG = ScoutLogManager.getLogger(NotificationPoller.class);
+public class ClientNotificationPoller {
+  private static final IScoutLogger LOG = ScoutLogManager.getLogger(ClientNotificationPoller.class);
   private IFuture<Void> m_pollerFuture;
 
   @PostConstruct
-  protected void setup() {
-    if (BEANS.get(IServiceTunnel.class).isActive() && BEANS.opt(INotificationServerService.class) != null) {
+  public void start() {
+    // TODO aho guard to start only once
+    if (BEANS.get(IServiceTunnel.class).isActive()) {
       P_NotificationPollJob pollJob = new P_NotificationPollJob();
       m_pollerFuture = Jobs.schedule(pollJob, Jobs.newInput(ClientRunContexts.copyCurrent().subject(BEANS.get(NotificationSubjectProperty.class).getValue()).userAgent(UserAgent.createDefault()).session(null, false)));
     }
@@ -52,20 +53,20 @@ public class NotificationPoller {
     }
   }
 
-  public void stopPoller() {
+  public void stop() {
     if (m_pollerFuture != null) {
       m_pollerFuture.cancel(true);
     }
   }
 
-  protected void handleNotificationMessagesReceived(List<NotificationMessage> notifications) {
+  protected void handleMessagesReceived(List<ClientNotificationMessage> notifications) {
     System.out.println(String.format("CLIENT NOTIFICATION returned with %s notifications (%s).", notifications.size(), notifications));
     // process notifications
     if (!notifications.isEmpty()) {
-      BEANS.get(NotificationDispatcher.class).dispatchNotifications(notifications, new IFilter<NotificationMessage>() {
+      BEANS.get(ClientNotificationDispatcher.class).dispatchNotifications(notifications, new IFilter<ClientNotificationMessage>() {
         @Override
-        public boolean accept(NotificationMessage message) {
-          return !CompareUtility.equals(message.getAddress().getExcludeNodeId(), INotificationClientService.NOTIFICATION_NODE_ID);
+        public boolean accept(ClientNotificationMessage message) {
+          return !CompareUtility.equals(message.getAddress().getExcludeNodeId(), IClientSessionRegistry.NOTIFICATION_NODE_ID);
         }
       });
     }
@@ -75,7 +76,7 @@ public class NotificationPoller {
     @Override
     public void run() {
       while (!RunMonitor.CURRENT.get().isCancelled()) {
-        handleNotificationMessagesReceived(BEANS.get(INotificationServerService.class).getNotifications(INotificationClientService.NOTIFICATION_NODE_ID));
+        handleMessagesReceived(BEANS.get(IClientNotificationService.class).getNotifications(IClientSessionRegistry.NOTIFICATION_NODE_ID));
       }
     }
   }

@@ -27,22 +27,22 @@ import org.eclipse.scout.commons.CompareUtility;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.server.services.common.security.LogoutService;
-import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
+import org.eclipse.scout.rt.shared.clientnotification.ClientNotificationMessage;
 
 /**
  *
  */
-public class NotificationNodeQueue {
+public class ClientNotificationNodeQueue {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(LogoutService.class);
 
   private final String m_nodeId;
   private final int m_capacity;
-  private final List<NotificationMessage> m_notifications = new LinkedList<NotificationMessage>();
+  private final List<ClientNotificationMessage> m_notifications = new LinkedList<ClientNotificationMessage>();
   private final Object m_sessionCacheLock = new Object();
   private final Map<String /*sessionId*/, String /*userId*/> m_sessionsToUser = new HashMap<>();
   private final Map<String /*userIds*/, Set<String /*sessionId*/>> m_userToSessions = new HashMap<>();
 
-  public NotificationNodeQueue(String nodeId, int capacity) {
+  public ClientNotificationNodeQueue(String nodeId, int capacity) {
     m_nodeId = nodeId;
     m_capacity = capacity;
   }
@@ -72,13 +72,13 @@ public class NotificationNodeQueue {
     }
   }
 
-  public void put(NotificationMessage notification) {
+  public void put(ClientNotificationMessage notification) {
     put(CollectionUtility.arrayList(notification));
   }
 
-  public void put(Collection<? extends NotificationMessage> notificationInput) {
-    List<NotificationMessage> notifications = new ArrayList<NotificationMessage>(notificationInput);
-    Iterator<NotificationMessage> it = notifications.iterator();
+  public void put(Collection<? extends ClientNotificationMessage> notificationInput) {
+    List<ClientNotificationMessage> notifications = new ArrayList<ClientNotificationMessage>(notificationInput);
+    Iterator<ClientNotificationMessage> it = notifications.iterator();
     while (it.hasNext()) {
       if (!isRelevant(it.next())) {
         it.remove();
@@ -100,7 +100,7 @@ public class NotificationNodeQueue {
     }
   }
 
-  public boolean isRelevant(NotificationMessage message) {
+  public boolean isRelevant(ClientNotificationMessage message) {
     if (CompareUtility.equals(getNodeId(), message.getAddress().getExcludeNodeId())) {
       return false;
     }
@@ -133,14 +133,14 @@ public class NotificationNodeQueue {
     }
   }
 
-  public List<NotificationMessage> consume(int maxAmount, long amount, TimeUnit unit) {
-    List<NotificationMessage> result = new ArrayList<NotificationMessage>(maxAmount);
+  public List<ClientNotificationMessage> consume(int maxAmount, long amount, TimeUnit unit) {
+    List<ClientNotificationMessage> result = new ArrayList<ClientNotificationMessage>(maxAmount);
     getNotifications(maxAmount, amount, unit, result, true);
     LOG.debug(String.format("consumed %s notifications.", result.size()));
     return result;
   }
 
-  protected void getNotifications(int maxAmount, long amount, TimeUnit unit, List<NotificationMessage> collector, boolean reschedule) {
+  protected void getNotifications(int maxAmount, long amount, TimeUnit unit, List<ClientNotificationMessage> collector, boolean reschedule) {
     synchronized (m_notifications) {
       if (m_notifications.isEmpty()) {
         try {
@@ -150,7 +150,7 @@ public class NotificationNodeQueue {
           LOG.warn("Consume notification thread waiting for notifications interrupted.");
         }
       }
-      Iterator<NotificationMessage> it = m_notifications.iterator();
+      Iterator<ClientNotificationMessage> it = m_notifications.iterator();
       int itemCount = collector.size();
       while (it.hasNext() && itemCount < maxAmount) {
         collector.add(it.next());

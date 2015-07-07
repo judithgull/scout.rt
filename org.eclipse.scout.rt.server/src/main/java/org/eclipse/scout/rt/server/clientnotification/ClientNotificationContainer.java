@@ -16,12 +16,12 @@ import java.util.Locale;
 import java.util.Set;
 
 import org.eclipse.scout.rt.server.context.ServerRunContext;
-import org.eclipse.scout.rt.shared.services.common.notification.NotificationMessage;
+import org.eclipse.scout.rt.shared.clientnotification.ClientNotificationMessage;
 
 /**
  * The container of all transactional notifications during a server request. Is kept on the {@link ServerRunContext}.
  *
- * @see NotificationTransactionMember
+ * @see ClientNotificationTransactionMember
  */
 public class ClientNotificationContainer {
 
@@ -30,7 +30,7 @@ public class ClientNotificationContainer {
    */
   public static final ThreadLocal<ClientNotificationContainer> CURRENT = new ThreadLocal<>();
 
-  private final Set<NotificationMessage> m_notifications = new HashSet<>();
+  private final Set<ClientNotificationMessage> m_notifications = new HashSet<>();
 
   public ClientNotificationContainer() {
   }
@@ -41,16 +41,16 @@ public class ClientNotificationContainer {
     return CURRENT.get();
   }
 
-  public boolean add(NotificationMessage message) {
+  public boolean add(ClientNotificationMessage message) {
     return m_notifications.add(message);
   }
 
-  public void addAll(Collection<NotificationMessage> messages) {
+  public void addAll(Collection<ClientNotificationMessage> messages) {
     m_notifications.addAll(messages);
   }
 
-  public Set<NotificationMessage> getNotifications() {
-    return new HashSet<NotificationMessage>(m_notifications);
+  public Set<ClientNotificationMessage> getNotifications() {
+    return new HashSet<ClientNotificationMessage>(m_notifications);
   }
 
 }

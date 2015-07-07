@@ -8,7 +8,7 @@
  * Contributors:
  *     BSI Business Systems Integration AG - initial API and implementation
  ******************************************************************************/
-package org.eclipse.scout.rt.shared.services.common.notification;
+package org.eclipse.scout.rt.shared.clientnotification;
 
 import java.io.Serializable;
 import java.util.Collections;
@@ -19,7 +19,7 @@ import org.eclipse.scout.commons.CollectionUtility;
 /**
  *
  */
-public class NotficationAddress implements Serializable {
+public class ClientNotficationAddress implements Serializable {
   private static final long serialVersionUID = 1L;
 
   private final Set<String> m_sessionIds;
@@ -28,7 +28,7 @@ public class NotficationAddress implements Serializable {
   private final boolean m_notifyAllSessions;
   private final boolean m_notifyAllNodes;
 
-  public NotficationAddress(Set<String> sessionIds, Set<String> userIds, boolean notifyAllSessions, boolean notifyAllNodes, String excludeNodeId) {
+  public ClientNotficationAddress(Set<String> sessionIds, Set<String> userIds, boolean notifyAllSessions, boolean notifyAllNodes, String excludeNodeId) {
     m_sessionIds = Collections.unmodifiableSet(CollectionUtility.hashSet(sessionIds));
     m_userIds = Collections.unmodifiableSet(CollectionUtility.hashSet(userIds));
     m_notifyAllSessions = notifyAllSessions;
@@ -36,36 +36,36 @@ public class NotficationAddress implements Serializable {
     m_excludeNodeId = excludeNodeId;
   }
 
-  public static NotficationAddress createSessionAddress(Set<String> sessionIds) {
+  public static ClientNotficationAddress createSessionAddress(Set<String> sessionIds) {
     return createSessionAddress(sessionIds, null);
   }
 
-  public static NotficationAddress createSessionAddress(Set<String> sessionIds, String excludeNodeId) {
-    return new NotficationAddress(sessionIds, null, false, false, excludeNodeId);
+  public static ClientNotficationAddress createSessionAddress(Set<String> sessionIds, String excludeNodeId) {
+    return new ClientNotficationAddress(sessionIds, null, false, false, excludeNodeId);
   }
 
-  public static NotficationAddress createUserAddress(Set<String> userIds) {
+  public static ClientNotficationAddress createUserAddress(Set<String> userIds) {
     return createUserAddress(userIds, null);
   }
 
-  public static NotficationAddress createUserAddress(Set<String> userIds, String excludeNodeId) {
-    return new NotficationAddress(null, userIds, false, false, excludeNodeId);
+  public static ClientNotficationAddress createUserAddress(Set<String> userIds, String excludeNodeId) {
+    return new ClientNotficationAddress(null, userIds, false, false, excludeNodeId);
   }
 
-  public static NotficationAddress createAllSessionsAddress() {
+  public static ClientNotficationAddress createAllSessionsAddress() {
     return createAllSessionsAddress(null);
   }
 
-  public static NotficationAddress createAllSessionsAddress(String excludeNodeId) {
-    return new NotficationAddress(null, null, true, false, excludeNodeId);
+  public static ClientNotficationAddress createAllSessionsAddress(String excludeNodeId) {
+    return new ClientNotficationAddress(null, null, true, false, excludeNodeId);
   }
 
-  public static NotficationAddress createAllNodesAddress() {
+  public static ClientNotficationAddress createAllNodesAddress() {
     return createAllNodesAddress(null);
   }
 
-  public static NotficationAddress createAllNodesAddress(String excludeNodeId) {
-    return new NotficationAddress(null, null, false, true, excludeNodeId);
+  public static ClientNotficationAddress createAllNodesAddress(String excludeNodeId) {
+    return new ClientNotficationAddress(null, null, false, true, excludeNodeId);
   }
 
   public Set<String> getSessionIds() {
@@ -126,10 +126,10 @@ public class NotficationAddress implements Serializable {
     if (obj == null) {
       return false;
     }
-    if (!(obj instanceof NotficationAddress)) {
+    if (!(obj instanceof ClientNotficationAddress)) {
       return false;
     }
-    NotficationAddress other = (NotficationAddress) obj;
+    ClientNotficationAddress other = (ClientNotficationAddress) obj;
     if (m_notifyAllSessions) {
       return other.m_notifyAllSessions;
     }

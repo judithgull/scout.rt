@@ -32,7 +32,7 @@ import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.platform.BEANS;
-import org.eclipse.scout.rt.server.clientnotification.NotificationRegistry;
+import org.eclipse.scout.rt.server.clientnotification.ClientNotificationRegistry;
 import org.eclipse.scout.rt.server.extension.IServerSessionExtension;
 import org.eclipse.scout.rt.server.extension.ServerSessionChains.ServerSessionLoadSessionChain;
 import org.eclipse.scout.rt.shared.OfflineState;
@@ -175,7 +175,7 @@ public abstract class AbstractServerSession implements IServerSession, Serializa
       @Override
       public void propertyChange(PropertyChangeEvent e) {
         if (OfflineState.isOfflineDefault() == OfflineState.isOfflineInCurrentThread()) {
-          BEANS.get(NotificationRegistry.class).putForSession(getId(), new SharedContextChangedNotification(new SharedVariableMap(m_sharedVariableMap)));
+          BEANS.get(ClientNotificationRegistry.class).putForSession(getId(), new SharedContextChangedNotification(new SharedVariableMap(m_sharedVariableMap)));
         } 
       }
     });

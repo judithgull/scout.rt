@@ -27,16 +27,16 @@ import org.eclipse.scout.rt.shared.ISession;
  */
 public abstract class AbstractObservableNotificationHandler<T extends Serializable> implements INotificationHandler<T> {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractObservableNotificationHandler.class);
-  private final List<IClientNotificationListener<T>> m_globalListeners = new LinkedList<>();
-  private final Map<ISession, List<IClientNotificationListener<T>>> m_listeners = new WeakHashMap<>();
+  private final List<INotificationListener<T>> m_globalListeners = new LinkedList<>();
+  private final Map<ISession, List<INotificationListener<T>>> m_listeners = new WeakHashMap<>();
 
-  public void addGlobalListener(IClientNotificationListener<T> listener) {
+  public void addGlobalListener(INotificationListener<T> listener) {
     synchronized (m_globalListeners) {
       m_globalListeners.add(listener);
     }
   }
 
-  public void removeGlobalListeners(IClientNotificationListener<T> listener) {
+  public void removeGlobalListeners(INotificationListener<T> listener) {
     synchronized (m_globalListeners) {
       m_globalListeners.remove(listener);
     }
@@ -45,13 +45,13 @@ public abstract class AbstractObservableNotificationHandler<T extends Serializab
   /**
    * @param listener
    */
-  public void addListener(IClientNotificationListener<T> listener) {
+  public void addListener(INotificationListener<T> listener) {
     addListener(ISession.CURRENT.get(), listener);
   }
 
-  public void addListener(ISession session, IClientNotificationListener<T> listener) {
+  public void addListener(ISession session, INotificationListener<T> listener) {
     synchronized (m_listeners) {
-      List<IClientNotificationListener<T>> listeners = m_listeners.get(Assertions.assertNotNull(session));
+      List<INotificationListener<T>> listeners = m_listeners.get(Assertions.assertNotNull(session));
       if (listeners == null) {
         listeners = new ArrayList<>();
         m_listeners.put(session, listeners);
@@ -60,13 +60,13 @@ public abstract class AbstractObservableNotificationHandler<T extends Serializab
     }
   }
 
-  public void removeListener(IClientNotificationListener<T> listener) {
+  public void removeListener(INotificationListener<T> listener) {
     removeListener(ISession.CURRENT.get(), listener);
   }
 
-  public void removeListener(ISession session, IClientNotificationListener<T> listener) {
+  public void removeListener(ISession session, INotificationListener<T> listener) {
     synchronized (m_listeners) {
-      List<IClientNotificationListener<T>> listeners = m_listeners.get(Assertions.assertNotNull(session));
+      List<INotificationListener<T>> listeners = m_listeners.get(Assertions.assertNotNull(session));
       if (listeners != null) {
         listeners.remove(listener);
       }
@@ -89,11 +89,11 @@ public abstract class AbstractObservableNotificationHandler<T extends Serializab
    * @param notification
    */
   protected void notifyGlobalListeners(T notification) {
-    final List<IClientNotificationListener<T>> listeners;
+    final List<INotificationListener<T>> listeners;
     synchronized (m_globalListeners) {
-      listeners = new ArrayList<IClientNotificationListener<T>>(m_globalListeners);
+      listeners = new ArrayList<INotificationListener<T>>(m_globalListeners);
     }
-    for (IClientNotificationListener<T> l : listeners) {
+    for (INotificationListener<T> l : listeners) {
       try {
         l.handleNotification(notification);
       }
@@ -107,17 +107,17 @@ public abstract class AbstractObservableNotificationHandler<T extends Serializab
    * @param notification
    */
   protected void notifySessionBasedListeners(ISession session, T notification) {
-    final List<IClientNotificationListener<T>> listeners;
+    final List<INotificationListener<T>> listeners;
     synchronized (m_listeners) {
-      List<IClientNotificationListener<T>> list = m_listeners.get(session);
+      List<INotificationListener<T>> list = m_listeners.get(session);
       if (list != null) {
-        listeners = new ArrayList<IClientNotificationListener<T>>(list);
+        listeners = new ArrayList<INotificationListener<T>>(list);
       }
       else {
         return;
       }
     }
-    for (IClientNotificationListener<T> l : listeners) {
+    for (INotificationListener<T> l : listeners) {
       try {
         l.handleNotification(notification);
       }

@@ -19,10 +19,10 @@ import org.eclipse.scout.commons.IRunnable;
 import org.eclipse.scout.commons.annotations.Internal;
 import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.rt.client.IClientSession;
+import org.eclipse.scout.rt.client.clientnotification.IClientSessionRegistry;
 import org.eclipse.scout.rt.client.context.ClientRunContext;
 import org.eclipse.scout.rt.client.context.ClientRunContexts;
 import org.eclipse.scout.rt.client.job.ModelJobs;
-import org.eclipse.scout.rt.client.services.common.notification.INotificationClientService;
 import org.eclipse.scout.rt.platform.ApplicationScoped;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.shared.ISession;
@@ -77,7 +77,7 @@ public class ClientSessionProvider {
 
   protected void registerClientSessionForNotifications(IClientSession session) {
     // register client session for notifications
-    BEANS.get(INotificationClientService.class).registerClientSession(session);
+    BEANS.get(IClientSessionRegistry.class).register(session);
   }
 
   /**

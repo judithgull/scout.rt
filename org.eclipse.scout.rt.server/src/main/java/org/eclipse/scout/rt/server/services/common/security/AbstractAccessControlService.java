@@ -18,7 +18,7 @@ import org.eclipse.scout.commons.exception.ProcessingException;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.platform.BEANS;
-import org.eclipse.scout.rt.server.clientnotification.NotificationRegistry;
+import org.eclipse.scout.rt.server.clientnotification.ClientNotificationRegistry;
 import org.eclipse.scout.rt.server.services.common.clustersync.IClusterSynchronizationService;
 import org.eclipse.scout.rt.server.transaction.ITransaction;
 import org.eclipse.scout.rt.shared.notification.INotificationHandler;
@@ -37,7 +37,7 @@ public abstract class AbstractAccessControlService extends AbstractSharedAccessC
   protected void notifySetPermisions(Permissions p) {
     // notify clients:
     String userId = BEANS.get(IAccessControlService.class).getUserIdOfCurrentSubject();
-    BEANS.get(NotificationRegistry.class).putTransactionalForUser(userId, new AccessControlChangedNotification(p));
+    BEANS.get(ClientNotificationRegistry.class).putTransactionalForUser(userId, new AccessControlChangedNotification(p));
   }
 
   @Override
@@ -45,7 +45,7 @@ public abstract class AbstractAccessControlService extends AbstractSharedAccessC
     clearCacheNoFire();
 
     //notify clients with a filter, that will be accepted nowhere:
-    BEANS.get(NotificationRegistry.class).putTransactionalForAllNodes(new ResetAccessControlChangedNotification());
+    BEANS.get(ClientNotificationRegistry.class).putTransactionalForAllNodes(new ResetAccessControlChangedNotification());
     distributeCluster(new AccessControlClusterNotification());
   }
 
@@ -57,7 +57,7 @@ public abstract class AbstractAccessControlService extends AbstractSharedAccessC
     //notify clients:
     for (String userId : userIds) {
       if (userId != null) {
-        BEANS.get(NotificationRegistry.class).putTransactionalForUser(userId, new AccessControlChangedNotification(null));
+        BEANS.get(ClientNotificationRegistry.class).putTransactionalForUser(userId, new AccessControlChangedNotification(null));
       }
     }
   }
