@@ -21,38 +21,49 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import javax.annotation.PostConstruct;
+
 import org.eclipse.scout.commons.Assertions;
 import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.CompareUtility;
+import org.eclipse.scout.commons.FinalValue;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
+import org.eclipse.scout.rt.platform.Bean;
 import org.eclipse.scout.rt.server.services.common.security.LogoutService;
 import org.eclipse.scout.rt.shared.clientnotification.ClientNotificationMessage;
 
 /**
  *
  */
+@Bean
 public class ClientNotificationNodeQueue {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(LogoutService.class);
 
-  private final String m_nodeId;
-  private final int m_capacity;
+  private FinalValue<String> m_nodeId;
+  private FinalValue<Integer> m_capacity;
+
   private final List<ClientNotificationMessage> m_notifications = new LinkedList<ClientNotificationMessage>();
   private final Object m_sessionCacheLock = new Object();
   private final Map<String /*sessionId*/, String /*userId*/> m_sessionsToUser = new HashMap<>();
-  private final Map<String /*userIds*/, Set<String /*sessionId*/>> m_userToSessions = new HashMap<>();
+  private final Map<String /*userId*/, Set<String /*sessionId*/>> m_userToSessions = new HashMap<>();
 
-  public ClientNotificationNodeQueue(String nodeId, int capacity) {
-    m_nodeId = nodeId;
-    m_capacity = capacity;
+  @PostConstruct
+  protected void initConfig() {
+    // TODO aho make configurable
+    m_capacity.setValue(200);
+  }
+
+  public void setNodeId(String nodeId) {
+    m_nodeId.setValue(nodeId);
   }
 
   public String getNodeId() {
-    return m_nodeId;
+    return m_nodeId.getValue();
   }
 
   public int getCapacity() {
-    return m_capacity;
+    return m_capacity.getValue();
   }
 
   /**

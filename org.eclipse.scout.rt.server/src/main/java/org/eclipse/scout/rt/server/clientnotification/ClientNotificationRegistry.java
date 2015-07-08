@@ -86,8 +86,8 @@ public class ClientNotificationRegistry {
       ClientNotificationNodeQueue queue = m_notificationQueues.get(notificationNodeId);
       if (queue == null) {
         // create new
-        // TODO[aho] make configurable
-        queue = new ClientNotificationNodeQueue(notificationNodeId, 200);
+        queue = BEANS.get(ClientNotificationNodeQueue.class);
+        queue.setNodeId(notificationNodeId);
         m_notificationQueues.put(notificationNodeId, queue);
       }
       return queue;
