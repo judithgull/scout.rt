@@ -189,6 +189,22 @@ public class ClientNotificationRegistry {
   /**
    * To put a notifications with transactional behavior. The notification will be processed on successful commit of the
    * {@link ITransaction} surrounding the server call.
+   * The notification will be distributed to all sessions of the given userids.
+   *
+   * @param userIds
+   *          the addressed user
+   * @param notification
+   */
+  public void putTransactionalForUsers(Set<String> userIds, Serializable notification) {
+    // exclude the node the request comes from
+    ClientNotificationMessage message = new ClientNotificationMessage(ClientNotficationAddress.createUserAddress(userIds,
+        Assertions.assertNotNull(ClientNotificationNodeId.CURRENT.get(), "No notification node id found on the thread context.")), notification);
+    putTransactional(message);
+  }
+
+  /**
+   * To put a notifications with transactional behavior. The notification will be processed on successful commit of the
+   * {@link ITransaction} surrounding the server call.
    * The notification will be distributed to the session addressed with the unique sessionId.
    *
    * @param sessionId
