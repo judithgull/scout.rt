@@ -11,13 +11,11 @@
 package org.eclipse.scout.rt.shared.notification;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
 
 import org.eclipse.scout.commons.Assertions;
+import org.eclipse.scout.commons.EventListenerList;
 import org.eclipse.scout.commons.logger.IScoutLogger;
 import org.eclipse.scout.commons.logger.ScoutLogManager;
 import org.eclipse.scout.rt.shared.ISession;
@@ -27,19 +25,16 @@ import org.eclipse.scout.rt.shared.ISession;
  */
 public abstract class AbstractObservableNotificationHandler<T extends Serializable> implements INotificationHandler<T> {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(AbstractObservableNotificationHandler.class);
-  private final List<INotificationListener<T>> m_globalListeners = new LinkedList<>();
-  private final Map<ISession, List<INotificationListener<T>>> m_listeners = new WeakHashMap<>();
+
+  private final EventListenerList m_globalListeners = new EventListenerList();
+  private final Map<ISession, EventListenerList> m_listeners = new WeakHashMap<>();
 
   public void addGlobalListener(INotificationListener<T> listener) {
-    synchronized (m_globalListeners) {
-      m_globalListeners.add(listener);
-    }
+    m_globalListeners.add(INotificationListener.class, listener);
   }
 
   public void removeGlobalListeners(INotificationListener<T> listener) {
-    synchronized (m_globalListeners) {
-      m_globalListeners.remove(listener);
-    }
+    m_globalListeners.remove(INotificationListener.class, listener);
   }
 
   /**
@@ -51,12 +46,12 @@ public abstract class AbstractObservableNotificationHandler<T extends Serializab
 
   public void addListener(ISession session, INotificationListener<T> listener) {
     synchronized (m_listeners) {
-      List<INotificationListener<T>> listeners = m_listeners.get(Assertions.assertNotNull(session));
+      EventListenerList listeners = m_listeners.get(Assertions.assertNotNull(session));
       if (listeners == null) {
-        listeners = new ArrayList<>();
+        listeners = new EventListenerList();
         m_listeners.put(session, listeners);
       }
-      listeners.add(listener);
+      listeners.add(INotificationListener.class, listener);
     }
   }
 
@@ -66,15 +61,19 @@ public abstract class AbstractObservableNotificationHandler<T extends Serializab
 
   public void removeListener(ISession session, INotificationListener<T> listener) {
     synchronized (m_listeners) {
-      List<INotificationListener<T>> listeners = m_listeners.get(Assertions.assertNotNull(session));
+      EventListenerList listeners = m_listeners.get(Assertions.assertNotNull(session));
       if (listeners != null) {
-        listeners.remove(listener);
+        listeners.remove(INotificationListener.class, listener);
       }
     }
   }
 
   @Override
   public void handleNotification(T notification) {
+    notifiyListeners(notification);
+  }
+
+  protected void notifiyListeners(T notification) {
     ISession session = ISession.CURRENT.get();
     if (session == null) {
       notifyGlobalListeners(notification);
@@ -82,18 +81,14 @@ public abstract class AbstractObservableNotificationHandler<T extends Serializab
     else {
       notifySessionBasedListeners(session, notification);
     }
-
   }
 
   /**
    * @param notification
    */
+  @SuppressWarnings("unchecked")
   protected void notifyGlobalListeners(T notification) {
-    final List<INotificationListener<T>> listeners;
-    synchronized (m_globalListeners) {
-      listeners = new ArrayList<INotificationListener<T>>(m_globalListeners);
-    }
-    for (INotificationListener<T> l : listeners) {
+    for (INotificationListener<T> l : m_globalListeners.getListeners(INotificationListener.class)) {
       try {
         l.handleNotification(notification);
       }
@@ -106,12 +101,13 @@ public abstract class AbstractObservableNotificationHandler<T extends Serializab
   /**
    * @param notification
    */
+  @SuppressWarnings("unchecked")
   protected void notifySessionBasedListeners(ISession session, T notification) {
-    final List<INotificationListener<T>> listeners;
+    final INotificationListener<T>[] listeners;
     synchronized (m_listeners) {
-      List<INotificationListener<T>> list = m_listeners.get(session);
+      EventListenerList list = m_listeners.get(session);
       if (list != null) {
-        listeners = new ArrayList<INotificationListener<T>>(list);
+        listeners = list.getListeners(INotificationListener.class);
       }
       else {
         return;

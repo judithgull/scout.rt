@@ -30,6 +30,7 @@ import org.eclipse.scout.rt.platform.config.CONFIG;
 import org.eclipse.scout.rt.platform.context.RunContexts;
 import org.eclipse.scout.rt.shared.SharedConfigProperties.NotificationSubjectProperty;
 import org.eclipse.scout.rt.shared.clientnotification.IClientNotificationService;
+import org.eclipse.scout.rt.shared.services.common.ping.IPingService;
 import org.eclipse.scout.rt.shared.servicetunnel.IServiceTunnel;
 import org.eclipse.scout.rt.shared.session.ISessionListener;
 import org.eclipse.scout.rt.shared.session.SessionEvent;
@@ -49,12 +50,15 @@ public class ClientSessionRegistry implements IClientSessionRegistry {
   private final ISessionListener m_clientSessionStateListener = new P_ClientSessionStateListener();
 
   @Override
-  public void register(IClientSession clientSession) {
+  public void register(IClientSession session, String sessionId) {
+    synchronized (m_cacheLock) {
+      m_sessionIdToSession.put(sessionId, new WeakReference<IClientSession>(session));
+    }
     if (BEANS.get(IServiceTunnel.class).isActive() && BEANS.opt(IClientNotificationService.class) != null) {
-      clientSession.addListener(m_clientSessionStateListener);
+      session.addListener(m_clientSessionStateListener);
       // if the client session is already started, otherwise the listener will invoke the clientSessionStated method.
-      if (clientSession.isActive()) {
-        sessionStarted(clientSession);
+      if (session.isActive()) {
+        sessionStarted(session);
       }
     }
   }
@@ -93,13 +97,13 @@ public class ClientSessionRegistry implements IClientSessionRegistry {
    * @throws ProcessingException
    */
   public void sessionStarted(final IClientSession session) {
+
     LOG.debug(String.format("client session [sessionid=%s, userId=%s] started", session.getId(), session.getUserId()));
     // lookup the userid remote because the user is not necessarily set on the client session.
-    final String userId = BEANS.get(IClientNotificationService.class).getUserIdOfCurrentSession();
+    BEANS.get(IPingService.class).ping("ensure shared context is loaded...");
     // local linking
     synchronized (m_cacheLock) {
-      m_sessionIdToSession.put(session.getId(), new WeakReference<IClientSession>(session));
-      List<WeakReference<IClientSession>> sessionRefs = m_userToSessions.get(userId);
+      List<WeakReference<IClientSession>> sessionRefs = m_userToSessions.get(session.getUserId());
       if (sessionRefs != null) {
         // clean cache
         boolean toBeAdded = true;
@@ -121,7 +125,7 @@ public class ClientSessionRegistry implements IClientSessionRegistry {
       else {
         sessionRefs = new LinkedList<>();
         sessionRefs.add(new WeakReference<>(session));
-        m_userToSessions.put(userId, sessionRefs);
+        m_userToSessions.put(session.getUserId(), sessionRefs);
       }
     }
     // register on backend
@@ -129,7 +133,7 @@ public class ClientSessionRegistry implements IClientSessionRegistry {
       RunContexts.empty().subject(NOTIFICATION_SUBJECT).run(new IRunnable() {
         @Override
         public void run() throws Exception {
-          BEANS.get(IClientNotificationService.class).registerSession(NOTIFICATION_NODE_ID, session.getId(), userId);
+          BEANS.get(IClientNotificationService.class).registerSession(NOTIFICATION_NODE_ID, session.getId(), session.getUserId());
         }
       });
     }

@@ -178,7 +178,7 @@ public abstract class AbstractServerSession implements IServerSession, Serializa
           String sessionId = getId();
           if (sessionId != null) {
             SharedContextChangedNotification notification = new SharedContextChangedNotification(new SharedVariableMap(m_sharedVariableMap));
-            BEANS.get(ClientNotificationRegistry.class).putForSession(sessionId, notification);
+            BEANS.get(ClientNotificationRegistry.class).putTransactionalForSession(sessionId, notification);
           }
           else {
             LOG.warn("No sessionId set");

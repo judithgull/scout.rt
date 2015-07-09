@@ -20,7 +20,7 @@ import org.eclipse.scout.rt.platform.ApplicationScoped;
 public interface IClientSessionRegistry {
   String NOTIFICATION_NODE_ID = UUID.randomUUID().toString();
 
-  void register(IClientSession clientSession);
+  void register(IClientSession clientSession, String sessionId);
 
   /**
    * @param sessionid

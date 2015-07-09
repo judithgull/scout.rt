@@ -40,8 +40,8 @@ import org.eclipse.scout.rt.shared.clientnotification.ClientNotificationMessage;
 public class ClientNotificationNodeQueue {
   private static final IScoutLogger LOG = ScoutLogManager.getLogger(LogoutService.class);
 
-  private FinalValue<String> m_nodeId;
-  private FinalValue<Integer> m_capacity;
+  private final FinalValue<String> m_nodeId = new FinalValue<>();
+  private final FinalValue<Integer> m_capacity = new FinalValue<>();
 
   private final List<ClientNotificationMessage> m_notifications = new LinkedList<ClientNotificationMessage>();
   private final Object m_sessionCacheLock = new Object();

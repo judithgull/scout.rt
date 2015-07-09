@@ -58,6 +58,7 @@ public class ClientSessionProvider {
       public SESSION call() throws Exception {
         // 1. Create an empty session instance.
         final SESSION clientSession = ClientSessionProvider.cast(BEANS.get(IClientSession.class));
+        registerClientSessionForNotifications(clientSession, sessionId);
 
         // 2. Load the session.
         ModelJobs.schedule(new IRunnable() {
@@ -69,15 +70,14 @@ public class ClientSessionProvider {
           }
         }, ModelJobs.newInput(ClientRunContexts.copyCurrent().session(clientSession, true)).name("initialize ClientSession [user=%s]", runContext.subject()).logOnError(false)).awaitDoneAndGet();
 
-        registerClientSessionForNotifications(clientSession);
         return clientSession;
       }
     });
   }
 
-  protected void registerClientSessionForNotifications(IClientSession session) {
+  protected void registerClientSessionForNotifications(IClientSession session, String sessionId) {
     // register client session for notifications
-    BEANS.get(IClientSessionRegistry.class).register(session);
+    BEANS.get(IClientSessionRegistry.class).register(session, sessionId);
   }
 
   /**

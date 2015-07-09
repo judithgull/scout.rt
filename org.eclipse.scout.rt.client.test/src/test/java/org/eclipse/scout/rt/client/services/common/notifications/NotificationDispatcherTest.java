@@ -23,6 +23,7 @@ import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.BeanMetaData;
 import org.eclipse.scout.rt.platform.IBean;
 import org.eclipse.scout.rt.platform.IBeanManager;
+import org.eclipse.scout.rt.platform.IgnoreBean;
 import org.eclipse.scout.rt.platform.job.DoneEvent;
 import org.eclipse.scout.rt.platform.job.IBlockingCondition;
 import org.eclipse.scout.rt.platform.job.IDoneCallback;
@@ -131,6 +132,7 @@ public class NotificationDispatcherTest {
     System.out.println("END TEST 2");
   }
 
+  @IgnoreBean
   private static class GlobalNotificationHandler implements INotificationHandler<Serializable> {
 
     @Override
