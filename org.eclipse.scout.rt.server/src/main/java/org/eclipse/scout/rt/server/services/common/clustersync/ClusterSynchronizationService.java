@@ -18,6 +18,8 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import javax.security.auth.Subject;
 
@@ -54,6 +56,7 @@ public class ClusterSynchronizationService extends AbstractService implements IC
 
   private final EventListenerList m_listenerList = new EventListenerList();
   private final ClusterNodeStatusInfo m_statusInfo = new ClusterNodeStatusInfo();
+  private final ConcurrentMap<Class<? extends Serializable>, ClusterNodeStatusInfo> m_messageStatusMap = new ConcurrentHashMap<>();
 
   private volatile String m_nodeId;
   private final Subject m_subject;
@@ -155,6 +158,10 @@ public class ClusterSynchronizationService extends AbstractService implements IC
     return m_statusInfo;
   }
 
+  protected ClusterNodeStatusInfo getStatusInfoInternal(Class<? extends Serializable> messageType) {
+    return m_messageStatusMap.putIfAbsent(messageType, new ClusterNodeStatusInfo());
+  }
+
   @Override
   public String getNodeId() {
     return m_nodeId;
@@ -252,6 +259,7 @@ public class ClusterSynchronizationService extends AbstractService implements IC
     m_messageService.publishNotifications(messages);
     for (IClusterNotificationMessage im : messages) {
       getStatusInfoInternal().updateSentStatus(im);
+      getStatusInfoInternal(im.getClass()).updateReceiveStatus(im);
     }
   }
 
@@ -272,6 +280,7 @@ public class ClusterSynchronizationService extends AbstractService implements IC
       }
 
       getStatusInfoInternal().updateReceiveStatus(message);
+      getStatusInfoInternal(message.getClass()).updateReceiveStatus(message);
 
       ServerRunContext serverRunContext = ServerRunContexts.empty();
       serverRunContext.subject(m_subject);
@@ -346,6 +355,11 @@ public class ClusterSynchronizationService extends AbstractService implements IC
     public synchronized void rollback() {
       m_messageQueue.clear();
     }
+  }
+
+  @Override
+  public IClusterNodeStatusInfo getStatusInfo(Class<? extends Serializable> messageType) {
+    return getStatusInfoInternal(messageType).getStatus();
   }
 
 }

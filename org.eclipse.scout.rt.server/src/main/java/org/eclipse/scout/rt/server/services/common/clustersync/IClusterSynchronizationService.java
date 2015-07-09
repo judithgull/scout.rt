@@ -40,6 +40,11 @@ public interface IClusterSynchronizationService extends IService {
    */
   IClusterNodeStatusInfo getStatusInfo();
 
+  /**
+   * @return info about sent and received messages of a given message type
+   */
+  IClusterNodeStatusInfo getStatusInfo(Class<? extends Serializable> messageType);
+
   IClusterNotificationProperties getNotificationProperties();
 
   /**
