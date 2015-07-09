@@ -191,7 +191,9 @@ public final class SharedConfigProperties {
 
     @Override
     protected Subject getDefaultValue() {
-      return convertToSubject("notification-authenticator");
+//TODO jgu
+//      return convertToSubject("notification-authenticator");
+      return convertToSubject("system");
     }
   }
 }
