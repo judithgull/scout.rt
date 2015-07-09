@@ -159,7 +159,8 @@ public class ClusterSynchronizationService extends AbstractService implements IC
   }
 
   protected ClusterNodeStatusInfo getStatusInfoInternal(Class<? extends Serializable> messageType) {
-    return m_messageStatusMap.putIfAbsent(messageType, new ClusterNodeStatusInfo());
+    m_messageStatusMap.putIfAbsent(messageType, new ClusterNodeStatusInfo());
+    return m_messageStatusMap.get(messageType);
   }
 
   @Override
