@@ -32,7 +32,7 @@ public class ClusterNotificationMessageCoalescer {
   public List<IClusterNotificationMessage> coalesce(List<IClusterNotificationMessage> inNotifications) {
     List<IClusterNotificationMessage> result = new ArrayList<>();
     // sort by properties
-    Map<IClusterNotificationMessageProperties, List<Serializable>> notificationsPerProps = new HashMap<>();
+    Map<IClusterNotificationProperties, List<Serializable>> notificationsPerProps = new HashMap<>();
     for (IClusterNotificationMessage message : inNotifications) {
       List<Serializable> messages = notificationsPerProps.get(message.getProperties());
       if (messages == null) {
@@ -42,13 +42,13 @@ public class ClusterNotificationMessageCoalescer {
       messages.add(message.getNotification());
     }
 
-    for (Entry<IClusterNotificationMessageProperties, List<Serializable>> e : notificationsPerProps.entrySet()) {
+    for (Entry<IClusterNotificationProperties, List<Serializable>> e : notificationsPerProps.entrySet()) {
       result.addAll(coalesce(e.getKey(), e.getValue()));
     }
     return result;
   }
 
-  protected List<IClusterNotificationMessage> coalesce(IClusterNotificationMessageProperties props, List<Serializable> notificationsIn) {
+  protected List<IClusterNotificationMessage> coalesce(IClusterNotificationProperties props, List<Serializable> notificationsIn) {
     if (notificationsIn.isEmpty()) {
       return new ArrayList<>();
     }

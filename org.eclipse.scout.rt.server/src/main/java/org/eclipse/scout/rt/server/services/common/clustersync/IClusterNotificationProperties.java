@@ -13,13 +13,11 @@ package org.eclipse.scout.rt.server.services.common.clustersync;
 import java.io.Serializable;
 
 /**
- * Message sent between cluster nodes
+ * Additional info about the cluster notification
  */
-public interface IClusterNotificationMessage extends Serializable, IClusterPropertyMessage {
+public interface IClusterNotificationProperties extends Serializable {
 
-  @Override
-  IClusterNotificationProperties getProperties();
+  String getOriginNode();
 
-  Serializable getNotification();
-
+  String getOriginUser();
 }

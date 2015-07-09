@@ -40,7 +40,7 @@ public interface IClusterSynchronizationService extends IService {
    */
   IClusterNodeStatusInfo getStatusInfo();
 
-  IClusterNotificationMessageProperties getNotificationProperties();
+  IClusterNotificationProperties getNotificationProperties();
 
   /**
    * Starts listening to notifications

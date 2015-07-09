@@ -39,7 +39,7 @@ import org.eclipse.scout.rt.server.ServerConfigProperties.ClusterSyncUserPropert
 import org.eclipse.scout.rt.server.context.ServerRunContext;
 import org.eclipse.scout.rt.server.context.ServerRunContexts;
 import org.eclipse.scout.rt.server.services.common.clustersync.internal.ClusterNotificationMessage;
-import org.eclipse.scout.rt.server.services.common.clustersync.internal.ClusterNotificationMessageProperties;
+import org.eclipse.scout.rt.server.services.common.clustersync.internal.ClusterNotificationProperties;
 import org.eclipse.scout.rt.server.session.ServerSessionProviderWithCache;
 import org.eclipse.scout.rt.server.transaction.AbstractTransactionMember;
 import org.eclipse.scout.rt.server.transaction.ITransaction;
@@ -256,10 +256,10 @@ public class ClusterSynchronizationService extends AbstractService implements IC
   }
 
   @Override
-  public IClusterNotificationMessageProperties getNotificationProperties() {
+  public IClusterNotificationProperties getNotificationProperties() {
     ISession curentSession = ISession.CURRENT.get();
     String userid = curentSession != null ? curentSession.getUserId() : "";
-    return new ClusterNotificationMessageProperties(getNodeId(), userid);
+    return new ClusterNotificationProperties(getNodeId(), userid);
   }
 
   @Override

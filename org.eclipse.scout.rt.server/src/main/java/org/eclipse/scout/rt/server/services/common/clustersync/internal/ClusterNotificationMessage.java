@@ -13,14 +13,14 @@ package org.eclipse.scout.rt.server.services.common.clustersync.internal;
 import java.io.Serializable;
 
 import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificationMessage;
-import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificationMessageProperties;
+import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificationProperties;
 
 public class ClusterNotificationMessage implements IClusterNotificationMessage {
   private static final long serialVersionUID = -4471640837086802256L;
   private final Serializable m_notification;
-  private final IClusterNotificationMessageProperties m_props;
+  private final IClusterNotificationProperties m_props;
 
-  public ClusterNotificationMessage(Serializable notification, IClusterNotificationMessageProperties props) {
+  public ClusterNotificationMessage(Serializable notification, IClusterNotificationProperties props) {
     m_notification = notification;
     m_props = props;
   }
@@ -31,7 +31,7 @@ public class ClusterNotificationMessage implements IClusterNotificationMessage {
   }
 
   @Override
-  public IClusterNotificationMessageProperties getProperties() {
+  public IClusterNotificationProperties getProperties() {
     return m_props;
   }
 

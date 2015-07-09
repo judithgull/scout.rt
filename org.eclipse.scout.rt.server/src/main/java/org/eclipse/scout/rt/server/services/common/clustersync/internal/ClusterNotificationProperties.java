@@ -10,14 +10,14 @@
  ******************************************************************************/
 package org.eclipse.scout.rt.server.services.common.clustersync.internal;
 
-import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificationMessageProperties;
+import org.eclipse.scout.rt.server.services.common.clustersync.IClusterNotificationProperties;
 
-public class ClusterNotificationMessageProperties implements IClusterNotificationMessageProperties {
+public class ClusterNotificationProperties implements IClusterNotificationProperties {
   private static final long serialVersionUID = 245680805887844037L;
   private final String m_originNode;
   private final String m_originUser;
 
-  public ClusterNotificationMessageProperties(String originNode, String originUser) {
+  public ClusterNotificationProperties(String originNode, String originUser) {
     m_originNode = originNode;
     m_originUser = originUser;
   }
@@ -57,7 +57,7 @@ public class ClusterNotificationMessageProperties implements IClusterNotificatio
     if (getClass() != obj.getClass()) {
       return false;
     }
-    ClusterNotificationMessageProperties other = (ClusterNotificationMessageProperties) obj;
+    ClusterNotificationProperties other = (ClusterNotificationProperties) obj;
     if (m_originNode == null) {
       if (other.m_originNode != null) {
         return false;
