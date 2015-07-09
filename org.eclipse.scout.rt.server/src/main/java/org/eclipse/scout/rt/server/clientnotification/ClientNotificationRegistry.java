@@ -154,20 +154,24 @@ public class ClientNotificationRegistry {
   }
 
   public void put(ClientNotificationMessage message) {
-    synchronized (m_notificationQueues) {
-      for (ClientNotificationNodeQueue queue : m_notificationQueues.values()) {
-        queue.put(message);
-      }
-    }
+    put(CollectionUtility.arrayList(message));
   }
 
-  public void put(Collection<? extends ClientNotificationMessage> message) {
+  public void putWithoutClusterNotification(ClientNotificationMessage message) {
+    putWithoutClusterNotification(CollectionUtility.arrayList(message));
+  }
+
+  public void put(Collection<? extends ClientNotificationMessage> messages) {
+    putWithoutClusterNotification(messages);
+    distributeCluster(messages);
+  }
+
+  public void putWithoutClusterNotification(Collection<? extends ClientNotificationMessage> messages) {
     synchronized (m_notificationQueues) {
       for (ClientNotificationNodeQueue queue : m_notificationQueues.values()) {
-        queue.put(message);
+        queue.put(messages);
       }
     }
-    distributeCluster(message);
   }
 
   /**
