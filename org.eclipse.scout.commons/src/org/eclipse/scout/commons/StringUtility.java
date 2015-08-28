@@ -885,7 +885,7 @@ public final class StringUtility {
 
   /**
    * @return encoded text, ready to be included in a html text
-   *         <xmp>replaces &, ", ', <, > and all whitespace</xmp>
+   *         <xmp>replaces &, ", ', <, >, / and all whitespace</xmp>
    */
   public static String htmlEncode(String s) {
     return htmlEncode(s, false);
@@ -903,6 +903,7 @@ public final class StringUtility {
     s = s.replace("'", "&#39;");
     s = s.replace("<", "&lt;");
     s = s.replace(">", "&gt;");
+    s = s.replace("/", "&#47;");
     s = s.replace("\n\r", "<br/>");
     s = s.replace("\n", "<br/>");
 
@@ -930,6 +931,7 @@ public final class StringUtility {
     s = s.replace("&quot;", "\"");
     s = s.replace("&apos;", "'");
     s = s.replace("&#39;", "'");
+    s = s.replace("&#47;", "/");
     s = s.replace("&lt;", "<");
     s = s.replace("&gt;", ">");
     s = s.replace("&amp;", "&");
