@@ -1,3 +1,10 @@
+IMPORTANT
+=========
+
+This Branch is not used anymore. Please refer to [Scout/Contribution Guidelines] [10] which branch is suitable for you.
+
+[Scout/Contribution Guidelines] [10] https://wiki.eclipse.org/Scout/Contribution_Guidelines
+
 Eclipse Scout - RT
 ==================
 
