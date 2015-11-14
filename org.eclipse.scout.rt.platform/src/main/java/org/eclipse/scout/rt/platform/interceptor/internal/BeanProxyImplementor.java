@@ -53,13 +53,13 @@ public class BeanProxyImplementor<T> implements InvocationHandler {
   public Object invoke(Object proxy, final Method method, final Object[] args) throws Throwable {
     switch (method.getName()) {
       case "hashCode": {
-        return (m_impl != null) ? m_impl.hashCode() : m_proxy.hashCode();
+        return (m_impl != null) ? m_impl.hashCode() : BeanProxyImplementor.this.hashCode();
       }
       case "equals": {
         return m_proxy == args[0];
       }
       case "toString": {
-        return "{proxy}" + ((m_impl != null) ? m_impl.toString() : Arrays.toString(m_types));
+        return "{proxy} " + ((m_impl != null) ? m_impl.toString() : Arrays.toString(m_types));
       }
     }
 

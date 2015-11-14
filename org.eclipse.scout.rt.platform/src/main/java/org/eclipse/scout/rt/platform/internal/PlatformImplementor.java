@@ -21,7 +21,6 @@ import org.eclipse.scout.commons.BeanUtility;
 import org.eclipse.scout.commons.ConfigUtility;
 import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.IBean;
-import org.eclipse.scout.rt.platform.IBeanDecorationFactory;
 import org.eclipse.scout.rt.platform.IBeanManager;
 import org.eclipse.scout.rt.platform.IBeanScopeEvaluator;
 import org.eclipse.scout.rt.platform.IPlatform;
@@ -29,7 +28,6 @@ import org.eclipse.scout.rt.platform.IPlatformListener;
 import org.eclipse.scout.rt.platform.Platform;
 import org.eclipse.scout.rt.platform.PlatformEvent;
 import org.eclipse.scout.rt.platform.PlatformStateLatch;
-import org.eclipse.scout.rt.platform.SimpleBeanDecorationFactory;
 import org.eclipse.scout.rt.platform.config.CONFIG;
 import org.eclipse.scout.rt.platform.config.IConfigProperty;
 import org.eclipse.scout.rt.platform.config.PlatformConfigProperties.PlatformDevModeProperty;
@@ -97,7 +95,7 @@ public class PlatformImplementor implements IPlatform {
         //validateBeanManager();
         validateConfiguration();
         initBeanScopeEvaluator();
-        initBeanDecorationFactory();
+        m_beanContext.initBeanDecorationFactory();
 
         changeState(State.BeanManagerValid, true);
         startCreateImmediatelyBeans();
@@ -155,19 +153,6 @@ public class PlatformImplementor implements IPlatform {
     if (bean != null) {
       m_beanContext.setScopeEvaluator(bean.getInstance());
     }
-  }
-
-  protected void initBeanDecorationFactory() {
-    if (m_beanContext.getBeanDecorationFactory() != null) {
-      return;
-    }
-    IBean<IBeanDecorationFactory> bean = m_beanContext.optBean(IBeanDecorationFactory.class);
-    if (bean != null) {
-      m_beanContext.setBeanDecorationFactory(bean.getInstance());
-      return;
-    }
-    LOG.warn("Using " + SimpleBeanDecorationFactory.class.getName() + ". Please verify that this application really has no client or server side " + IBeanDecorationFactory.class.getSimpleName());
-    m_beanContext.setBeanDecorationFactory(new SimpleBeanDecorationFactory());
   }
 
   protected void validateBeanManager() {

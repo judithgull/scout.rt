@@ -28,7 +28,7 @@ import org.eclipse.scout.rt.platform.internal.DefaultBeanInstanceProducer;
  * @since 5.1
  */
 public class BeanMetaData {
-  private final Class<?> m_beanClazz;
+  private Class<?> m_beanClazz;
   private final Map<Class<? extends Annotation>, Annotation> m_beanAnnotations;
   private Object m_initialInstance;
   private IBeanInstanceProducer<?> m_producer;
@@ -261,6 +261,11 @@ public class BeanMetaData {
    */
   public BeanMetaData withoutAnnotation(Class<? extends Annotation> annotationType) {
     m_beanAnnotations.remove(annotationType);
+    return this;
+  }
+
+  public BeanMetaData withBeanClazz(Class<?> beanClazz) {
+    m_beanClazz = beanClazz;
     return this;
   }
 }

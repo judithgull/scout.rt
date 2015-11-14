@@ -14,9 +14,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.eclipse.scout.commons.Assertions;
@@ -25,18 +27,30 @@ import org.eclipse.scout.commons.CollectionUtility;
 import org.eclipse.scout.commons.annotations.Internal;
 import org.eclipse.scout.commons.exception.InitializationException;
 import org.eclipse.scout.rt.platform.ApplicationScoped;
+import org.eclipse.scout.rt.platform.BeanInvocationHint;
 import org.eclipse.scout.rt.platform.BeanMetaData;
 import org.eclipse.scout.rt.platform.CreateImmediately;
 import org.eclipse.scout.rt.platform.IBean;
 import org.eclipse.scout.rt.platform.IBeanDecorationFactory;
 import org.eclipse.scout.rt.platform.IBeanManager;
 import org.eclipse.scout.rt.platform.IBeanScopeEvaluator;
+import org.eclipse.scout.rt.platform.interceptor.IBeanInterceptor;
+import org.eclipse.scout.rt.platform.interceptor.internal.BeanProxyImplementor;
+import org.eclipse.scout.rt.platform.inventory.ClassInventory;
+import org.eclipse.scout.rt.platform.inventory.IClassInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class BeanManagerImplementor implements IBeanManager {
+
+  private static final Logger LOG = LoggerFactory.getLogger(BeanManagerImplementor.class);
+
   private final ReentrantReadWriteLock m_lock;
   private final Map<Class<?>, BeanHierarchy> m_beanHierarchies;
   private IBeanDecorationFactory m_beanDecorationFactory;
   private IBeanScopeEvaluator m_scopeEvaluator;
+
+  private Set<Class<?>> m_decorableLookupTypes = new HashSet<>(); // Lookup-Types subject for decoration.
 
   public BeanManagerImplementor() {
     this(null);
@@ -46,6 +60,30 @@ public class BeanManagerImplementor implements IBeanManager {
     m_lock = new ReentrantReadWriteLock(true);
     m_beanHierarchies = new HashMap<>();
     m_beanDecorationFactory = f;
+  }
+
+  public void initBeanDecorationFactory() {
+    if (m_beanDecorationFactory == null) {
+      m_beanDecorationFactory = getBean(IBeanDecorationFactory.class).getInstance();
+    }
+
+    // Collect all interfaces which are potentially subject for decoration.
+    // That are all public interfaces which are annotated with an annotation marked as bean invocation hint (@BeanInvocationHint).
+    for (IClassInfo annotation : ClassInventory.get().getKnownAnnotatedTypes(BeanInvocationHint.class)) {
+      for (IClassInfo decorableCandidate : ClassInventory.get().getKnownAnnotatedTypes(annotation.resolveClass())) {
+        Class<?> decorableCandidateClazz = decorableCandidate.resolveClass();
+        if (decorableCandidate.isPublic() && decorableCandidate.isInterface()) {
+          m_decorableLookupTypes.add(decorableCandidateClazz);
+        }
+        else {
+          LOG.warn("Only public interfaces are subject for decoration with a dynamic Java proxy [{}]", decorableCandidateClazz.getName());
+        }
+      }
+    }
+  }
+
+  public boolean isDecorable(Class<?> iface) {
+    return m_decorableLookupTypes.contains(iface);
   }
 
   public ReentrantReadWriteLock getReadWriteLock() {
@@ -58,7 +96,7 @@ public class BeanManagerImplementor implements IBeanManager {
     try {
       @SuppressWarnings("unchecked")
       BeanHierarchy<T> h = m_beanHierarchies.get(beanClazz);
-      return (h == null) ? Collections.<IBean<T>> emptyList() : h.querySingle(getScopeEvaluator());
+      return decorateBeans((h == null) ? Collections.<IBean<T>> emptyList() : h.querySingle(getScopeEvaluator()), beanClazz);
     }
     finally {
       m_lock.readLock().unlock();
@@ -74,7 +112,7 @@ public class BeanManagerImplementor implements IBeanManager {
       if (h == null) {
         return Collections.emptyList();
       }
-      return h.queryAll(getScopeEvaluator());
+      return decorateBeans(h.queryAll(getScopeEvaluator()), beanClazz);
     }
     finally {
       m_lock.readLock().unlock();
@@ -114,7 +152,7 @@ public class BeanManagerImplementor implements IBeanManager {
   public <T> IBean<T> registerBean(BeanMetaData beanData) {
     m_lock.writeLock().lock();
     try {
-      IBean<T> bean = new BeanImplementor<T>(beanData, this);
+      IBean<T> bean = new BeanImplementor<T>(beanData);
       for (Class<?> type : listImplementedTypes(bean)) {
         BeanHierarchy h = m_beanHierarchies.get(type);
         if (h == null) {
@@ -189,6 +227,34 @@ public class BeanManagerImplementor implements IBeanManager {
     else {
       return Assertions.fail("multiple instances found for query: %s %s", beanClazz, list);
     }
+  }
+
+  protected <T> List<IBean<T>> decorateBeans(List<IBean<T>> beans, Class<? extends T> queryType) {
+    List<IBean<T>> result = new ArrayList<>(beans.size());
+    for (final IBean<T> bean : beans) {
+      result.add(decorateBean(bean, queryType));
+    }
+    return result;
+  }
+
+  private <T> IBean<T> decorateBean(IBean<T> bean, Class<? extends T> queryType) {
+    IBeanDecorationFactory decorationFactory = getBeanDecorationFactory();
+    if (decorationFactory == null) {
+      return bean;
+    }
+
+    if (!isDecorable(queryType)) {
+      return bean;
+    }
+
+    IBeanInterceptor<T> interceptor = decorationFactory.decorate(bean, queryType);
+    if (interceptor == null) {
+      return bean;
+    }
+
+    // Decorate the bean
+    T proxy = new BeanProxyImplementor<T>(bean, interceptor, bean.getInstance(), queryType).getProxy();
+    return new BeanImplementor<T>(new BeanMetaData(bean).withBeanClazz(queryType).withInitialInstance(proxy));
   }
 
   @Override
