@@ -16,6 +16,8 @@ import static org.junit.Assert.assertTrue;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import org.eclipse.scout.rt.platform.context.RunContexts;
@@ -27,6 +29,7 @@ import org.eclipse.scout.rt.platform.visitor.IVisitor;
 import org.eclipse.scout.rt.testing.commons.BlockingCountDownLatch;
 import org.eclipse.scout.rt.testing.platform.job.JobTestUtil;
 import org.eclipse.scout.rt.testing.platform.runner.PlatformTestRunner;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -40,10 +43,12 @@ public class JobFutureVisitTest {
 
   private Set<String> protocol;
 
-  private BlockingCountDownLatch latch;
+  private BlockingCountDownLatch m_latch;
 
   private IBlockingCondition bc1;
   private IBlockingCondition bc2;
+
+  private static final String JOB_IDENTIFIER = UUID.randomUUID().toString();
 
   @Before
   public void before() throws InterruptedException {
@@ -56,7 +61,7 @@ public class JobFutureVisitTest {
     bc1 = Jobs.getJobManager().createBlockingCondition("BC1", true);
     bc2 = Jobs.getJobManager().createBlockingCondition("BC2", true);
 
-    latch = new BlockingCountDownLatch(3);
+    m_latch = new BlockingCountDownLatch(3);
 
     // SESSION 1 (JOB-1)
     Jobs.getJobManager().schedule(new IRunnable() {
@@ -70,6 +75,7 @@ public class JobFutureVisitTest {
         .withRunContext(RunContexts.empty())
         .withName("mutex1_job1")
         .withMutex(m_mutex1)
+        .withExecutionHint(JOB_IDENTIFIER)
         .withExceptionHandling(null, false));
 
     // SESSION 1 (JOB-2)
@@ -78,12 +84,13 @@ public class JobFutureVisitTest {
       @Override
       public void run() throws Exception {
         protocol.add(IFuture.CURRENT.get().getJobInput().getName());
-        latch.countDownAndBlock();
+        m_latch.countDownAndBlock();
       }
     }, Jobs.newInput()
         .withRunContext(RunContexts.empty())
         .withName("mutex1_job2")
         .withMutex(m_mutex1)
+        .withExecutionHint(JOB_IDENTIFIER)
         .withExceptionHandling(null, false));
 
     // SESSION 1 (JOB-3)
@@ -96,6 +103,7 @@ public class JobFutureVisitTest {
     }, Jobs.newInput()
         .withRunContext(RunContexts.empty())
         .withName("mutex1_job3")
+        .withExecutionHint(JOB_IDENTIFIER)
         .withMutex(m_mutex1));
 
     // =========
@@ -109,6 +117,7 @@ public class JobFutureVisitTest {
     }, Jobs.newInput()
         .withRunContext(RunContexts.empty())
         .withName("mutex2_job1")
+        .withExecutionHint(JOB_IDENTIFIER)
         .withMutex(m_mutex2));
 
     // SESSION 2 (JOB-2)
@@ -123,6 +132,7 @@ public class JobFutureVisitTest {
         .withRunContext(RunContexts.empty())
         .withName("mutex2_job2")
         .withMutex(m_mutex2)
+        .withExecutionHint(JOB_IDENTIFIER)
         .withExceptionHandling(null, false));
 
     // SESSION 2  (JOB-3)
@@ -135,12 +145,13 @@ public class JobFutureVisitTest {
 
         JobTestUtil.waitForMutexCompetitors(m_mutex2, 3); // Wait until job 'mutex2_job2' is re-acquiring the mutex. [3=job-2, job-3, job-4]
 
-        latch.countDownAndBlock();
+        m_latch.countDownAndBlock();
       }
     }, Jobs.newInput()
         .withRunContext(RunContexts.empty())
         .withName("mutex2_job3")
         .withMutex(m_mutex2)
+        .withExecutionHint(JOB_IDENTIFIER)
         .withExceptionHandling(null, false));
 
     // SESSION 2  (JOB-4)
@@ -153,6 +164,7 @@ public class JobFutureVisitTest {
     }, Jobs.newInput()
         .withRunContext(RunContexts.empty())
         .withName("mutex2_job4")
+        .withExecutionHint(JOB_IDENTIFIER)
         .withMutex(m_mutex2));
 
     // =========
@@ -162,15 +174,26 @@ public class JobFutureVisitTest {
       @Override
       public void run() throws Exception {
         protocol.add(IFuture.CURRENT.get().getJobInput().getName());
-        latch.countDownAndBlock();
+        m_latch.countDownAndBlock();
       }
     }, Jobs.newInput()
         .withRunContext(RunContexts.empty())
         .withName("mutex3_job1")
         .withMutex(m_mutex3)
+        .withExecutionHint(JOB_IDENTIFIER)
         .withExceptionHandling(null, false));
 
-    assertTrue(latch.await());
+    assertTrue(m_latch.await());
+  }
+
+  @After
+  public void after() {
+    m_latch.unblock();
+    bc1.setBlocking(false);
+
+    assertTrue(Jobs.getJobManager().awaitDone(Jobs.newFutureFilterBuilder()
+        .andMatchExecutionHint(JOB_IDENTIFIER)
+        .toFilter(), 10, TimeUnit.SECONDS));
   }
 
   @Test
