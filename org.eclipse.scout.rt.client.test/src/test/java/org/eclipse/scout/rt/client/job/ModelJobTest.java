@@ -41,10 +41,10 @@ public class ModelJobTest {
   @Before
   public void before() {
     m_clientSession1 = mock(IClientSession.class);
-    when(m_clientSession1.getModelJobMutex()).thenReturn(Jobs.newMutex());
+    when(m_clientSession1.getModelJobSchedulingSemaphore()).thenReturn(Jobs.newSchedulingSemaphore(1));
 
     m_clientSession2 = mock(IClientSession.class);
-    when(m_clientSession2.getModelJobMutex()).thenReturn(Jobs.newMutex());
+    when(m_clientSession2.getModelJobSchedulingSemaphore()).thenReturn(Jobs.newSchedulingSemaphore(1));
   }
 
   @After

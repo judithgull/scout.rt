@@ -22,7 +22,7 @@ import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.filter.IFilter;
 import org.eclipse.scout.rt.platform.job.IFuture;
 import org.eclipse.scout.rt.platform.job.IJobManager;
-import org.eclipse.scout.rt.platform.job.IMutex;
+import org.eclipse.scout.rt.platform.job.ISchedulingSemaphore;
 import org.eclipse.scout.rt.platform.job.JobInput;
 import org.eclipse.scout.rt.platform.job.filter.event.JobEventFilterBuilder;
 import org.eclipse.scout.rt.platform.job.filter.future.FutureFilterBuilder;
@@ -36,9 +36,9 @@ import org.eclipse.scout.rt.platform.util.concurrent.IRunnable;
  * time for the same session. Model jobs are used to interact with the client model to read and write model values. This
  * class is for convenience purpose to facilitate the creation and scheduling of model jobs.
  * <p>
- * <strong>By definition, a <code>ModelJob</code> requires a {@link ClientRunContext} and the {@link IClientSession}'s
- * 'model-job-mutex' to be set as its mutex object. That causes all jobs within that session to be run in sequence in
- * the model thread. At any given time, there is only one model thread per client session.</strong>
+ * <strong>By definition, a <em>ModelJob</em> requires a {@link ClientRunContext} with a {@link IClientSession} and the
+ * session's {@link ISchedulingSemaphore}. That causes all jobs within that session to be run in sequence in the model
+ * thread. At any given time, there is only one model thread per client session.</strong>
  * <p>
  * Example:
  *
@@ -71,12 +71,11 @@ import org.eclipse.scout.rt.platform.util.concurrent.IRunnable;
  *     }
  *   }, BEANS.get(JobInput.class)
  *        .withRunContext(clientRunContext)
- *        .<strong>withMutex(clientRunContext.getSession().getModelJobMutex())</strong>);
+ *        .<strong>withSchedulingSemaphore(clientRunContext.getSession().getModelJobSchedulingSemaphore())</strong>);
  * </pre>
  *
  * @since 5.1
- * @see IJobManager
- * @see ClientRunContext
+ * @see IClientSession#getModelJobSchedulingSemaphore()
  */
 public final class ModelJobs {
 
@@ -115,12 +114,12 @@ public final class ModelJobs {
   }
 
   /**
-   * Runs the given {@link IRunnable} asynchronously in the model thread once acquired the model mutex. The caller of
-   * this method continues to run in parallel.
+   * Runs the given {@link IRunnable} asynchronously in the model thread once acquired the model permit. The submitter
+   * of the job continues to run in parallel.
    * <p>
    * <strong>Do not wait for this job to complete if being a model job yourself as this would cause a deadlock.</strong>
    * <p>
-   * The job manager will use the {@link JobInput} as provided to run the job.
+   * The job manager will use the {@link JobInput} as given to control job execution.
    * <p>
    * The {@link IFuture} returned allows to wait for the job to complete or to cancel its execution.
    * <p>
@@ -148,13 +147,13 @@ public final class ModelJobs {
   }
 
   /**
-   * Runs the given {@link Callable} asynchronously in the model thread once acquired the model mutex. The caller of
-   * this method continues to run in parallel. Jobs in the form of a {@link Callable} typically return a computation
-   * result to the submitter.
+   * Runs the given {@link Callable} asynchronously in the model thread once acquired the model permit. The submitter of
+   * the job continues to run in parallel. Jobs in the form of a {@link Callable} typically return a computation result
+   * to the submitter.
    * <p>
    * <strong>Do not wait for this job to complete if being a model job yourself as this would cause a deadlock.</strong>
    * <p>
-   * The job manager will use the {@link JobInput} as provided to run the job.
+   * * The job manager will use the {@link JobInput} as given to control job execution.
    * <p>
    * The {@link IFuture} returned allows to wait for the job to complete or to cancel its execution. To immediately
    * block waiting for the job to complete, you can use constructions of the following form.
@@ -186,8 +185,7 @@ public final class ModelJobs {
   }
 
   /**
-   * Creates a {@link JobInput} initialized with the given {@link ClientRunContext} and with the session set as it's
-   * mutex.
+   * Creates a {@link JobInput} specific for model jobs initialized with the given {@link ClientRunContext}.
    * <p>
    * The job input returned can be associated with meta information about the job and with execution instructions to
    * tell the job manager how to run the job. The input is to be given to the job manager alongside with the
@@ -208,11 +206,11 @@ public final class ModelJobs {
   public static JobInput newInput(final ClientRunContext clientRunContext) {
     Assertions.assertNotNull(clientRunContext, "ClientRunContext required for model jobs");
     Assertions.assertNotNull(clientRunContext.getSession(), "ClientSession required for model jobs");
-    Assertions.assertNotNull(clientRunContext.getSession().getModelJobMutex(), "Mutex required for model jobs");
+    Assertions.assertNotNull(clientRunContext.getSession().getModelJobSchedulingSemaphore(), "SchedulingSemaphore required for model jobs");
     return BEANS.get(JobInput.class)
         .withThreadName("scout-model-thread")
         .withRunContext(clientRunContext)
-        .withMutex(clientRunContext.getSession().getModelJobMutex());
+        .withSchedulingSemaphore(clientRunContext.getSession().getModelJobSchedulingSemaphore());
   }
 
   /**
@@ -267,8 +265,8 @@ public final class ModelJobs {
       return false;
     }
 
-    final IMutex mutex = currentFuture.getMutex();
-    return mutex != null && mutex.isMutexOwner(currentFuture);
+    final ISchedulingSemaphore semaphore = currentFuture.getSchedulingSemaphore();
+    return semaphore != null && semaphore.isPermitOwner(currentFuture);
   }
 
   /**
@@ -279,7 +277,7 @@ public final class ModelJobs {
       return false;
     }
 
-    if (future.getJobInput().getMutex() == null) {
+    if (future.getJobInput().getSchedulingSemaphore() == null) {
       return false;
     }
 
@@ -292,7 +290,7 @@ public final class ModelJobs {
       return false;
     }
 
-    return future.getJobInput().getMutex() == clientSession.getModelJobMutex();
+    return future.getJobInput().getSchedulingSemaphore() == clientSession.getModelJobSchedulingSemaphore();
   }
 
   /**

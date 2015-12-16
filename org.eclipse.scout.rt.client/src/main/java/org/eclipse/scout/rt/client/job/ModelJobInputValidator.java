@@ -30,6 +30,6 @@ public class ModelJobInputValidator {
     Assertions.assertNotNull(input, "ModelJob requires a 'JobInput'");
     Assertions.assertTrue(input.getRunContext() instanceof ClientRunContext, "ModelJob requires a 'ClientRunContext'");
     Assertions.assertNotNull(((ClientRunContext) input.getRunContext()).getSession(), "ModelJob requires a ClientSession");
-    Assertions.assertSame(((ClientRunContext) input.getRunContext()).getSession().getModelJobMutex(), input.getMutex(), "ModelJob requires the 'session mutex' as its mutex object");
+    Assertions.assertSame(((ClientRunContext) input.getRunContext()).getSession().getModelJobSchedulingSemaphore(), input.getSchedulingSemaphore(), "ModelJob requires the session's SchedulingSemaphore");
   }
 }

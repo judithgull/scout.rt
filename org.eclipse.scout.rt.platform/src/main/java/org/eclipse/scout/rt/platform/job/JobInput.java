@@ -54,7 +54,7 @@ public class JobInput {
   public static final long INFINITE_EXPIRATION = 0;
 
   protected String m_name;
-  protected IMutex m_mutex;
+  protected ISchedulingSemaphore m_schedulingSemaphore;
   protected long m_expirationTime = INFINITE_EXPIRATION;
   protected String m_threadName = "scout-thread";
   protected RunContext m_runContext;
@@ -167,22 +167,26 @@ public class JobInput {
   }
 
   /**
-   * Returns the mutex object, if the job is to be run in sequence among other jobs with the same mutex object, or
-   * <code>null</code> to run the job at the next reasonable opportunity.
+   * Returns the scheduling semaphore which this job belongs to, or <code>null</code> if there is no maximal concurrency
+   * restriction for this job.
+   * <p>
+   * With a semaphore in place, this job only commences execution, once a permit is or gets available. Otherwise, the
+   * job commences execution immediately at the next reasonable opportunity, unless no worker thread is available.
    */
-  public IMutex getMutex() {
-    return m_mutex;
+  public ISchedulingSemaphore getSchedulingSemaphore() {
+    return m_schedulingSemaphore;
   }
 
   /**
-   * Sets the mutex object to run the job in sequence among other jobs with the same mutex object, so that no two such
-   * jobs are run in parallel at the same time. By default, no mutex object is set, meaning the job is not executed in
-   * mutually exclusive manner.
+   * Sets the scheduling semaphore to control the maximal number of jobs running concurrently among the same semaphore.
+   * <p>
+   * With a semaphore in place, this job only commences execution once a permit is or gets available. Otherwise, the job
+   * commences execution immediately at the next reasonable opportunity, unless no worker thread is available.
    *
-   * @see Jobs#newMutex()
+   * @see Jobs#newSchedulingSemaphore()
    */
-  public JobInput withMutex(final IMutex mutex) {
-    m_mutex = mutex;
+  public JobInput withSchedulingSemaphore(final ISchedulingSemaphore schedulingSemaphore) {
+    m_schedulingSemaphore = schedulingSemaphore;
     return this;
   }
 
@@ -307,7 +311,7 @@ public class JobInput {
   public String toString() {
     final ToStringBuilder builder = new ToStringBuilder(this);
     builder.attr("name", m_name);
-    builder.ref("mutex", m_mutex);
+    builder.ref("schedulingSemaphore", m_schedulingSemaphore);
     builder.attr("expirationTime", m_expirationTime);
     builder.attr("exceptionHandler", m_exceptionHandler);
     builder.attr("swallowException", m_swallowException);
@@ -327,7 +331,7 @@ public class JobInput {
   public JobInput copy() {
     final JobInput copy = BEANS.get(JobInput.class);
     copy.m_name = m_name;
-    copy.m_mutex = m_mutex;
+    copy.m_schedulingSemaphore = m_schedulingSemaphore;
     copy.m_expirationTime = m_expirationTime;
     copy.m_exceptionHandler = m_exceptionHandler;
     copy.m_swallowException = m_swallowException;

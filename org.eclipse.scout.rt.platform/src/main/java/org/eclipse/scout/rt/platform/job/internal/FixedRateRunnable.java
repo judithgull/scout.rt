@@ -16,7 +16,8 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.eclipse.scout.rt.platform.job.JobState;
-import org.eclipse.scout.rt.platform.job.internal.Mutex.QueuePosition;
+import org.eclipse.scout.rt.platform.job.internal.SchedulingSemaphore.IPermitAcquiredCallback;
+import org.eclipse.scout.rt.platform.job.internal.SchedulingSemaphore.QueuePosition;
 
 /**
  * Runnable to run the given {@link JobFutureTask} periodically at a 'fixed-rate', meaning that if the period is 2
@@ -54,17 +55,17 @@ class FixedRateRunnable implements IRejectableRunnable {
 
     final long startTimeNanos = System.nanoTime();
 
-    final Mutex mutex = m_futureTask.getMutex();
-    if (mutex == null) {
+    final SchedulingSemaphore semaphore = m_futureTask.getSchedulingSemaphore();
+    if (semaphore == null) {
       m_futureTask.run();
       scheduleNextExecution(startTimeNanos);
     }
     else {
-      m_futureTask.changeState(JobState.WAITING_FOR_MUTEX);
-      mutex.compete(m_futureTask, QueuePosition.TAIL, new IMutexAcquiredCallback() {
+      m_futureTask.changeState(JobState.WAITING_FOR_PERMIT);
+      semaphore.compete(m_futureTask, QueuePosition.TAIL, new IPermitAcquiredCallback() {
 
         @Override
-        public void onMutexAcquired() {
+        public void onPermitAcquired() {
           m_executor.execute(new IRejectableRunnable() {
 
             @Override

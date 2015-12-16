@@ -50,9 +50,13 @@ public interface IFuture<RESULT> extends ICancellable {
   JobInput getJobInput();
 
   /**
-   * Returns the mutex object, or <code>null</code> if not being a mutually exclusive task.
+   * Returns the scheduling semaphore which this job belongs to, or <code>null</code> if there is no concurrency
+   * restriction for this job.
+   * <p>
+   * With a semaphore in place, this job only commences execution, once a permit is or gets available. Otherwise, the
+   * job commences execution immediately at the next reasonable opportunity, unless no worker thread is available.
    */
-  IMutex getMutex();
+  ISchedulingSemaphore getSchedulingSemaphore();
 
   /**
    * Attempts to cancel the execution of the associated job. This attempt will be ignored if the job has already
