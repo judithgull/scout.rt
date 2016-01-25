@@ -28,7 +28,6 @@ import org.eclipse.scout.rt.platform.IBean;
 import org.eclipse.scout.rt.platform.IBeanInstanceProducer;
 import org.eclipse.scout.rt.testing.platform.runner.JUnitExceptionHandler;
 import org.eclipse.scout.rt.testing.shared.TestingUtility;
-import org.eclipse.scout.rt.ui.html.UiSession.P_ClientSessionCleanupHandler;
 import org.eclipse.scout.rt.ui.html.json.JsonAdapterRegistry;
 import org.eclipse.scout.rt.ui.html.json.JsonEvent;
 import org.eclipse.scout.rt.ui.html.json.testing.JsonTestUtility;
@@ -49,7 +48,7 @@ public class UiSessionTest {
 
   @Before
   public void before() {
-    m_beans = TestingUtility.registerBeans(new BeanMetaData(JobCompletionDelayOnSessionShutdown.class).withReplace(true).withProducer(new IBeanInstanceProducer<JobCompletionDelayOnSessionShutdown>() {
+    m_beans = TestingUtility.registerBeans(new BeanMetaData(JobCompletionDelayOnSessionShutdown.class).withProducer(new IBeanInstanceProducer<JobCompletionDelayOnSessionShutdown>() {
 
       @Override
       public JobCompletionDelayOnSessionShutdown produce(IBean<JobCompletionDelayOnSessionShutdown> bean) {
@@ -94,6 +93,7 @@ public class UiSessionTest {
     assertEquals(1, responseEvents.size());
   }
 
+  // XXX
   @Test
   public void testSessionInvalidation() throws Exception {
     UiSession uiSession = (UiSession) JsonTestUtility.createAndInitializeUiSession();
@@ -103,11 +103,12 @@ public class UiSessionTest {
     // Don't waste time waiting for client jobs to finish. Test job itself runs inside a client job so we always have to wait until max time
     WeakReference<IUiSession> ref = new WeakReference<IUiSession>(uiSession);
     HttpSessionBindingEvent mockEvent = Mockito.mock(HttpSessionBindingEvent.class);
-    P_ClientSessionCleanupHandler dummyCleanupHandler = new UiSession.P_ClientSessionCleanupHandler(clientSession);
+    SessionStore sessionStore = BEANS.get(HttpSessionHelper.class).getOrCreateSessionStore(uiSession.currentHttpSession());
+    sessionStore.putClientSession(clientSession);
+    sessionStore.putUiSession(uiSession);
 
     JsonTestUtility.endRequest(uiSession);
-    uiSession.valueUnbound(mockEvent);
-    dummyCleanupHandler.valueUnbound(mockEvent);
+    sessionStore.valueUnbound(mockEvent);
     BEANS.get(UiJobs.class).awaitModelJobs(clientSession, JUnitExceptionHandler.class);
     assertFalse(clientSession.isActive());
     assertTrue(uiSession.isDisposed());

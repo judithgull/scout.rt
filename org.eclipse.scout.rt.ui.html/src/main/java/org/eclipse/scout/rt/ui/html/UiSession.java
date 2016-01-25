@@ -27,8 +27,6 @@ import javax.security.auth.Subject;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
-import javax.servlet.http.HttpSessionBindingEvent;
-import javax.servlet.http.HttpSessionBindingListener;
 
 import org.eclipse.scout.rt.client.IClientSession;
 import org.eclipse.scout.rt.client.context.ClientRunContext;
@@ -37,6 +35,8 @@ import org.eclipse.scout.rt.client.job.ModelJobs;
 import org.eclipse.scout.rt.client.session.ClientSessionProvider;
 import org.eclipse.scout.rt.client.ui.desktop.IDesktop;
 import org.eclipse.scout.rt.platform.BEANS;
+import org.eclipse.scout.rt.platform.IPlatform;
+import org.eclipse.scout.rt.platform.Platform;
 import org.eclipse.scout.rt.platform.context.RunMonitor;
 import org.eclipse.scout.rt.platform.exception.ExceptionHandler;
 import org.eclipse.scout.rt.platform.filter.IFilter;
@@ -77,16 +77,9 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class UiSession implements IUiSession, HttpSessionBindingListener {
+public class UiSession implements IUiSession {
 
   private static final Logger LOG = LoggerFactory.getLogger(UiSession.class);
-
-  /**
-   * Prefix for name of HTTP session attribute that is used to store the associated {@link IClientSession}s.
-   * <p>
-   * The full attribute name is: <b><code>{@link #CLIENT_SESSION_ATTRIBUTE_NAME_PREFIX} + clientSessionId</code></b>
-   */
-  public static final String CLIENT_SESSION_ATTRIBUTE_NAME_PREFIX = "scout.htmlui.clientsession."/*+clientSessionId*/;
 
   private static final long ROOT_ID = 1;
   private static final String EVENT_INITIALIZED = "initialized";
@@ -98,6 +91,7 @@ public class UiSession implements IUiSession, HttpSessionBindingListener {
   private final P_RootAdapter m_rootJsonAdapter;
 
   private volatile boolean m_initialized;
+  private volatile SessionStore m_sessionStore;
   private volatile String m_uiSessionId;
   private volatile IClientSession m_clientSession;
   private final AtomicLong m_jsonAdapterSeq = new AtomicLong(ROOT_ID);
@@ -176,6 +170,7 @@ public class UiSession implements IUiSession, HttpSessionBindingListener {
         ModelJobs.newEventFilterBuilder()
             .andMatch(new SessionJobEventFilter(clientSession))
             .andMatchNotExecutionHint(UiJobs.EXECUTION_HINT_POLL_REQUEST) // events for poll-requests are not of interest
+            .andMatchNotExecutionHint(UiJobs.EXECUTION_HINT_RESPONSE_TO_JSON) // events for response-to-json are not of interest
             .andMatch(newUiDataAvailableFilter()) // filter which evaluates to 'true' once possible UI data is available
             .andMatch(new IFilter<JobEvent>() {
 
@@ -263,11 +258,14 @@ public class UiSession implements IUiSession, HttpSessionBindingListener {
       HttpSession httpSession = req.getSession();
       m_currentHttpSession = httpSession;
 
+      // Remember it here, because getting the store from an invalidated httpSession does not work (there might even be dead locks!)
+      m_sessionStore = BEANS.get(HttpSessionHelper.class).getOrCreateSessionStore(httpSession);
+
       // Look up the requested client session (create and start a new one if necessary)
       m_clientSession = getOrCreateClientSession(httpSession, req, jsonStartupReq);
 
       // At this point we have a valid, active clientSession. Therefore, we may now safely store it in the HTTP session
-      storeClientSessionInHttpSession(httpSession, m_clientSession);
+      storeClientSessionInSessionStore(httpSession, m_clientSession);
 
       // Add a cookie with the preferred user-language
       storePreferredLocaleInCookie(resp, m_clientSession.getLocale());
@@ -323,6 +321,10 @@ public class UiSession implements IUiSession, HttpSessionBindingListener {
     return m_initialized;
   }
 
+  protected SessionStore sessionStore() {
+    return m_sessionStore;
+  }
+
   @Override
   public ReentrantLock uiSessionLock() {
     return m_uiSessionLock;
@@ -342,7 +344,7 @@ public class UiSession implements IUiSession, HttpSessionBindingListener {
     String requestedClientSessionId = jsonStartupReq.getClientSessionId();
     IClientSession clientSession = null;
     if (StringUtility.hasText(requestedClientSessionId)) {
-      clientSession = loadClientSessionFromHttpSession(httpSession, requestedClientSessionId);
+      clientSession = m_sessionStore.getClientSessionForUse(requestedClientSessionId);
     }
 
     if (clientSession != null) {
@@ -358,32 +360,23 @@ public class UiSession implements IUiSession, HttpSessionBindingListener {
         throw new UiException("ClientSession is not active, there must have been a problem with loading or starting [clientSessionId=" + clientSession.getId() + "]");
       }
     }
+
+    // Link both sessions
+    m_sessionStore.linkSessions(clientSession, this);
+
     return clientSession;
   }
 
-  protected IClientSession loadClientSessionFromHttpSession(HttpSession httpSession, String clientSessionId) {
-    if (clientSessionId == null) {
-      return null;
-    }
-    return (IClientSession) httpSession.getAttribute(getClientSessionAttributeName(clientSessionId));
-  }
+  protected void storeClientSessionInSessionStore(HttpSession httpSession, IClientSession clientSession) {
+    IClientSession existingClientSession = m_sessionStore.getClientSessionForUse(clientSession.getId());
 
-  protected void storeClientSessionInHttpSession(HttpSession httpSession, IClientSession clientSession) {
-    IClientSession existingClientSession = loadClientSessionFromHttpSession(httpSession, clientSession.getId());
-
-    // Implementation note: The cleanup listener is triggered, when the attribute value is changed.
-    // This happens in two cases:
-    //   1. when the attribute is set manually
-    //   2. the entire session is invalidated.
+    // XXX was ist das für ein fall?
     if (existingClientSession != clientSession) {
-      String clientSessionAttributeName = getClientSessionAttributeName(clientSession.getId());
-      httpSession.setAttribute(clientSessionAttributeName, clientSession);
-      httpSession.setAttribute(clientSessionAttributeName + ".cleanup", new P_ClientSessionCleanupHandler(clientSession));
+      if (existingClientSession != null) {
+        existingClientSession.stop(); // XXX unregister?
+      }
+      m_sessionStore.putClientSession(clientSession);
     }
-  }
-
-  protected String getClientSessionAttributeName(String clientSessionId) {
-    return CLIENT_SESSION_ATTRIBUTE_NAME_PREFIX + clientSessionId;
   }
 
   protected void storePreferredLocaleInCookie(HttpServletResponse resp, Locale locale) {
@@ -395,7 +388,7 @@ public class UiSession implements IUiSession, HttpSessionBindingListener {
    * changes during a client-job, the cookie cannot be updated.
    */
   protected void updatePreferredLocaleCookie(Locale locale) {
-    HttpServletResponse resp = m_currentHttpContext.getResponse();
+    HttpServletResponse resp = currentHttpResponse();
     if (resp != null) {
       storePreferredLocaleInCookie(resp, locale);
     }
@@ -460,7 +453,7 @@ public class UiSession implements IUiSession, HttpSessionBindingListener {
     }, ModelJobs.newInput(ClientRunContexts.copyCurrent()
         .withSession(m_clientSession, true))
         .withName("Looking up Locale")
-        .withExceptionHandling(null, false /* propagate */)); // exception handling done by caller
+        .withExceptionHandling(null, false)); // exception handling done by caller
 
     final JSONObject jsonEvent = new JSONObject();
     jsonEvent.put("clientSessionId", m_clientSession.getId()); // Send back clientSessionId to allow the browser to attach to the same client session on page reload
@@ -495,7 +488,6 @@ public class UiSession implements IUiSession, HttpSessionBindingListener {
 
   @Override
   public void dispose() {
-    m_disposed = true;
     if (isProcessingJsonRequest()) {
       // If there is a request in progress just mark the session as being disposed.
       // The actual disposing happens before returning to the client, see processJsonRequest().
@@ -503,9 +495,21 @@ public class UiSession implements IUiSession, HttpSessionBindingListener {
       return;
     }
 
-    // Notify waiting requests - should not delay web-container shutdown
+    LOG.info("Disposing UI session with ID {}...", m_uiSessionId);
+    synchronized (this) {
+      if (m_disposed) {
+        LOG.trace("UI session with ID {} already disposed.", m_uiSessionId);
+        return;
+      }
+      m_disposed = true;
+    }
+
+    if (m_sessionStore != null) {
+      m_sessionStore.removeUiSession(this); // also removes client session if necessary
+    }
+
     uninstallUiDataAvailableListener();
-    signalPoller();
+    signalPoller(); // Notify waiting requests - should not delay web-container shutdown
 
     m_jsonAdapterRegistry.disposeAdapters();
     m_currentHttpContext.clear();
@@ -635,6 +639,11 @@ public class UiSession implements IUiSession, HttpSessionBindingListener {
   @Override
   public HttpServletRequest currentHttpRequest() {
     return m_currentHttpContext.getRequest();
+  }
+
+  @Override
+  public HttpServletResponse currentHttpResponse() {
+    return m_currentHttpContext.getResponse();
   }
 
   @Override
@@ -801,6 +810,20 @@ public class UiSession implements IUiSession, HttpSessionBindingListener {
   }
 
   @Override
+  public void processUnloadRequest() {
+    // XXX ModelJob required?
+//    ModelJobs.schedule(new IRunnable() {
+//      @Override
+//      public void run() throws Exception {
+    dispose();
+    LOG.info("Disposed UI session with ID {} due to unload request from UI", m_uiSessionId);
+//      }
+//    }, ModelJobs.newInput(ClientRunContexts.copyCurrent()
+//        .withSession(m_clientSession, true))
+//        .withName("Processing unload request"));
+  }
+
+  @Override
   public void waitForBackgroundJobs(int pollWaitSeconds) {
     boolean wait = true;
     while (wait) {
@@ -811,11 +834,11 @@ public class UiSession implements IUiSession, HttpSessionBindingListener {
         Object notificationToken = m_pollerQueue.poll(pollWaitSeconds, TimeUnit.SECONDS);
         int durationSeconds = (int) Math.round((System.currentTimeMillis() - t0) / 1000d);
         int newPollWaitSeconds = pollWaitSeconds - durationSeconds;
-        if (notificationToken == null || newPollWaitSeconds <= 0 || currentJsonResponse() == null || !currentJsonResponse().isEmpty()) {
+        if (notificationToken == null || newPollWaitSeconds <= 0 || m_disposed || (m_currentJsonResponse != null && !m_currentJsonResponse.isEmpty())) {
           // Stop wait loop for one of the following reasons:
           // 1. Timeout has occurred -> return always, even with empty answer
           // 2. Remaining pollWaitTime would be zero -> same as no. 1
-          // 3. Session is disposed (-> currentJsonResponse is null)
+          // 3. Session is disposed
           // 4. Poller was waken up by m_modelJobFinishedListener and JsonResponse is not empty
           wait = false;
         }
@@ -868,7 +891,7 @@ public class UiSession implements IUiSession, HttpSessionBindingListener {
 
   @Override
   public void updateTheme(String theme) {
-    UiThemeUtility.storeTheme(m_currentHttpContext.getResponse(), m_currentHttpSession, theme);
+    UiThemeUtility.storeTheme(currentHttpResponse(), m_currentHttpSession, theme);
     sendReloadPageEvent();
     LOG.info("UI theme changed to: {}", theme);
   }
@@ -889,27 +912,38 @@ public class UiSession implements IUiSession, HttpSessionBindingListener {
     currentJsonResponse().addActionEvent(getUiSessionId(), EVENT_DISPOSE_ADAPTER, jsonEvent);
   }
 
+  /**
+   * Called from the model, when the desktop is closed (which is called when the client session is stopped)
+   */
   @Override
   public void logout() {
     LOG.info("Logging out from UI session with ID {} [clientSessionId={}]", m_uiSessionId, getClientSessionId());
-    HttpSession httpSession = currentHttpSession();
-    if (httpSession != null) {
-      // This will cause P_ClientSessionCleanupHandler.valueUnbound() to be executed
-      try {
-        httpSession.invalidate();
-      }
-      catch (IllegalStateException e) {
-        // May happen in tomcat if session was already invalidated (e.g. due to expiration)
-        // We need to keep a reference to the session and cannot call req.getSession(false) because the model may call logout without having a pending request
-        // TODO [5.2] cgu: verify with BSH if this statement is true.
-        // FIXME cgu: This will generate a deadlock in jetty (tomcat will throw the exception). Happens if client session close job is running when UIsession.valueUnboudn is called.
-        LOG.info("Session already invalidated");
-      }
-    }
+
+    // XXX What about that?
+//    HttpSession httpSession = currentHttpSession();
+//    if (httpSession != null) {
+//      // This will cause P_ClientSessionCleanupHandler.valueUnbound() to be executed
+//      try {
+//        httpSession.invalidate();
+//      }
+//      catch (IllegalStateException e) {
+//        // May happen in tomcat if session was already invalidated (e.g. due to expiration)
+//        // We need to keep a reference to the session and cannot call req.getSession(false) because the model may call logout without having a pending request
+//        // TODO [5.2] cgu: verify with BSH if this statement is true.
+//        // FIXME cgu: This will generate a deadlock in jetty (tomcat will throw the exception). Happens if client session close job is running when UIsession.valueUnboudn is called.
+//        LOG.info("Session already invalidated");
+//      }
+//    }
+
+    // Redirect client to "you are now logged out" screen
     JsonResponse jsonResponse = currentJsonResponse();
-    if (jsonResponse != null) {
-      jsonResponse.addActionEvent(getUiSessionId(), getLogoutRedirectUrl(), createLogoutEventData());
+    boolean platformValid = (Platform.get() != null && Platform.get().getState() == IPlatform.State.PlatformStarted);
+    if (jsonResponse != null && platformValid) {//m_sessionStore.isHttpSessionValid()) {
+      jsonResponse.addActionEvent(getUiSessionId(), "logout", createLogoutEventData());
     }
+
+    // Dispose UI session. This will also remove the client session from the session store.
+    dispose();
     LOG.info("Logged out successfully from UI session with ID {}", m_uiSessionId);
   }
 
@@ -930,43 +964,6 @@ public class UiSession implements IUiSession, HttpSessionBindingListener {
     return (req != null && UiHints.isInspectorHint(req));
   }
 
-  /**
-   * An instance of this class should be added to the HTTP session for each client session. If the HTTP session is
-   * invalidated, this listener is called and can shutdown the client session model.
-   */
-  protected static class P_ClientSessionCleanupHandler implements HttpSessionBindingListener {
-
-    private final IClientSession m_clientSession;
-
-    public P_ClientSessionCleanupHandler(IClientSession clientSession) {
-      m_clientSession = clientSession;
-    }
-
-    @Override
-    public void valueBound(HttpSessionBindingEvent event) {
-    }
-
-    @Override
-    public void valueUnbound(HttpSessionBindingEvent event) {
-      // Ensure client session is stopped. Do this inside a model job, but do _not_ wait for it, because closing the
-      // desktop will eventually call logout(), where we try to invalidate the HTTP session again (which would block
-      // forever, if this method was still executing).
-      ModelJobs.schedule(new IRunnable() {
-        @Override
-        public void run() {
-          LOG.info("Shutting down client session with ID {} due to invalidation of HTTP session", m_clientSession.getId());
-          // Dispose model (if session was not already stopped earlier by itself).
-          // Session inactivation is executed delayed (see AbstractClientSession#getMaxShutdownWaitTime(), that's why desktop may already be null
-          if (m_clientSession.isActive() && m_clientSession.getDesktop() != null) {
-            m_clientSession.getDesktop().getUIFacade().fireDesktopClosingFromUI(true);
-          }
-          LOG.info("Client session with ID {} terminated.", m_clientSession.getId());
-        }
-      }, ModelJobs.newInput(ClientRunContexts.copyCurrent().withSession(m_clientSession, true))
-          .withName("Closing desktop due to HTTP session invalidation"));
-    }
-  }
-
   private static class P_RootAdapter extends AbstractJsonAdapter<Object> {
 
     public P_RootAdapter(IUiSession uiSession) {
@@ -976,40 +973,6 @@ public class UiSession implements IUiSession, HttpSessionBindingListener {
     @Override
     public String getObjectType() {
       return "GlobalAdapter";
-    }
-  }
-
-  // === HttpSessionBindingListener ===
-
-  @Override
-  public void valueBound(HttpSessionBindingEvent event) {
-  }
-
-  @Override
-  public void valueUnbound(HttpSessionBindingEvent event) {
-    if (ModelJobs.isModelThread()) {
-      dispose(); // already in model job
-      LOG.info("UI session with ID {} unbound from HTTP session.", m_uiSessionId);
-      return;
-    }
-    try {
-      m_uiSessionLock.lock();
-      ModelJobs.schedule(new IRunnable() {
-
-        @Override
-        public void run() throws Exception {
-          dispose();
-          LOG.info("UI session with ID {} unbound from HTTP session.", m_uiSessionId);
-        }
-      }, ModelJobs.newInput(ClientRunContexts.copyCurrent()
-          .withSession(getClientSession(), true)))
-          .awaitDone();
-    }
-    catch (ThreadInterruptedException e) {
-      LOG.error("Interrupted while waiting for the UISession to be disposed", e);
-    }
-    finally {
-      m_uiSessionLock.unlock();
     }
   }
 

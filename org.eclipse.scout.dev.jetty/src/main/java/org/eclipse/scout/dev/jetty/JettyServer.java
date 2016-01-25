@@ -10,8 +10,11 @@
  ******************************************************************************/
 package org.eclipse.scout.dev.jetty;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
@@ -19,15 +22,24 @@ import java.net.URL;
 import java.nio.file.Paths;
 import java.util.Enumeration;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.SessionManager;
+import org.eclipse.jetty.server.handler.StatisticsHandler;
+import org.eclipse.jetty.server.session.AbstractSession;
+import org.eclipse.jetty.server.session.HashSessionManager;
+import org.eclipse.jetty.server.session.HashedSession;
+import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.util.URIUtil;
 import org.eclipse.jetty.webapp.WebAppContext;
+import org.eclipse.scout.rt.platform.util.NumberUtility;
 import org.eclipse.scout.rt.platform.util.StringUtility;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,10 +87,12 @@ public class JettyServer {
       }
       contextPath = contextPathConfig;
     }
-
     WebAppContext webApp = createWebApp(webappFolder, contextPath);
     Server server = new Server(port);
-    server.setHandler(webApp);
+    StatisticsHandler statsHandler = new StatisticsHandler();
+    statsHandler.setHandler(webApp);
+    server.setHandler(statsHandler);
+    server.setStopTimeout(30000L);
     server.start();
     if (LOG.isInfoEnabled()) {
       StringBuilder sb = new StringBuilder();
@@ -94,6 +108,9 @@ public class JettyServer {
       sb.append("---------------------------------------------------------------------\n");
       LOG.info(sb.toString());
     }
+
+    ControlThread controlThread = new ControlThread(server);
+    controlThread.start();
   }
 
   protected WebAppContext createWebApp(File webappDir, String contextPath) throws Exception {
@@ -246,5 +263,103 @@ public class JettyServer {
     }
 
     return resources;
+  }
+
+  private static class ControlThread extends Thread {
+
+    private Server m_server;
+
+    public ControlThread(Server server) {
+      m_server = server;
+      setDaemon(true);
+      setName("jetty-control-thread");
+    }
+
+    @Override
+    public void run() {
+      LOG.info("Listening to STDIN. Type one of the followng commands to control the server:\n" +
+          "  shutdown           - Shutdown JettyServer\n" +
+          "  stop               - Stop the webapp\n" +
+          "  timeout <N>        - Set session timeout to <N> seconds\n" +
+          "  invalidate <SID>   - Destroy session with ID <SID>\n");
+      try {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+        boolean done = false;
+        while (!done) {
+          String s = reader.readLine();
+          try {
+            s = s.trim();
+            if (s == null || s.length() == 0) {
+              continue;
+            }
+            if (StringUtility.equalsIgnoreCase(s, "shutdown")) {
+              LOG.info("*** Shutting down the server ***");
+              m_server.stop();
+              done = true;
+            }
+            else if (StringUtility.equalsIgnoreCase(s, "stop")) {
+              if (m_server.getHandler().isRunning()) {
+                LOG.info("*** Stopping webapp ***");
+                m_server.getHandler().stop();
+              }
+              else {
+                LOG.warn("Webapp is not running");
+              }
+              done = true;
+            }
+            else if (s.matches("timeout \\d+")) {
+              int sec = NumberUtility.parseInt(s.substring(s.indexOf(" ") + 1));
+              Handler h = m_server.getHandler();
+              if (h instanceof StatisticsHandler) {
+                h = ((StatisticsHandler) h).getHandler();
+              }
+              SessionManager sessionManager = ((ServletContextHandler) h).getSessionHandler().getSessionManager();
+              sessionManager.setMaxInactiveInterval(sec);
+              if (sessionManager instanceof HashSessionManager) {
+                try {
+                  Field f = HashSessionManager.class.getDeclaredField("_sessions");
+                  f.setAccessible(true);
+                  @SuppressWarnings("unchecked")
+                  Map<String, HashedSession> sessions = (Map<String, HashedSession>) f.get(sessionManager);
+                  for (HashedSession session : sessions.values()) {
+                    session.setMaxInactiveInterval(sec);
+                  }
+                  LOG.info("*** Set session timeout set to " + sec + " seconds for " + sessions.size() + " sessions ***");
+                }
+                catch (Exception e) {
+                  LOG.warn("Cannot set timeout for existing session");
+                }
+              }
+              LOG.info("*** Default session timeout set to " + sec + " seconds ***");
+            }
+            else if (s.matches("invalidate .+")) {
+              String sid = s.substring(s.indexOf(" ") + 1);
+              LOG.info("*** Invalidating session with ID " + sid + " ***");
+              Handler h = m_server.getHandler();
+              if (h instanceof StatisticsHandler) {
+                h = ((StatisticsHandler) h).getHandler();
+              }
+              SessionManager sessionManager = ((ServletContextHandler) h).getSessionHandler().getSessionManager();
+              if (sessionManager instanceof HashSessionManager) {
+                HashSessionManager hsm = (HashSessionManager) sessionManager;
+                AbstractSession session = hsm.getSession(sid);
+                if (session == null) {
+                  LOG.warn("Session not found");
+                }
+                else {
+                  session.invalidate();
+                }
+              }
+            }
+          }
+          catch (Exception e) {
+            LOG.error("Unexpected error", e);
+          }
+        }
+      }
+      catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
   }
 }

@@ -39,13 +39,6 @@ public interface IUiSession {
   ThreadLocal<IUiSession> CURRENT = new ThreadLocal<>();
 
   /**
-   * Prefix for name of HTTP session attribute that is used to store the associated {@link IUiSession}s.
-   * <p>
-   * The full attribute name is: <b><code>{@link #HTTP_SESSION_ATTRIBUTE_PREFIX} + uiSessionId</code></b>
-   */
-  String HTTP_SESSION_ATTRIBUTE_PREFIX = "scout.htmlui.uisession."/*+JsonRequest.PROP_UI_SESSION_ID*/;
-
-  /**
    * Cookie name used to store the preferred language of a user (even after user has logged out).
    */
   String PREFERRED_LOCALE_COOKIE_NAME = "scout.preferredLocale";
@@ -94,6 +87,8 @@ public interface IUiSession {
 
   HttpServletRequest currentHttpRequest();
 
+  HttpServletResponse currentHttpResponse();
+
   HttpSession currentHttpSession();
 
   /**
@@ -116,6 +111,8 @@ public interface IUiSession {
       List<BinaryResource> uploadResources, Map<String, String> uploadProperties);
 
   void processCancelRequest();
+
+  void processUnloadRequest();
 
   String getUiSessionId();
 

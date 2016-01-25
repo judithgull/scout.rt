@@ -15,11 +15,15 @@ import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
 
+import org.eclipse.scout.rt.platform.BEANS;
 import org.eclipse.scout.rt.platform.resource.BinaryResource;
 import org.eclipse.scout.rt.platform.util.IOUtility;
 import org.eclipse.scout.rt.platform.util.StringUtility;
+import org.eclipse.scout.rt.ui.html.HttpSessionHelper;
 import org.eclipse.scout.rt.ui.html.IUiSession;
+import org.eclipse.scout.rt.ui.html.SessionStore;
 import org.eclipse.scout.rt.ui.html.cache.HttpCacheKey;
 import org.eclipse.scout.rt.ui.html.cache.HttpCacheObject;
 import org.eclipse.scout.rt.ui.html.cache.HttpResponseHeaderContributor;
@@ -40,6 +44,8 @@ public class DynamicResourceLoader extends AbstractResourceLoader {
 
   private static final String DEFAULT_FILENAME = "Download";
 
+  private final HttpSessionHelper m_httpSessionHelper = BEANS.get(HttpSessionHelper.class);
+
   public DynamicResourceLoader(HttpServletRequest req) {
     super(req);
   }
@@ -55,7 +61,12 @@ public class DynamicResourceLoader extends AbstractResourceLoader {
     String adapterId = m.group(2);
     String filename = m.group(3);
 
-    IUiSession uiSession = (IUiSession) getSession().getAttribute(IUiSession.HTTP_SESSION_ATTRIBUTE_PREFIX + uiSessionId);
+    HttpSession httpSession = getRequest().getSession();
+    SessionStore sessionStore = m_httpSessionHelper.getSessionStore(httpSession);
+    if (sessionStore == null) {
+      return null;
+    }
+    IUiSession uiSession = sessionStore.getUiSession(uiSessionId);
     if (uiSession == null) {
       return null;
     }

@@ -19,16 +19,23 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
+import org.eclipse.scout.rt.client.IClientSession;
+import org.eclipse.scout.rt.client.context.ClientRunContexts;
+import org.eclipse.scout.rt.client.job.ModelJobs;
 import org.eclipse.scout.rt.platform.BEANS;
+import org.eclipse.scout.rt.platform.IPlatform;
 import org.eclipse.scout.rt.platform.Order;
+import org.eclipse.scout.rt.platform.Platform;
 import org.eclipse.scout.rt.platform.config.CONFIG;
 import org.eclipse.scout.rt.platform.exception.DefaultExceptionTranslator;
 import org.eclipse.scout.rt.platform.util.CompareUtility;
 import org.eclipse.scout.rt.platform.util.StringUtility;
 import org.eclipse.scout.rt.platform.util.concurrent.IRunnable;
 import org.eclipse.scout.rt.ui.html.AbstractUiServletRequestHandler;
+import org.eclipse.scout.rt.ui.html.HttpSessionHelper;
 import org.eclipse.scout.rt.ui.html.IUiSession;
 import org.eclipse.scout.rt.ui.html.MaxUserIdleTimeProperty;
+import org.eclipse.scout.rt.ui.html.SessionStore;
 import org.eclipse.scout.rt.ui.html.UiRunContexts;
 import org.eclipse.scout.rt.ui.html.UiServlet;
 import org.eclipse.scout.rt.ui.html.cache.IHttpCacheControl;
@@ -47,10 +54,14 @@ import org.slf4j.MDC;
 public class JsonMessageRequestHandler extends AbstractUiServletRequestHandler {
   private static final Logger LOG = LoggerFactory.getLogger(JsonMessageRequestHandler.class);
 
+  public static final String CLEANUP_HTTP_SESSION_ATTRIBUTE_NAME = "scout.htmlui.httpsession.cleanup";
+  public static final String HTTP_SESSION_LOCK_ATTRIBUTE_NAME = "scout.htmlui.httpsession.lock";
+
   private static final int BACKGROUND_POLLING_INTERVAL_SECONDS = 60;
 
   private final int m_maxUserIdleTime = CONFIG.getPropertyValue(MaxUserIdleTimeProperty.class).intValue();
 
+  private final HttpSessionHelper m_httpSessionHelper = BEANS.get(HttpSessionHelper.class);
   private final IHttpCacheControl m_httpCacheControl = BEANS.get(IHttpCacheControl.class);
   private final JsonRequestHelper m_jsonRequestHelper = BEANS.get(JsonRequestHelper.class);
 
@@ -156,7 +167,18 @@ public class JsonMessageRequestHandler extends AbstractUiServletRequestHandler {
   }
 
   protected void handleUiSessionDisposed(HttpServletResponse resp, IUiSession uiSession, JsonRequest jsonReq) throws IOException {
-    if (RequestType.POLL_REQUEST.equals(jsonReq.getRequestType())) { // TODO [5.2] bsh: isManualLogout?
+    // When the UI session becomes invalid, we usually want to show the "session timeout" error message.
+    //
+    // There is one exception: When the user clicked a "logout" action in the model, we want to redirect
+    // the UI to the /logout URL. This is one in UiSession.logout(). For all other client sessions on that
+    // HTTP session, the redirect should also be made, but via poller.
+    //
+    // And here is the exception to the exception: When the platform is no longer valid, it means that
+    // we probably cannot show the /logout URL. To prevent nasty error messages from the app server, we
+    // fall back to the "session timeout" error message.
+    // XXX Maybe this should be made simpler...
+    boolean platformValid = (Platform.get() != null && Platform.get().getState() == IPlatform.State.PlatformStarted);
+    if (platformValid && RequestType.POLL_REQUEST.equals(jsonReq.getRequestType())) { // TODO [5.2] bsh: isManualLogout?
       writeJsonResponse(resp, m_jsonRequestHelper.createSessionTerminatedResponse(uiSession.getLogoutRedirectUrl()));
     }
     else {
@@ -205,19 +227,29 @@ public class JsonMessageRequestHandler extends AbstractUiServletRequestHandler {
     writeJsonResponse(resp, m_jsonRequestHelper.createSessionTimeoutResponse());
   }
 
-  protected void handleMaxIdeTimeout(HttpServletResponse resp, JsonRequest jsonReq, HttpSession httpSession, int idleSeconds, int maxIdleSeconds) throws IOException {
+  protected void handleMaxIdeTimeout(HttpServletResponse resp, JsonRequest jsonReq, IUiSession uiSession, int idleSeconds, int maxIdleSeconds) throws IOException {
     LOG.info("Detected UI session timeout [id={}] after idle of {} seconds (maxInactiveInterval={})", jsonReq.getUiSessionId(), idleSeconds, maxIdleSeconds);
-    httpSession.invalidate();
+
+    final IClientSession clientSession = uiSession.getClientSession();
+    ModelJobs.schedule(new IRunnable() {
+      @Override
+      public void run() throws Exception {
+        // Stop the client session. This also triggers the disposal of the attached UiSession. If this was the last UiSession,
+        // the HTTP session will eventually be invalidated by the web server.
+        clientSession.stop();
+      }
+    }, ModelJobs.newInput(ClientRunContexts.copyCurrent().withSession(uiSession.getClientSession(), true)))
+        .awaitDone();
+
     writeJsonResponse(resp, m_jsonRequestHelper.createSessionTimeoutResponse());
   }
 
-  protected void handleUnloadRequest(HttpServletResponse resp, JsonRequest jsonReq, String uiSessionAttributeName, HttpSession httpSession, IUiSession uiSession) throws IOException {
+  protected void handleUnloadRequest(HttpServletResponse resp, JsonRequest jsonReq, HttpSession httpSession, IUiSession uiSession) throws IOException {
     LOG.info("Unloading UI session with ID {} (requested by UI)", jsonReq.getUiSessionId());
     if (uiSession != null) {
-      // Unbinding the uiSession will cause it to be disposed automatically, see UiSession.valueUnbound()
       uiSession.uiSessionLock().lock();
       try {
-        httpSession.removeAttribute(uiSessionAttributeName);
+        uiSession.processUnloadRequest();
       }
       finally {
         uiSession.uiSessionLock().unlock();
@@ -227,18 +259,18 @@ public class JsonMessageRequestHandler extends AbstractUiServletRequestHandler {
   }
 
   protected IUiSession getOrCreateUiSession(HttpServletRequest req, HttpServletResponse resp, JsonRequest jsonReq) throws ServletException, IOException {
-    String uiSessionAttributeName = IUiSession.HTTP_SESSION_ATTRIBUTE_PREFIX + jsonReq.getUiSessionId();
     HttpSession httpSession = req.getSession();
-
     // Because the app-server might keep or request locks on the httpSession object, we don't synchronize directly
     // on httpSession, but use a dedicated session lock object instead.
-    ReentrantLock httpSessionLock = httpSessionLock(httpSession);
+    ReentrantLock httpSessionLock = m_httpSessionHelper.httpSessionLock(httpSession);
     httpSessionLock.lock();
     try {
-      IUiSession uiSession = (IUiSession) httpSession.getAttribute(uiSessionAttributeName);
+      SessionStore sessionStore = m_httpSessionHelper.getOrCreateSessionStore(httpSession);
+
+      IUiSession uiSession = sessionStore.getUiSession(jsonReq.getUiSessionId());
 
       if (RequestType.UNLOAD_REQUEST.equals(jsonReq.getRequestType())) {
-        handleUnloadRequest(resp, jsonReq, uiSessionAttributeName, httpSession, uiSession);
+        handleUnloadRequest(resp, jsonReq, httpSession, uiSession);
         return null;
       }
 
@@ -259,7 +291,7 @@ public class JsonMessageRequestHandler extends AbstractUiServletRequestHandler {
         uiSession.uiSessionLock().lock();
         try {
           uiSession.init(req, resp, new JsonStartupRequest(jsonReq));
-          httpSession.setAttribute(uiSessionAttributeName, uiSession);
+          sessionStore.putUiSession(uiSession);
         }
         finally {
           uiSession.uiSessionLock().unlock();
@@ -270,7 +302,7 @@ public class JsonMessageRequestHandler extends AbstractUiServletRequestHandler {
       int idleSeconds = (int) ((System.currentTimeMillis() - uiSession.getLastAccessedTime()) / 1000L);
       int maxIdleSeconds = m_maxUserIdleTime;
       if (idleSeconds > maxIdleSeconds) {
-        handleMaxIdeTimeout(resp, jsonReq, httpSession, idleSeconds, maxIdleSeconds);
+        handleMaxIdeTimeout(resp, jsonReq, uiSession, idleSeconds, maxIdleSeconds);
         return null;
       }
 
@@ -283,18 +315,6 @@ public class JsonMessageRequestHandler extends AbstractUiServletRequestHandler {
     }
     finally {
       httpSessionLock.unlock();
-    }
-  }
-
-  protected ReentrantLock httpSessionLock(HttpSession httpSession) {
-    synchronized (httpSession) {
-      String lockAttributeName = "scout.htmlui.httpsession.lock";
-      ReentrantLock lock = (ReentrantLock) httpSession.getAttribute(lockAttributeName);
-      if (lock == null) {
-        lock = new ReentrantLock();
-        httpSession.setAttribute(lockAttributeName, lock);
-      }
-      return lock;
     }
   }
 

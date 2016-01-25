@@ -22,7 +22,9 @@ import javax.servlet.http.HttpSession;
 import org.eclipse.scout.rt.client.ui.form.IFormFieldVisitor;
 import org.eclipse.scout.rt.client.ui.form.fields.ICompositeField;
 import org.eclipse.scout.rt.client.ui.form.fields.IFormField;
+import org.eclipse.scout.rt.ui.html.HttpSessionHelper;
 import org.eclipse.scout.rt.ui.html.IUiSession;
+import org.eclipse.scout.rt.ui.html.SessionStore;
 import org.eclipse.scout.rt.ui.html.UiException;
 import org.eclipse.scout.rt.ui.html.UiSession;
 import org.eclipse.scout.rt.ui.html.UiSession.HttpContext;
@@ -46,11 +48,12 @@ public final class JsonTestUtility {
     HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
     HttpServletResponse response = Mockito.mock(HttpServletResponse.class);
     HttpSession httpSession = Mockito.mock(HttpSession.class);
+    SessionStore sessionStore = new SessionStore(httpSession);
     Mockito.when(request.getLocale()).thenReturn(new Locale("de_CH"));
     Mockito.when(request.getHeader("User-Agent")).thenReturn("dummy");
     Mockito.when(request.getSession()).thenReturn(httpSession);
     Mockito.when(request.getSession(false)).thenReturn(httpSession);
-    Mockito.when(httpSession.getAttribute("scout.htmlui.clientsession." + clientSessionId)).thenReturn(null);
+    Mockito.when(httpSession.getAttribute(HttpSessionHelper.SESSION_STORE_ATTRIBUTE_NAME)).thenReturn(sessionStore);
     JSONObject jsonReqObj = new JSONObject();
     try {
       jsonReqObj.put(JsonRequest.PROP_UI_SESSION_ID, uiSessionId);
